@@ -1580,15 +1580,19 @@ install_update_xray_tls_web()
                 fi
             fi
         else
-            if [ $release == "centos" ] && version_ge $systemVersion 8; then
-                local redhat_enable_repo="epel,PowerTools"
+            if [ $release == "centos" ] && version_ge $systemVersion 7; then
+                if version_ge $systemVersion 8; then
+                    local temp_repo="epel,PowerTools"
+                else
+                    local temp_repo="os"
+                fi
+                if $redhat_package_manager --help | grep -q "\-\-enablerepo="; then
+                    local redhat_install_command="$redhat_package_manager -y --enablerepo=$temp_repo install"
+                else
+                    local redhat_install_command="$redhat_package_manager -y --enablerepo $temp_repo install"
+                fi
             else
-                local redhat_enable_repo="epel"
-            fi
-            if $redhat_package_manager --help | grep -q "\-\-enablerepo="; then
-                local redhat_install_command="$redhat_package_manager -y --enablerepo=$redhat_enable_repo install"
-            else
-                local redhat_install_command="$redhat_package_manager -y --enablerepo $redhat_enable_repo install"
+                local redhat_install_command="$redhat_package_manager -y install"
             fi
             if ! $redhat_install_command $1; then
                 yellow "依赖安装失败！！"
