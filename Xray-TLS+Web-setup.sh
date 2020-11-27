@@ -2,7 +2,7 @@
 
 #安装选项
 nginx_version="nginx-1.19.5"
-openssl_version="openssl-openssl-3.0.0-alpha8"
+openssl_version="openssl-openssl-3.0.0-alpha9"
 xray_config="/usr/local/etc/xray/config.json"
 nginx_prefix="/etc/nginx"
 nginx_config="${nginx_prefix}/conf.d/xray.conf"
@@ -1001,7 +1001,7 @@ install_nginx()
     if ! make; then
         red    "nginx编译失败！"
         yellow "请尝试更换系统，建议使用Ubuntu最新版系统"
-        green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-TLS-Web-setup-script/issues)，感谢您的支持"
+        green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
         exit 1
     fi
     if [ $update == 1 ]; then
@@ -1416,7 +1416,7 @@ get_web()
     if [ $2 -eq 3 ]; then
         rm -rf ${nginx_prefix}/html/$1
         mkdir ${nginx_prefix}/html/$1
-        if ! wget -O ${nginx_prefix}/html/$1/Website-Template.zip https://github.com/kirin10000/Xray-TLS-Web-setup-script/raw/main/Website-Template.zip; then
+        if ! wget -O ${nginx_prefix}/html/$1/Website-Template.zip https://github.com/kirin10000/Xray-script/raw/main/Website-Template.zip; then
             red    "获取网站模板失败"
             yellow "按回车键继续或者按ctrl+c终止"
             read -s
@@ -1470,9 +1470,10 @@ echo_end()
         tyblue "------------------------------------------------------------------------"
         echo
         green  " 目前支持支持XTLS的图形化客户端："
-        green  "   Windows    ：V2RayN  v3.26+  Qv2ray v2.7.0-pre1+"
-        green  "   Android    ：V2RayNG v1.4.8+"
-        green  "   Linux/MacOS：Qv2ray  v2.7.0-pre1+"
+        green  "   Windows    ：Qv2ray       v2.7.0-pre1+    V2RayN  v3.26+"
+        green  "   Android    ：V2RayNG      v1.4.8+"
+        green  "   Linux/MacOS：Qv2ray       v2.7.0-pre1+"
+        green  "   IOS        ：Shadowrocket v2.1.67+"
     fi
     if [ $protocol_2 -ne 0 ]; then
         echo
@@ -1598,7 +1599,7 @@ install_update_xray_tls_web()
                 apt update
                 if ! apt -y --no-install-recommends install $1; then
                     yellow "依赖安装失败！！"
-                    green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-TLS-Web-setup-script/issues)，感谢您的支持"
+                    green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
                     yellow "按回车键继续或者ctrl+c退出"
                     read -s
                 fi
@@ -1620,7 +1621,7 @@ install_update_xray_tls_web()
             fi
             if ! $redhat_install_command $1; then
                 yellow "依赖安装失败！！"
-                green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-TLS-Web-setup-script/issues)，感谢您的支持"
+                green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
                 yellow "按回车键继续或者ctrl+c退出"
                 read -s
             fi
@@ -1835,7 +1836,7 @@ start_menu()
     echo
     tyblue "            Nginx ：           ${nginx_status}"
     echo
-    tyblue " 官网：https://github.com/kirin10000/Xray-TLS-Web-setup-script"
+    tyblue " 官网：https://github.com/kirin10000/Xray-script"
     echo
     tyblue "----------------------------------注意事项----------------------------------"
     yellow " 此脚本需要一个解析到本服务器的域名!!!!"
@@ -1907,7 +1908,7 @@ start_menu()
             exit 1
         fi
         rm -rf "$0"
-        wget -O "$0" "https://github.com/kirin10000/Xray-TLS-Web-setup-script/raw/main/Xray-TLS+Web-setup.sh"
+        wget -O "$0" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh"
         chmod +x "$0"
         "$0" --update
     elif [ $choice -eq 3 ]; then
