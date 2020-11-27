@@ -88,7 +88,7 @@ if [ -e /usr/local/bin/xray ]; then
 else
     xray_is_installed=0
 fi
-if [ -e $nginx_config ] || [ -e /etc/nginx/conf.d/v2ray.conf ]; then
+if [ -e $nginx_config ] || [ -e $nginx_prefix/conf.d/v2ray.conf ]; then
     nginx_is_installed=1
 else
     nginx_is_installed=0
@@ -196,6 +196,23 @@ check_SELinux()
             exit 0
         fi
     fi
+}
+
+#检查80端口和443端口是否被占用
+check_port()
+{
+    local i=2
+    local temp_port=443
+    while ((i!=0))
+    do
+        ((i--))
+        if netstat -tuln | tail -n +3 | awk '{print $4}' | awk -F : '{print $NF}' | grep -wq "$temp_port"; then
+            red "$temp_port端口被占用！"
+            yellow "请用 lsof -i:$temp_port 命令检查"
+            exit 1
+        fi
+        temp_port=80
+    done
 }
 
 #将域名列表转化为一个数组
@@ -836,22 +853,29 @@ readDomain()
     do
         read -p "您的选择是：" domainconfig
     done
-    case "$domainconfig" in
-        1)
-            echo
-            tyblue "--------------------请输入一级域名(不带www.，http，:，/)--------------------"
+    local queren=""
+    while [ "$queren" != "y" ]
+    do
+        echo
+        if [ $domainconfig -eq 1 ]; then
+            tyblue '---------请输入一级域名(前面不带"www."、"http://"或"https://")---------'
             read -p "请输入域名：" domain
             while check_domain $domain
             do
                 read -p "请输入域名：" domain
             done
-            ;;
-        2)
-            echo
-            tyblue "----------------请输入解析到此服务器的域名(不带http，:，/)----------------"
+        else
+            tyblue '-------请输入解析到此服务器的域名(前面不带"http://"或"https://")-------'
             read -p "请输入域名：" domain
-            ;;
-    esac
+        fi
+        echo
+        queren=""
+        while [ "$queren" != "y" -a "$queren" != "n" ]
+        do
+            tyblue "您输入的域名是\"$domain\"，确认吗？(y/n)"
+            read queren
+        done
+    done
     echo -e "\n\n\n"
     tyblue "------------------------------请选择要伪装的网站页面------------------------------"
     tyblue " 1. 403页面 (模拟网站后台)"
@@ -1603,14 +1627,10 @@ install_update_xray_tls_web()
         fi
     }
     check_SELinux
-    check_ssh_timeout
     systemctl stop nginx
     systemctl stop xray
-    if netstat -tuln | tail -n +3 | awk '{print $4}' | awk -F : '{print $NF}' | grep -Eq "^[ \t]*443[ \t]*$"; then
-        red "443端口被占用！"
-        yellow "请用 lsof -i:443 命令检查"
-        exit 1
-    fi
+    check_port
+    check_ssh_timeout
     uninstall_firewall
     doupdate
     if ! grep -q "#This file has been edited by Xray-TLS-Web-setup-script" /etc/sysctl.conf; then
