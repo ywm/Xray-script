@@ -35,7 +35,7 @@ Red Hat基系统(包括CentOS、fedora)：
 ```
 ### 2. 获取/更新脚本
 ```bash
-wget -O Xray-TLS+Web-setup.sh --no-check-certificate https://github.com/kirin10000/Xray-TLS-Web-setup-script/raw/main/Xray-TLS+Web-setup.sh
+wget -O Xray-TLS+Web-setup.sh --no-check-certificate https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh
 ```
 ### 3. 增加脚本可执行权限
 ```bash
@@ -48,10 +48,10 @@ chmod +x Xray-TLS+Web-setup.sh
 ### 5. 根据脚本提示完成安装
 ## 运行截图
 <div>
-    <img width="400" src="https://github.com/kirin10000/Xray-TLS-Web-setup-script/blob/main/image/menu.jpg">
+    <img width="400" src="https://github.com/kirin10000/Xray-script/blob/main/image/menu.jpg">
 </div>
 <div>
-    <img width="600" src="https://github.com/kirin10000/Xray-TLS-Web-setup-script/blob/main/image/protocol.jpg">
+    <img width="600" src="https://github.com/kirin10000/Xray-script/blob/main/image/protocol.jpg">
 </div>
 
 ## 注
