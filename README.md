@@ -55,7 +55,7 @@ chmod +x Xray-TLS+Web-setup.sh
 </div>
 
 ## 注
-1.本文链接(官网)：https://github.com/kirin10000/Xray-TLS-Web-setup-script
+1.本文链接(官网)：https://github.com/kirin10000/Xray-script
 
 2.参考教程：https://www.v2fly.org/config/overview.html https://guide.v2fly.org/
 
