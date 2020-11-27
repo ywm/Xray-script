@@ -1445,7 +1445,7 @@ echo_end()
         purple "  (Qv2ray:主机)"
         tyblue " port(端口)            ：443"
         tyblue " id(用户ID/UUID)       ：${xid_1}"
-        tyblue " flow(流控)            ：使用XTLS：xtls-rprx-direct-udp443;使用TLS：空"
+        tyblue " flow(流控)            ：使用XTLS：xtls-rprx-direct;使用TLS：空"
         tyblue " encryption(加密)      ：none"
         tyblue " ---Transport/StreamSettings(底层传输方式/流设置)---"
         tyblue "  network(传输协议)             ：tcp"
@@ -1607,7 +1607,7 @@ install_update_xray_tls_web()
         else
             if [ $release == "centos" ] && version_ge $systemVersion 7; then
                 if version_ge $systemVersion 8; then
-                    local temp_repo="epel,PowerTools"
+                    local temp_repo="BaseOS,AppStream,epel,PowerTools"
                 else
                     local temp_repo="os"
                 fi
