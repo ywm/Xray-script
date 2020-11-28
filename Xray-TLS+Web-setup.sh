@@ -171,6 +171,33 @@ get_system_info()
     fi
 }
 
+#检查Nginx是否已通过apt/dnf/yum安装
+check_nginx()
+{
+    if [[ ! -f /usr/lib/systemd/system/nginx.service ]] && [[ ! -f /lib/systemd/system/nginx.service ]]; then
+        return 0
+    fi
+    red "检测到Nginx已安装，并且可能与本脚本冲突"
+    local choice=""
+    while [ "$choice" != "y" -a "$choice" != "n" ]
+    do
+        tyblue "是否尝试卸载？(y/n)"
+        read choice
+    done
+    if [ $choice == "n" ]; then
+        exit 0
+    fi
+    apt -y purge nginx
+    $redhat_package_manager -y remove nginx
+    if [[ ! -f /usr/lib/systemd/system/nginx.service ]] && [[ ! -f /lib/systemd/system/nginx.service ]]; then
+        return 0
+    fi
+    red "卸载失败！"
+    yellow "请尝试更换系统，建议使用Ubuntu最新版系统"
+    green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
+    exit 1
+}
+
 #检查SELinux
 check_SELinux()
 {
@@ -1616,10 +1643,14 @@ install_update_xray_tls_web()
             fi
         fi
     }
-    check_SELinux
     systemctl stop nginx
     systemctl stop xray
     check_port
+    apt -y -f install
+    get_system_info
+    check_important_dependence_installed ca-certificates ca-certificates
+    check_nginx
+    check_SELinux
     check_ssh_timeout
     uninstall_firewall
     doupdate
@@ -1876,11 +1907,6 @@ start_menu()
     do
         read -p "您的选择是：" choice
     done
-    if [ $choice -le 5 ] || [ $choice -eq 9 ] || [ $choice -eq 10 ]; then
-        apt -y -f install
-        get_system_info
-        check_important_dependence_installed ca-certificates ca-certificates
-    fi
     if [ $choice -eq 1 ]; then
         install_update_xray_tls_web
     elif [ $choice -eq 2 ]; then
@@ -1897,10 +1923,16 @@ start_menu()
             exit 1
         fi
         rm -rf "$0"
-        wget -O "$0" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh"
+        if ! wget -O "$0" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh" && ! wget -O "$0" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh"; then
+            red "获取最新脚本失败！"
+            exit 1
+        fi
         chmod +x "$0"
         "$0" --update
     elif [ $choice -eq 3 ]; then
+        apt -y -f install
+        get_system_info
+        check_important_dependence_installed ca-certificates ca-certificates
         enter_temp_dir
         install_bbr
         apt -y -f install
@@ -2150,8 +2182,5 @@ if ! [ "$1" == "--update" ]; then
     start_menu
 else
     update=1
-    apt -y -f install
-    get_system_info
-    check_important_dependence_installed ca-certificates ca-certificates
     install_update_xray_tls_web
 fi
