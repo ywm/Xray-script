@@ -680,61 +680,58 @@ install_bbr()
     }
     local your_kernel_version
     local latest_kernel_version
+    get_kernel_info
     if ! grep -q "#This file has been edited by Xray-TLS-Web-setup-script" /etc/sysctl.conf; then
         echo >> /etc/sysctl.conf
         echo "#This file has been edited by Xray-TLS-Web-setup-script" >> /etc/sysctl.conf
     fi
-    if [ "$latest_kernel_version" == "" ]; then
-        get_kernel_info
-    else
-        sleep 3s
-    fi
-    echo -e "\n\n\n"
-    tyblue "------------------请选择要使用的bbr版本------------------"
-    green  " 1. 升级最新版内核并启用bbr(推荐)"
-    if version_ge $your_kernel_version 4.9; then
-        tyblue " 2. 启用bbr"
-    else
-        tyblue " 2. 升级内核启用bbr"
-    fi
-    tyblue " 3. 启用bbr2(需更换第三方内核)"
-    tyblue " 4. 启用bbrplus/bbr魔改版/暴力bbr魔改版/锐速(需更换第三方内核)"
-    tyblue " 5. 卸载多余内核"
-    tyblue " 6. 退出bbr安装"
-    tyblue "------------------关于安装bbr加速的说明------------------"
-    green  " bbr加速可以大幅提升网络速度，建议安装"
-    yellow " 更换第三方内核可能造成系统不稳定，甚至无法开机"
-    yellow " 更换/升级内核需重启，重启后，请再次运行此脚本完成剩余安装"
-    tyblue "---------------------------------------------------------"
-    tyblue " 当前内核版本：${your_kernel_version}"
-    tyblue " 最新内核版本：${latest_kernel_version}"
-    tyblue " 当前内核是否支持bbr："
-    if version_ge $your_kernel_version 4.9; then
-        green "     是"
-    else
-        red "     否，需升级内核"
-    fi
-    tyblue "  bbr启用状态："
-    if sysctl net.ipv4.tcp_congestion_control | grep -Eq "bbr|nanqinlang|tsunami"; then
-        local bbr_info=`sysctl net.ipv4.tcp_congestion_control`
-        bbr_info=${bbr_info#*=}
-        if [ $bbr_info == nanqinlang ]; then
-            bbr_info="暴力bbr魔改版"
-        elif [ $bbr_info == tsunami ]; then
-            bbr_info="bbr魔改版"
-        fi
-        green "   正在使用：${bbr_info}"
-    else
-        red "   bbr未启用"
-    fi
-    echo
-    choice=""
-    while [ "$choice" != "1" -a "$choice" != "2" -a "$choice" != "3" -a "$choice" != "4" -a "$choice" != "5" -a "$choice" != "6" ]
+    while ((1))
     do
-        read -p "您的选择是：" choice
-    done
-    case "$choice" in
-        1)
+        echo -e "\n\n\n"
+        tyblue "------------------请选择要使用的bbr版本------------------"
+        green  " 1. 升级最新版内核并启用bbr(推荐)"
+        if version_ge $your_kernel_version 4.9; then
+            tyblue " 2. 启用bbr"
+        else
+            tyblue " 2. 升级内核启用bbr"
+        fi
+        tyblue " 3. 启用bbr2(需更换第三方内核)"
+        tyblue " 4. 启用bbrplus/bbr魔改版/暴力bbr魔改版/锐速(需更换第三方内核)"
+        tyblue " 5. 卸载多余内核"
+        tyblue " 6. 退出bbr安装"
+        tyblue "------------------关于安装bbr加速的说明------------------"
+        green  " bbr加速可以大幅提升网络速度，建议安装"
+        yellow " 更换第三方内核可能造成系统不稳定，甚至无法开机"
+        yellow " 更换/升级内核需重启，重启后，请再次运行此脚本完成剩余安装"
+        tyblue "---------------------------------------------------------"
+        tyblue " 当前内核版本：${your_kernel_version}"
+        tyblue " 最新内核版本：${latest_kernel_version}"
+        tyblue " 当前内核是否支持bbr："
+        if version_ge $your_kernel_version 4.9; then
+            green "     是"
+        else
+            red "     否，需升级内核"
+        fi
+        tyblue "  bbr启用状态："
+        if sysctl net.ipv4.tcp_congestion_control | grep -Eq "bbr|nanqinlang|tsunami"; then
+            local bbr_info=`sysctl net.ipv4.tcp_congestion_control`
+            bbr_info=${bbr_info#*=}
+            if [ $bbr_info == nanqinlang ]; then
+                bbr_info="暴力bbr魔改版"
+            elif [ $bbr_info == tsunami ]; then
+                bbr_info="bbr魔改版"
+            fi
+            green "   正在使用：${bbr_info}"
+        else
+            red "   bbr未启用"
+        fi
+        echo
+        choice=""
+        while [ "$choice" != "1" -a "$choice" != "2" -a "$choice" != "3" -a "$choice" != "4" -a "$choice" != "5" -a "$choice" != "6" ]
+        do
+            read -p "您的选择是：" choice
+        done
+        if [ $choice -eq 1 ]; then
             sed -i '/^[ \t]*net.core.default_qdisc[ \t]*=/d' /etc/sysctl.conf
             sed -i '/^[ \t]*net.ipv4.tcp_congestion_control[ \t]*=/d' /etc/sysctl.conf
             echo 'net.core.default_qdisc = fq' >> /etc/sysctl.conf
@@ -754,9 +751,7 @@ install_bbr()
             else
                 green "--------------------bbr已安装--------------------"
             fi
-            install_bbr
-            ;;
-        2)
+        elif [ $choice -eq 2 ]; then
             sed -i '/^[ \t]*net.core.default_qdisc[ \t]*=/d' /etc/sysctl.conf
             sed -i '/^[ \t]*net.ipv4.tcp_congestion_control[ \t]*=/d' /etc/sysctl.conf
             echo 'net.core.default_qdisc = fq' >> /etc/sysctl.conf
@@ -774,31 +769,25 @@ install_bbr()
             else
                 green "--------------------bbr已安装--------------------"
             fi
-            install_bbr
-            ;;
-        3)
+        elif [ $choice -eq 3 ]; then
             tyblue "--------------------即将安装bbr2加速，安装完成后服务器将会重启--------------------"
             tyblue " 重启后，请再次选择这个选项完成bbr2剩余部分安装(开启bbr和ECN)"
             yellow " 按回车键以继续。。。。"
             read -s
+            local temp_bbr2
             if [ $release == "ubuntu" ] || [ $release == "other-debian" ]; then
-                if ! wget -O bbr2.sh https://github.com/yeyingorg/bbr2.sh/raw/master/bbr2.sh; then
-                    red    "获取bbr2脚本失败"
-                    yellow "按回车键继续或者按ctrl+c终止"
-                    read -s
-                fi
+                local temp_bbr2="https://github.com/yeyingorg/bbr2.sh/raw/master/bbr2.sh"
             else
-                if ! wget -O bbr2.sh https://github.com/jackjieYYY/bbr2/raw/master/bbr2.sh; then
-                    red    "获取bbr2脚本失败"
-                    yellow "按回车键继续或者按ctrl+c终止"
-                    read -s
-                fi
+                local temp_bbr2="https://github.com/jackjieYYY/bbr2/raw/master/bbr2.sh"
+            fi
+            if ! wget -O bbr2.sh $temp_bbr2; then
+                red    "获取bbr2脚本失败"
+                yellow "按回车键继续或者按ctrl+c终止"
+                read -s
             fi
             chmod +x bbr2.sh
             ./bbr2.sh
-            install_bbr
-            ;;
-        4)
+        elif [ $choice -eq 4 ]; then
             if ! wget -O tcp.sh "https://raw.githubusercontent.com/chiakge/Linux-NetSpeed/master/tcp.sh"; then
                 red    "获取脚本失败"
                 yellow "按回车键继续或者按ctrl+c终止"
@@ -806,9 +795,7 @@ install_bbr()
             fi
             chmod +x tcp.sh
             ./tcp.sh
-            install_bbr
-            ;;
-        5)
+        elif [ $choice -eq 5 ]; then
             tyblue " 该操作将会卸载除现在正在使用的内核外的其余内核"
             tyblue "    您正在使用的内核是：$(uname -r)"
             choice=""
@@ -819,9 +806,11 @@ install_bbr()
             if [ $choice == y ]; then
                 remove_other_kernel
             fi
-            install_bbr
-            ;;
-    esac
+        else
+            break
+        fi
+        sleep 3s
+    done
 }
 
 #读取域名
