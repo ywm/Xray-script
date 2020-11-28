@@ -50,9 +50,9 @@ Nginx之所以采用编译的形式，主要考虑到的主要原因为：
 ```
 缺点就是编译耗时长
 
-如果有快速安装的需求，推荐在 [Xray-core](https://github.com/XTLS/Xray-core) 的 **Installation** 中选择其他脚本
+如果有快速安装的需求，推荐在 [Xray-core](https://github.com/XTLS/Xray-core#Installation) 中选择其他脚本
 ## 脚本使用说明
-#### 1. 安装wget
+### 1. 安装wget
 Debian基系统(包括Ubuntu、Debian、deepin)：
 ```bash
 [[ "$(type -P wget)" ]] || apt -y install wget || (apt update && apt -y install wget)
@@ -61,19 +61,19 @@ Red Hat基系统(包括CentOS、fedora)：
 ```bash
 [[ "$(type -P wget)" ]] || dnf -y install wget || yum -y install wget
 ```
-#### 2. 获取/更新脚本
+### 2. 获取/更新脚本
 ```bash
 wget -O Xray-TLS+Web-setup.sh --no-check-certificate https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh
 ```
-#### 3. 增加脚本可执行权限
+### 3. 增加脚本可执行权限
 ```bash
 chmod +x Xray-TLS+Web-setup.sh
 ```
-#### 4. 执行脚本
+### 4. 执行脚本
 ```bash
 ./Xray-TLS+Web-setup.sh
 ```
-#### 5. 根据脚本提示完成安装
+### 5. 根据脚本提示完成安装
 ## 运行截图
 <div>
     <img width="400" src="https://github.com/kirin10000/Xray-script/blob/main/image/menu.jpg">
