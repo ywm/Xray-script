@@ -1910,18 +1910,13 @@ start_menu()
     if [ $choice -eq 1 ]; then
         install_update_xray_tls_web
     elif [ $choice -eq 2 ]; then
-        if [ $is_installed == 1 ]; then
-            if [ $release == ubuntu ]; then
-                yellow "升级bbr/系统可能需要重启，重启后请再次选择'升级Xray-TLS+Web'"
-            else
-                yellow "升级bbr可能需要重启，重启后请再次选择'升级Xray-TLS+Web'"
-            fi
-            yellow "按回车键继续，或者ctrl+c中止"
-            read -s
-        else
+        if [ $is_installed == 0 ]; then
             red "请先安装Xray-TLS+Web！！"
             exit 1
         fi
+        yellow "升级bbr/系统可能需要重启，重启后请再次选择'升级Xray-TLS+Web'"
+        yellow "按回车键继续，或者ctrl+c中止"
+        read -s
         rm -rf "$0"
         if ! wget -O "$0" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh" && ! wget -O "$0" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh"; then
             red "获取最新脚本失败！"
