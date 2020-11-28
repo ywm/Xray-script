@@ -419,19 +419,22 @@ doupdate()
             apt -y --auto-remove --purge full-upgrade
         done
     }
-    echo -e "\n\n\n"
-    tyblue "-----------------------是否更新系统组件？-----------------------"
-    if [ "$release" == "ubuntu" ]; then
-        green  " 1. 更新已安装软件，并升级系统(仅对ubuntu有效)"
+    while ((1))
+    do
+        echo -e "\n\n\n"
+        tyblue "-----------------------是否更新系统组件？-----------------------"
+        green  " 1. 更新已安装软件，并升级系统 (Ubuntu专享)"
         green  " 2. 仅更新已安装软件"
         red    " 3. 不更新"
-        if [ $mem_ok == 2 ]; then
-            echo
-            yellow "如果要升级系统，请确保服务器的内存>=512MB"
-            yellow "否则可能无法开机"
-        elif [ $mem_ok == 0 ]; then
-            echo
-            red "检测到内存过小，升级系统可能导致无法开机，请谨慎选择"
+        if [ "$release" == "ubuntu" ]; then
+            if [ $mem_ok == 2 ]; then
+                echo
+                yellow "如果要升级系统，请确保服务器的内存>=512MB"
+                yellow "否则可能无法开机"
+            elif [ $mem_ok == 0 ]; then
+                echo
+                red "检测到内存过小，升级系统可能导致无法开机，请谨慎选择"
+            fi
         fi
         echo
         choice=""
@@ -439,23 +442,20 @@ doupdate()
         do
             read -p "您的选择是：" choice
         done
-    else
-        green  " 1. 仅更新已安装软件"
-        red    " 2. 不更新"
+        if [ "$release" == "ubuntu" ] || [ $choice -ne 1 ]; then
+            break
+        fi
         echo
-        choice=""
-        while [ "$choice" != "1" -a "$choice" != "2" ]
-        do
-            read -p "您的选择是：" choice
-        done
-    fi
-    if [[ "$release" == "ubuntu" && "$choice" == "1" ]]; then
+        yellow " 更新系统仅支持Ubuntu！"
+        sleep 3s
+    done
+    if [ $choice -eq 1 ]; then
         updateSystem
         apt -y --purge autoremove
         apt clean
-    elif [[ $release == "ubuntu" && $choice -eq 2 || $choice -eq 1 ]]; then
+    elif [ $choice -eq 2 ]; then
         tyblue "-----------------------即将开始更新-----------------------"
-        yellow " 更新过程中若有问话/对话框，优先选择yes/y/第一个选项"
+        yellow " 更新过程中遇到问话/对话框，如果不明白，选择yes/y/第一个选项"
         yellow " 按回车键继续。。。"
         read -s
         $redhat_package_manager -y autoremove
