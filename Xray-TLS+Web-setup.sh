@@ -177,7 +177,10 @@ check_nginx()
     if [[ ! -f /usr/lib/systemd/system/nginx.service ]] && [[ ! -f /lib/systemd/system/nginx.service ]]; then
         return 0
     fi
-    red "检测到Nginx已安装，并且可能与本脚本冲突"
+    red    "------------检测到Nginx已安装，并且会与此脚本冲突------------"
+    yellow " 如果您不记得之前有安装过Nginx，那么可能是使用别的一键脚本时安装的"
+    yellow " 建议使用纯净的系统运行此脚本"
+    echo
     local choice=""
     while [ "$choice" != "y" -a "$choice" != "n" ]
     do
@@ -1856,14 +1859,14 @@ start_menu()
     echo
     tyblue "            Nginx ：           ${nginx_status}"
     echo
-    tyblue " 官网：https://github.com/kirin10000/Xray-script"
+    tyblue "       官网：https://github.com/kirin10000/Xray-script"
     echo
     tyblue "----------------------------------注意事项----------------------------------"
-    yellow " 此脚本需要一个解析到本服务器的域名!!!!"
-    tyblue " 推荐服务器系统使用Ubuntu最新版"
-    yellow " 部分ssh工具会出现退格键无法使用问题，建议先保证退格键正常，再安装"
-    yellow " 测试退格键正常方法：按一下退格键，不会出现奇怪的字符即为正常"
-    yellow " 若退格键异常可以选择选项14修复"
+    yellow " 1. 此脚本需要一个解析到本服务器的域名"
+    tyblue " 2. 此脚本安装时间较长，详细原因见："
+    tyblue "       https://github.com/kirin10000/Xray-script#安装时长说明"
+    green  " 3. 建议使用纯净的系统 (VPS控制台-重置系统)"
+    green  " 4. 推荐使用Ubuntu最新版系统"
     tyblue "----------------------------------------------------------------------------"
     echo
     echo
