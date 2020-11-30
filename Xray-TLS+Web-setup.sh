@@ -155,7 +155,7 @@ get_system_info()
     elif lsb_release -a 2>/dev/null | grep -qi "fedora"; then
         release="fedora"
     fi
-    systemVersion=`lsb_release -r -s`
+    systemVersion=$(lsb_release -r -s)
     if [ $release == "fedora" ]; then
         if version_ge $systemVersion 28; then
             redhat_version=8
@@ -518,7 +518,7 @@ install_bbr()
         local kernel_list_temp=($(timeout 60 wget -qO- https://kernel.ubuntu.com/~kernel-ppa/mainline/ | awk -F'\"v' '/v[0-9]/{print $2}' | cut -d '"' -f1 | cut -d '/' -f1 | sort -rV))
         if [ ${#kernel_list_temp[@]} -le 1 ]; then
             latest_kernel_version="error"
-            your_kernel_version=`uname -r | cut -d - -f 1`
+            your_kernel_version=$(uname -r | cut -d - -f 1)
             return 1
         fi
         local i=0
@@ -574,7 +574,7 @@ install_bbr()
             done
         fi
         latest_kernel_version=${kernel_list[0]}
-        your_kernel_version=`uname -r | cut -d - -f 1`
+        your_kernel_version=$(uname -r | cut -d - -f 1)
         check_fake_version()
         {
             local temp=${1##*.}
@@ -589,7 +589,7 @@ install_bbr()
             your_kernel_version=${your_kernel_version%.*}
         done
         if [ $release == "ubuntu" ] || [ $release == "other-debian" ]; then
-            local rc_version=`uname -r | cut -d - -f 2`
+            local rc_version=$(uname -r | cut -d - -f 2)
             if [[ $rc_version =~ "rc" ]]; then
                 rc_version=${rc_version##*'rc'}
                 your_kernel_version=${your_kernel_version}-rc${rc_version}
@@ -604,7 +604,7 @@ install_bbr()
         if [ $release == "ubuntu" ] || [ $release == "other-debian" ]; then
             local kernel_list_image=($(dpkg --list | grep 'linux-image' | awk '{print $2}'))
             local kernel_list_modules=($(dpkg --list | grep 'linux-modules' | awk '{print $2}'))
-            local kernel_now=`uname -r`
+            local kernel_now=$(uname -r)
             local ok_install=0
             for ((i=${#kernel_list_image[@]}-1;i>=0;i--))
             do
@@ -645,7 +645,7 @@ install_bbr()
                 local kernel_list_modules=($(rpm -qa |grep '^kernel-modules\|^kernel-ml-modules'))
                 local kernel_list_core=($(rpm -qa | grep '^kernel-core\|^kernel-ml-core'))
             fi
-            local kernel_now=`uname -r`
+            local kernel_now=$(uname -r)
             local ok_install=0
             for ((i=${#kernel_list[@]}-1;i>=0;i--))
             do
@@ -744,7 +744,7 @@ install_bbr()
         fi
         tyblue "  bbr启用状态："
         if sysctl net.ipv4.tcp_congestion_control | grep -Eq "bbr|nanqinlang|tsunami"; then
-            local bbr_info=`sysctl net.ipv4.tcp_congestion_control`
+            local bbr_info=$(sysctl net.ipv4.tcp_congestion_control)
             bbr_info=${bbr_info#*=}
             if [ $bbr_info == nanqinlang ]; then
                 bbr_info="暴力bbr魔改版"
@@ -1555,9 +1555,9 @@ echo_end()
 #获取配置信息 protocol_1 xid_1 protocol_2 xid_2 path
 get_base_information()
 {
-    if [ $(grep "clients" $xray_config | wc -l) -eq 2 ] || [ $(grep -E "vmess|vless" $xray_config | wc -l) -eq 1 ]; then
+    if [ $(grep '"clients"' $xray_config | wc -l) -eq 2 ] || [ $(grep -E '"(vmess|vless)"' $xray_config | wc -l) -eq 1 ]; then
         protocol_1=1
-        xid_1=`grep id $xray_config | head -n 1`
+        xid_1=$(grep '"id"' $xray_config | head -n 1)
         xid_1=${xid_1##*' '}
         xid_1=${xid_1#*'"'}
         xid_1=${xid_1%'"'*}
@@ -1565,13 +1565,13 @@ get_base_information()
         protocol_1=0
         xid_1=""
     fi
-    if [ $(grep -E "vmess|vless" $xray_config | wc -l) -eq 2 ]; then
-        grep -q "vmess" $xray_config && protocol_2=2 || protocol_2=1
-        path=`grep path $xray_config`
+    if [ $(grep -E '"(vmess|vless)"' $xray_config | wc -l) -eq 2 ]; then
+        grep -q '"vmess"' $xray_config && protocol_2=2 || protocol_2=1
+        path=$(grep '"path"' $xray_config)
         path=${path##*' '}
         path=${path#*'"'}
         path=${path%'"'*}
-        xid_2=`grep id $xray_config | tail -n 1`
+        xid_2=$(grep '"id"' $xray_config | tail -n 1)
         xid_2=${xid_2##*' '}
         xid_2=${xid_2#*'"'}
         xid_2=${xid_2%'"'*}
@@ -1586,14 +1586,14 @@ get_base_information()
 get_domainlist()
 {
     unset domain_list
-    domain_list=($(grep server_name $nginx_config | sed 's/;//g' | awk 'NR>1 {print $NF}'))
+    domain_list=($(grep "^[ \t]*server_name[ \t].*;[ \t]*$" $nginx_config | sed 's/;//g' | awk 'NR>1 {print $NF}'))
     local line
     local i
     for i in ${!domain_list[@]}
     do
-        line=`grep -n "server_name www.${domain_list[i]} ${domain_list[i]};" $nginx_config | tail -n 1 | awk -F : '{print $1}'`
+        line=$(grep -n "server_name www.${domain_list[i]} ${domain_list[i]};" $nginx_config | tail -n 1 | awk -F : '{print $1}')
         if [ "$line" == "" ]; then
-            line=`grep -n "server_name ${domain_list[i]};" $nginx_config | tail -n 1 | awk -F : '{print $1}'`
+            line=$(grep -n "server_name ${domain_list[i]};" $nginx_config | tail -n 1 | awk -F : '{print $1}')
             domainconfig_list[i]=2
         else
             domainconfig_list[i]=1
@@ -1776,8 +1776,8 @@ EOF
     if [ $update == 0 ]; then
         path=$(cat /dev/urandom | head -c 8 | md5sum | head -c 7)
         path="/$path"
-        xid_1=`cat /proc/sys/kernel/random/uuid`
-        xid_2=`cat /proc/sys/kernel/random/uuid`
+        xid_1=$(cat /proc/sys/kernel/random/uuid)
+        xid_2=$(cat /proc/sys/kernel/random/uuid)
     fi
     config_nginx
     config_xray
@@ -1811,11 +1811,11 @@ start_menu()
             red "传输协议未更换"
             return 0
         fi
-        [ $protocol_1_old -eq 0 ] && [ $protocol_1 -ne 0 ] && xid_1=`cat /proc/sys/kernel/random/uuid`
+        [ $protocol_1_old -eq 0 ] && [ $protocol_1 -ne 0 ] && xid_1=$(cat /proc/sys/kernel/random/uuid)
         if [ $protocol_2_old -eq 0 ] && [ $protocol_2 -ne 0 ]; then
             path=$(cat /dev/urandom | head -c 8 | md5sum | head -c 7)
             path="/$path"
-            xid_2=`cat /proc/sys/kernel/random/uuid`
+            xid_2=$(cat /proc/sys/kernel/random/uuid)
         fi
         get_domainlist
         config_xray
