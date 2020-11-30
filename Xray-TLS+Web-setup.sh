@@ -1030,6 +1030,38 @@ install_nginx()
     make install
     cd ..
 }
+config_service_nginx()
+{
+    systemctl disable nginx
+    rm -rf $nginx_service
+cat > $nginx_service << EOF
+[Unit]
+Description=The NGINX HTTP and reverse proxy server
+After=syslog.target network-online.target remote-fs.target nss-lookup.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+User=root
+ExecStartPre=/bin/rm -rf /dev/shm/nginx_unixsocket
+ExecStartPre=/bin/mkdir /dev/shm/nginx_unixsocket
+ExecStartPre=/bin/chmod 711 /dev/shm/nginx_unixsocket
+ExecStartPre=/bin/rm -rf /dev/shm/nginx_tcmalloc
+ExecStartPre=/bin/mkdir /dev/shm/nginx_tcmalloc
+ExecStartPre=/bin/chmod 0777 /dev/shm/nginx_tcmalloc
+ExecStart=${nginx_prefix}/sbin/nginx
+ExecStop=${nginx_prefix}/sbin/nginx -s stop
+ExecStopPost=/bin/rm -rf /dev/shm/nginx_tcmalloc
+ExecStopPost=/bin/rm -rf /dev/shm/nginx_unixsocket
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    chmod 0644 $nginx_service
+    systemctl daemon-reload
+    systemctl enable nginx
+}
 
 #安装/更新Xray
 install_update_xray()
@@ -1070,8 +1102,8 @@ get_cert()
     else
         local temp=""
     fi
-    if ! $HOME/.acme.sh/acme.sh --issue -d $1 $temp -w ${nginx_prefix}/html -k ec-256 -ak ec-256 --pre-hook "mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak && cp ${nginx_prefix}/conf/nginx.conf.default ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --post-hook "mv ${nginx_prefix}/conf/nginx.conf.bak ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --ocsp; then
-        $HOME/.acme.sh/acme.sh --issue -d $1 $temp -w ${nginx_prefix}/html -k ec-256 -ak ec-256 --pre-hook "mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak && cp ${nginx_prefix}/conf/nginx.conf.default ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --post-hook "mv ${nginx_prefix}/conf/nginx.conf.bak ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --ocsp --debug
+    if ! $HOME/.acme.sh/acme.sh --issue -d $1 $temp -w ${nginx_prefix}/html/issue_certs -k ec-256 -ak ec-256 --pre-hook "mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak && cp ${nginx_prefix}/conf/issue_certs.conf ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --post-hook "mv ${nginx_prefix}/conf/nginx.conf.bak ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --ocsp; then
+        $HOME/.acme.sh/acme.sh --issue -d $1 $temp -w ${nginx_prefix}/html/issue_certs -k ec-256 -ak ec-256 --pre-hook "mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak && cp ${nginx_prefix}/conf/issue_certs.conf ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --post-hook "mv ${nginx_prefix}/conf/nginx.conf.bak ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --ocsp --debug
     fi
     if id nobody | grep -qw 'nogroup'; then
         temp="chown -R nobody:nogroup ${nginx_prefix}/certs"
@@ -1267,38 +1299,6 @@ EOF
         fi
         echo "}" >> $nginx_config
     done
-}
-config_service_nginx()
-{
-    systemctl disable nginx
-    rm -rf $nginx_service
-cat > $nginx_service << EOF
-[Unit]
-Description=The NGINX HTTP and reverse proxy server
-After=syslog.target network-online.target remote-fs.target nss-lookup.target
-Wants=network-online.target
-
-[Service]
-Type=forking
-User=root
-ExecStartPre=/bin/rm -rf /dev/shm/nginx_unixsocket
-ExecStartPre=/bin/mkdir /dev/shm/nginx_unixsocket
-ExecStartPre=/bin/chmod 711 /dev/shm/nginx_unixsocket
-ExecStartPre=/bin/rm -rf /dev/shm/nginx_tcmalloc
-ExecStartPre=/bin/mkdir /dev/shm/nginx_tcmalloc
-ExecStartPre=/bin/chmod 0777 /dev/shm/nginx_tcmalloc
-ExecStart=${nginx_prefix}/sbin/nginx
-ExecStop=${nginx_prefix}/sbin/nginx -s stop
-ExecStopPost=/bin/rm -rf /dev/shm/nginx_tcmalloc
-ExecStopPost=/bin/rm -rf /dev/shm/nginx_unixsocket
-PrivateTmp=true
-
-[Install]
-WantedBy=multi-user.target
-EOF
-    chmod 0644 $nginx_service
-    systemctl daemon-reload
-    systemctl enable nginx
 }
 
 #配置xray
@@ -1738,11 +1738,25 @@ install_update_xray_tls_web()
         else
             rm -rf ${nginx_prefix}/conf.d
             rm -rf ${nginx_prefix}/certs
+            rm -rf ${nginx_prefix}/html/issue_certs
+            rm -rf ${nginx_prefix}/conf/issue_certs.conf
             cp ${nginx_prefix}/conf/nginx.conf.default ${nginx_prefix}/conf/nginx.conf
         fi
     fi
     mkdir ${nginx_prefix}/conf.d
     mkdir ${nginx_prefix}/certs
+    mkdir ${nginx_prefix}/html/issue_certs
+cat > ${nginx_prefix}/conf/issue_certs.conf << EOF
+events {
+    worker_connections  1024;
+}
+http {
+    server {
+        listen [::]:80 ipv6only=off;
+        root ${nginx_prefix}/html/issue_certs;
+    }
+}
+EOF
     config_service_nginx
 
 #安装Xray
