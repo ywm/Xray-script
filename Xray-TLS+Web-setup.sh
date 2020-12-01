@@ -1285,6 +1285,7 @@ EOF
         else
             echo "    server_name ${domain_list[i]};" >> $nginx_config
         fi
+        echo '    add_header Strict-Transport-Security "max-age=63072000; includeSubdomains; preload" always;' >> $nginx_config
         if [ ${pretend_list[i]} -eq 1 ]; then
             echo "    return 403;" >> $nginx_config
         elif [ ${pretend_list[i]} -eq 2 ]; then
@@ -1546,7 +1547,7 @@ echo_end()
     tyblue " 修改$nginx_config"
     tyblue " 将v.qq.com修改为你要镜像的网站"
     echo
-    tyblue " 脚本最后更新时间：2020.11.26"
+    tyblue " 脚本最后更新时间：2020.12.01"
     echo
     red    " 此脚本仅供交流学习使用，请勿使用此脚本行违法之事。网络非法外之地，行非法之事，必将接受法律制裁!!!!"
     tyblue " 2020.11"
@@ -1598,9 +1599,9 @@ get_domainlist()
         else
             domainconfig_list[i]=1
         fi
-        if awk 'NR=='"$(($line+1))"' {print $0}' $nginx_config | grep -q "return 403"; then
+        if awk 'NR=='"$(($line+2))"' {print $0}' $nginx_config | grep -q "return 403"; then
             pretend_list[i]=1
-        elif awk 'NR=='"$(($line+1))"' {print $0}' $nginx_config | grep -q "location / {"; then
+        elif awk 'NR=='"$(($line+2))"' {print $0}' $nginx_config | grep -q "location / {"; then
             pretend_list[i]=2
         else
             pretend_list[i]=3
