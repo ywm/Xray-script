@@ -2018,6 +2018,7 @@ start_menu()
         $HOME/.acme.sh/acme.sh --uninstall
         rm -rf $HOME/.acme.sh
         curl https://get.acme.sh | sh
+        $HOME/.acme.sh/acme.sh --upgrade --auto-upgrade
         get_base_information
         get_domainlist
         for i in ${!domain_list[@]}
