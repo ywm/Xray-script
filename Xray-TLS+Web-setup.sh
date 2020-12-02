@@ -1630,7 +1630,10 @@ install_update_xray_tls_web()
             else
                 local temp_redhat_install="$redhat_package_manager -y --enablerepo "
             fi
-            if ! $temp_redhat_install'*' install $1; then
+            if ! $redhat_package_manager -y install $1 && ! $temp_redhat_install'*' install $1; then
+                if [ "$release" == "centos" ] && version_ge $systemVersion 8 && $temp_redhat_install"epel,PowerTools" install $1;then
+                    return 0
+                fi
                 yellow "依赖安装失败！！"
                 green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
                 yellow "按回车键继续或者ctrl+c退出"
