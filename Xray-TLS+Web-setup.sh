@@ -1625,16 +1625,10 @@ install_update_xray_tls_web()
                 fi
             fi
         else
-            local temp_repo_list=($($redhat_package_manager -q repolist all | awk 'NR>1 {print $1}' | cut -d / -f 1 | cut -d '!' -f 2))
-            local temp_repo_all="${temp_repo_list[0]}"
-            for ((i=1;i<${#temp_repo_list[@]};i++))
-            do
-                temp_repo_all="$temp_repo_all,${temp_repo_list[i]}"
-            done
             if $redhat_package_manager --help | grep -q "\-\-enablerepo="; then
-                local redhat_install_command="$redhat_package_manager -y --enablerepo=$temp_repo_all install"
+                local redhat_install_command="$redhat_package_manager -y --enablerepo='*' install"
             else
-                local redhat_install_command="$redhat_package_manager -y --enablerepo $temp_repo_all install"
+                local redhat_install_command="$redhat_package_manager -y --enablerepo '*' install"
             fi
             if ! $redhat_install_command $1; then
                 yellow "依赖安装失败！！"
