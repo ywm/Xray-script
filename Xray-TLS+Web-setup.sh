@@ -1687,10 +1687,6 @@ install_update_xray_tls_web()
 
 #读取信息
     if [ $update == 0 ]; then
-        if [ $nginx_is_installed -eq 1 ]; then
-            get_domainlist
-            remove_all_domains
-        fi
         readDomain
         readProtocolConfig
     else
@@ -1755,6 +1751,14 @@ install_update_xray_tls_web()
         if [ $choice -eq 2 ]; then
             install_nginx
         else
+            local temp_domain_bak=${domain_list[0]}
+            local temp_domainconfig_bak=${domainconfig_list[0]}
+            local temp_pretend_bak=${pretend_list[0]}
+            get_domainlist
+            remove_all_domains
+            domain_list+=("$temp_domain_bak")
+            domainconfig_list+=("$temp_domainconfig_bak")
+            pretend_list+=("$temp_pretend_bak")
             rm -rf ${nginx_prefix}/conf.d
             rm -rf ${nginx_prefix}/certs
             rm -rf ${nginx_prefix}/html/issue_certs
