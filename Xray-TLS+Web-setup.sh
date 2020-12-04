@@ -1067,7 +1067,7 @@ EOF
 install_update_xray()
 {
     green "正在安装/更新Xray。。。。"
-    if ! bash <(curl -L https://raw.githubusercontent.com/XTLS/Xray-install/main/install-release.sh) --version v1.1.1 && ! bash <(curl -L https://raw.githubusercontent.com/XTLS/Xray-install/main/install-release.sh) --version v1.1.1; then
+    if ! bash <(curl -L https://raw.githubusercontent.com/XTLS/Xray-install/main/install-release.sh) && ! bash <(curl -L https://raw.githubusercontent.com/XTLS/Xray-install/main/install-release.sh); then
         red    "安装/更新Xray失败"
         yellow "按回车键继续或者按ctrl+c终止"
         read -s
@@ -1544,6 +1544,7 @@ echo_end()
     yellow " 若使用VMess，请尽快将客户端升级至 Xray 或 V2Ray v4.28.0+ 以启用VMessAEAD"
     yellow " 若使用VLESS，请确保客户端为 Xray 或 V2Ray v4.30.0+"
     yellow " 若使用XTLS，请确保客户端为 Xray 或 V2Ray v4.31.0至v4.32.1"
+    yellow " 若使用xtls-rprx-splice，请确保客户端为 Xray v1.1.0+"
     echo
     tyblue " 如果要更换被镜像的伪装网站"
     tyblue " 修改$nginx_config"
