@@ -931,7 +931,7 @@ readProtocolConfig()
     green  "    适合一直使用CDN，且CDN可信任"
     echo
     yellow " 注："
-    yellow "   1.各协议理论速度对比：https://github.com/badO1a5A90/v2ray-doc/blob/main/performance_test/Xray/speed_test_20201124.md"
+    yellow "   1.各协议理论速度对比：github.com/badO1a5A90/v2ray-doc/blob/main/Xray_test_v1.1.1.md"
     yellow "   2.XTLS完全兼容TLS"
     yellow "   3.WebSocket协议支持CDN，TCP不支持"
     yellow "   4.VLESS协议用于CDN，CDN可以看见传输的明文"
@@ -1067,7 +1067,7 @@ EOF
 install_update_xray()
 {
     green "正在安装/更新Xray。。。。"
-    if ! bash <(curl -L https://raw.githubusercontent.com/XTLS/Xray-install/main/install-release.sh) && ! bash <(curl -L https://raw.githubusercontent.com/XTLS/Xray-install/main/install-release.sh); then
+    if ! bash <(curl -L https://raw.githubusercontent.com/XTLS/Xray-install/main/install-release.sh) --version v1.1.1 && ! bash <(curl -L https://raw.githubusercontent.com/XTLS/Xray-install/main/install-release.sh) --version v1.1.1; then
         red    "安装/更新Xray失败"
         yellow "按回车键继续或者按ctrl+c终止"
         read -s
@@ -1465,19 +1465,21 @@ echo_end()
         purple "  (Qv2ray:主机)"
         tyblue " port(端口)            ：443"
         tyblue " id(用户ID/UUID)       ：${xid_1}"
-        tyblue " flow(流控)            ：使用XTLS：xtls-rprx-direct;使用TLS：空"
+        tyblue " flow(流控)            ：使用XTLS ：Linux/安卓/路由器:xtls-rprx-splice\033[32m(推荐)\033[36m或xtls-rprx-direct"
+        tyblue "                                    其它:xtls-rprx-direct"
+        tyblue "                         使用TLS  ：空"
         tyblue " encryption(加密)      ：none"
         tyblue " ---Transport/StreamSettings(底层传输方式/流设置)---"
         tyblue "  network(传输协议)             ：tcp"
         purple "   (Shadowrocket:传输方式:none)"
         tyblue "  type(伪装类型)                ：none"
         purple "   (Qv2ray:协议设置-类型)"
-        tyblue "  security(传输层加密)          ：xtls或tls \033[35;1m(此选项将决定是使用XTLS还是TLS)"
+        tyblue "  security(传输层加密)          ：xtls\033[32m(推荐)\033[36m或tls \033[35m(此选项将决定是使用XTLS还是TLS)"
         purple "   (V2RayN(G):底层传输安全;Qv2ray:TLS设置-安全类型)"
         if [ ${#all_domains[@]} -eq 1 ]; then
             tyblue "  serverName(验证服务端证书域名)：${all_domains[@]}"
         else
-            tyblue "  serverName(验证服务端证书域名)：${all_domains[@]} \033[35;1m(任选其一)"
+            tyblue "  serverName(验证服务端证书域名)：${all_domains[@]} \033[35m(任选其一)"
         fi
         purple "   (V2RayN(G):伪装域名;Qv2ray:TLS设置-服务器地址;Shadowrocket:Peer 名称)"
         tyblue "  allowInsecure                 ：false"
@@ -1506,7 +1508,7 @@ echo_end()
         if [ ${#all_domains[@]} -eq 1 ]; then
             tyblue " address(地址)         ：${all_domains[@]}"
         else
-            tyblue " address(地址)         ：${all_domains[@]} \033[35;1m(任选其一)"
+            tyblue " address(地址)         ：${all_domains[@]} \033[35m(任选其一)"
         fi
         purple "  (Qv2ray:主机)"
         tyblue " port(端口)            ：443"
