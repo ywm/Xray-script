@@ -1556,6 +1556,18 @@ echo_end()
     tyblue " 2020.11"
 }
 
+#删除所有域名
+remove_all_domains()
+{
+    for i in ${!domain_list[@]}
+    do
+        rm -rf ${nginx_prefix}/html/${domain_list[$i]}
+    done
+    unset domain_list
+    unset domainconfig_list
+    unset pretend_list
+}
+
 #获取配置信息 protocol_1 xid_1 protocol_2 xid_2 path
 get_base_information()
 {
@@ -1590,6 +1602,8 @@ get_base_information()
 get_domainlist()
 {
     unset domain_list
+    unset domainconfig_list
+    unset pretend_list
     domain_list=($(grep "^[ \t]*server_name[ \t].*;[ \t]*$" $nginx_config | sed 's/;//g' | awk 'NR>1 {print $NF}'))
     local line
     local i
@@ -1673,6 +1687,10 @@ install_update_xray_tls_web()
 
 #读取信息
     if [ $update == 0 ]; then
+        if [ $nginx_is_installed -eq 1 ]; then
+            get_domainlist
+            remove_all_domains
+        fi
         readDomain
         readProtocolConfig
     else
@@ -2021,13 +2039,7 @@ start_menu()
         $HOME/.acme.sh/acme.sh --upgrade --auto-upgrade
         get_base_information
         get_domainlist
-        for i in ${!domain_list[@]}
-        do
-            rm -rf ${nginx_prefix}/html/${domain_list[$i]}
-        done
-        unset domain_list
-        unset domainconfig_list
-        unset pretend_list
+        remove_all_domains
         readDomain
         get_all_certs
         get_all_webs
