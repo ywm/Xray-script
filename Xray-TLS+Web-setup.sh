@@ -1257,8 +1257,8 @@ config_nginx()
     get_all_domains
 cat > $nginx_config<<EOF
 server {
-    listen 80 fastopen=100 reuseport default_server;
-    listen [::]:80 fastopen=100 reuseport default_server;
+    listen 80 reuseport default_server;
+    listen [::]:80 reuseport default_server;
     return 301 https://${all_domains[0]};
 }
 server {
@@ -1376,9 +1376,6 @@ EOF
     done
 cat >> $xray_config <<EOF
                     ]
-                },
-                "sockopt": {
-                    "tcpFastOpen": true
                 }
             }
 EOF
@@ -1418,12 +1415,7 @@ cat >> $xray_config <<EOF
     ],
     "outbounds": [
         {
-            "protocol": "freedom",
-            "streamSettings": {
-                "sockopt": {
-                    "tcpFastOpen": true
-                }
-            }
+            "protocol": "freedom"
         }
     ]
 }
@@ -1484,7 +1476,6 @@ echo_end()
         purple "   (V2RayN(G):伪装域名;Qv2ray:TLS设置-服务器地址;Shadowrocket:Peer 名称)"
         tyblue "  allowInsecure                 ：false"
         purple "   (Qv2ray:允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
-        tyblue "  tcpFastOpen(TCP快速打开)      ：可以启用"
         tyblue " ------------------------其他-----------------------"
         tyblue "  Mux(多路复用)                 ：使用XTLS必须关闭;不使用XTLS也建议关闭"
         tyblue "  Sniffing(流量探测)            ：建议开启"
@@ -1533,7 +1524,6 @@ echo_end()
         purple "   (V2RayN(G):伪装域名;Qv2ray:TLS设置-服务器地址;Shadowrocket:Peer 名称)"
         tyblue "  allowInsecure                 ：false"
         purple "   (Qv2ray:允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
-        tyblue "  tcpFastOpen(TCP快速打开)      ：可以启用"
         tyblue " ------------------------其他-----------------------"
         tyblue "  Mux(多路复用)                 ：建议关闭"
         tyblue "  Sniffing(流量探测)            ：建议开启"
@@ -1672,15 +1662,6 @@ install_update_xray_tls_web()
     check_ssh_timeout
     uninstall_firewall
     doupdate
-    if ! grep -q "#This file has been edited by Xray-TLS-Web-setup-script" /etc/sysctl.conf; then
-        echo >> /etc/sysctl.conf
-        echo "#This file has been edited by Xray-TLS-Web-setup-script" >> /etc/sysctl.conf
-    fi
-    if ! grep -Eq '^[ '$'\t]*net.ipv4.tcp_fastopen[ '$'\t]*=[ '$'\t]*3[ '$'\t]*$' /etc/sysctl.conf || ! sysctl net.ipv4.tcp_fastopen | grep -wq 3; then
-        sed -i '/^[ \t]*net.ipv4.tcp_fastopen[ \t]*=/d' /etc/sysctl.conf
-        echo 'net.ipv4.tcp_fastopen = 3' >> /etc/sysctl.conf
-        sysctl -p
-    fi
     enter_temp_dir
     install_bbr
     apt -y -f install
