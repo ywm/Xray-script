@@ -74,8 +74,8 @@ if [[ ! -d /dev/shm ]]; then
     red "/dev/shm不存在，不支持的系统"
     exit 1
 fi
-if [ "$(cat /proc/meminfo |grep 'MemTotal' |awk '{print $3}' | tr [A-Z] [a-z])" == "kb" ]; then
-    if [ "$(cat /proc/meminfo |grep 'MemTotal' |awk '{print $2}')" -le 400000 ]; then
+if [ "$(cat /proc/meminfo | grep 'MemTotal' | awk '{print $3}' | tr 'A-Z' 'a-z')" == "kb" ]; then
+    if [ "$(cat /proc/meminfo | grep 'MemTotal' | awk '{print $2}')" -le 400000 ]; then
         mem_ok=0
     else
         mem_ok=1
