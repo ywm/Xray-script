@@ -74,7 +74,7 @@ if [[ ! -d /dev/shm ]]; then
     red "/dev/shm不存在，不支持的系统"
     exit 1
 fi
-if [ "$(cat /proc/meminfo | grep 'MemTotal' | awk '{print $3}' | tr 'A-Z' 'a-z')" == "kb" ]; then
+if [ "$(cat /proc/meminfo | grep 'MemTotal' | awk '{print $3}' | tr [:upper:] [:lower:])" == "kb" ]; then
     if [ "$(cat /proc/meminfo | grep 'MemTotal' | awk '{print $2}')" -le 400000 ]; then
         mem_ok=0
     else
@@ -1322,8 +1322,7 @@ cat >> $xray_config <<EOF
                 "clients": [
                     {
                         "id": "$xid_1",
-                        "flow": "xtls-rprx-direct",
-                        "level": 2
+                        "flow": "xtls-rprx-direct"
                     }
                 ],
 EOF
@@ -1334,20 +1333,17 @@ EOF
 cat >> $xray_config <<EOF
                     {
                         "path": "$path",
-                        "dest": "@/dev/shm/xray/ws.sock",
-                        "xver": 0
+                        "dest": "@/dev/shm/xray/ws.sock"
                     },
 EOF
     fi
 cat >> $xray_config <<EOF
                     {
-                        "dest": "/dev/shm/nginx_unixsocket/default.sock",
-                        "xver": 0
+                        "alpn": "h2",
+                        "dest": "/dev/shm/nginx_unixsocket/h2.sock"
                     },
                     {
-                        "alpn": "h2",
-                        "dest": "/dev/shm/nginx_unixsocket/h2.sock",
-                        "xver": 0
+                        "dest": "/dev/shm/nginx_unixsocket/default.sock"
                     }
                 ]
             },
@@ -1391,8 +1387,7 @@ EOF
         echo '            "settings": {' >> $xray_config
         echo '                "clients": [' >> $xray_config
         echo '                    {' >> $xray_config
-        echo '                        "id": "'"$xid_2"'",' >> $xray_config
-        echo '                        "level": 1' >> $xray_config
+        echo "                        \"id\": \"$xid_2\"" >> $xray_config
         echo '                    }' >> $xray_config
         if [ $protocol_2 -eq 2 ]; then
             echo '                ]' >> $xray_config
@@ -1714,32 +1709,40 @@ install_update_xray_tls_web()
     $redhat_package_manager clean all
 
 ##安装nginx
-    if [ $nginx_is_installed -eq 0 ] || [ $update -eq 1 ]; then
+    if [ $nginx_is_installed -eq 0 ]; then
         install_nginx
     else
-        tyblue "---------------检测到nginx已存在---------------"
-        tyblue " 1. 尝试使用现有nginx"
-        tyblue " 2. 卸载现有nginx并重新编译安装"
-        echo
-        yellow " 若安装完成后nginx无法启动，请卸载并重新安装"
-        green  " 若想更新nginx，请选择2"
-        echo
         choice=""
-        while [ "$choice" != "1" ] && [ "$choice" != "2" ]
-        do
-            read -p "您的选择是：" choice
-        done
-        if [ $choice -eq 2 ]; then
+        if [ $update -eq 1 ]; then
+            while [ "$choice" != "y" ] && [ "$choice" != "n" ]
+            do
+                tyblue "是否更新Nginx?(y/n)"
+                read choice
+            done
+        else
+            tyblue "---------------检测到nginx已存在---------------"
+            tyblue " 1. 尝试使用现有nginx"
+            tyblue " 2. 卸载现有nginx并重新编译安装"
+            echo
+            yellow " 若安装完成后Nginx无法启动，请卸载并重新安装"
+            echo
+            while [ "$choice" != "1" ] && [ "$choice" != "2" ]
+            do
+                read -p "您的选择是：" choice
+            done
+        fi
+        if [ "$choice" == "y" ] || [ "$choice" == "2" ]; then
             install_nginx
         else
-            local temp_domain_bak=${domain_list[0]}
-            local temp_domainconfig_bak=${domainconfig_list[0]}
-            local temp_pretend_bak=${pretend_list[0]}
+            [ $update -eq 1 ] && backup_domains_web
+            local temp_domain_bak=("${domain_list[@]}")
+            local temp_domainconfig_bak=("${domainconfig_list[@]}")
+            local temp_pretend_bak=("${pretend_list[@]}")
             get_domainlist
             remove_all_domains
-            domain_list+=("$temp_domain_bak")
-            domainconfig_list+=("$temp_domainconfig_bak")
-            pretend_list+=("$temp_pretend_bak")
+            domain_list=("${temp_domain_bak[@]}")
+            domainconfig_list=("${temp_domainconfig_bak[@]}")
+            pretend_list=("${temp_pretend_bak[@]}")
             rm -rf ${nginx_prefix}/conf.d
             rm -rf ${nginx_prefix}/certs
             rm -rf ${nginx_prefix}/html/issue_certs
