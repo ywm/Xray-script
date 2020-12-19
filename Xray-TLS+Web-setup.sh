@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #安装选项
-nginx_version="nginx-1.19.5"
+nginx_version="nginx-1.19.6"
 openssl_version="openssl-openssl-3.0.0-alpha9"
 xray_config="/usr/local/etc/xray/config.json"
 nginx_prefix="/etc/nginx"
@@ -405,7 +405,7 @@ doupdate()
         do
             read -p "您的选择是：" choice
         done
-        if ! [[ "$(cat /etc/ssh/sshd_config | grep -i "^[ \t]*port " | awk '{print $2}')" =~ ^("22"|"")$ ]]; then
+        if ! [[ "$(cat /etc/ssh/sshd_config | grep -i '^[ '$'\t]*port ' | awk '{print $2}')" =~ ^("22"|"")$ ]]; then
             red "检测到ssh端口号被修改"
             red "升级系统后ssh端口号可能恢复默认值(22)"
             yellow "按回车键继续。。。"
@@ -1589,7 +1589,7 @@ get_domainlist()
     unset domain_list
     unset domainconfig_list
     unset pretend_list
-    domain_list=($(grep "^[ \t]*server_name[ \t].*;[ \t]*$" $nginx_config | sed 's/;//g' | awk 'NR>1 {print $NF}'))
+    domain_list=($(grep '^[ '$'\t]*server_name[ '$'\t].*;[ '$'\t]*$' $nginx_config | sed 's/;//g' | awk 'NR>1 {print $NF}'))
     local line
     local i
     for i in ${!domain_list[@]}
