@@ -1355,6 +1355,8 @@ cat >> $xray_config <<EOF
                         "h2",
                         "http/1.1"
                     ],
+                    "minVersion": "1.2",
+                    "cipherSuites": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384:TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
                     "certificates": [
 EOF
     for ((i=0;i<${#domain_list[@]};i++))
