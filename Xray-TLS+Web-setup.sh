@@ -1589,7 +1589,7 @@ get_domainlist()
     unset domain_list
     unset domainconfig_list
     unset pretend_list
-    domain_list=($(grep '^[ '$'\t]*server_name[ '$'\t].*;[ '$'\t]*$' $nginx_config | sed 's/;//g' | awk 'NR>1 {print $NF}'))
+    domain_list=($(grep '^[ '$'\t]*server_name[ '$'\t].*;' $nginx_config | cut -d ';' -f 1 | awk 'NR>1 {print $NF}'))
     local line
     local i
     for i in ${!domain_list[@]}
