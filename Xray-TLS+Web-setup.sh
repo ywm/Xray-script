@@ -102,7 +102,7 @@ fi
 check_important_dependence_installed()
 {
     if [ $release == "ubuntu" ] || [ $release == "other-debian" ]; then
-        if ! dpkg -s $1 2>&1 >/dev/null; then
+        if ! dpkg -s $1 > /dev/null 2>&1; then
             if ! apt -y --no-install-recommends install $1; then
                 apt update
                 if ! apt -y --no-install-recommends install $1; then
@@ -113,7 +113,7 @@ check_important_dependence_installed()
             fi
         fi
     else
-        if ! rpm -q $2 2>&1 >/dev/null; then
+        if ! rpm -q $2 > /dev/null 2>&1; then
             if ! $redhat_package_manager -y install $2; then
                 yellow "重要组件安装失败！！"
                 red "不支持的系统！！"
