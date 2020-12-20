@@ -297,13 +297,13 @@ check_ssh_timeout()
 #删除防火墙和阿里云盾
 uninstall_firewall()
 {
-    green "正在删除防火墙。。。"
-    ufw disable
-    apt -y purge firewalld
-    apt -y purge ufw
-    systemctl stop firewalld
-    systemctl disable firewalld
-    $redhat_package_manager -y remove firewalld
+    #green "正在删除防火墙。。。"
+    #ufw disable
+    #apt -y purge firewalld
+    #apt -y purge ufw
+    #systemctl stop firewalld
+    #systemctl disable firewalld
+    #$redhat_package_manager -y remove firewalld
     green "正在删除阿里云盾和腾讯云盾 (仅对阿里云和腾讯云服务器有效)。。。"
 #阿里云盾
     if [ $release == "ubuntu" ] || [ $release == "other-debian" ]; then
@@ -363,6 +363,11 @@ uninstall_firewall()
     mkdir /usr/local/qcloud/action
     mkdir /usr/local/qcloud/action/login_banner.sh
     mkdir /usr/local/qcloud/action/action.sh
+    if [[ "$(type -P uname)" ]] && uname -a | grep solaris >/dev/null; then
+        crontab -l | sed "/qcloud/d" | crontab --
+    else
+        crontab -l | sed "/qcloud/d" | crontab -
+    fi
 }
 
 #升级系统组件
@@ -998,10 +1003,10 @@ remove_nginx()
     rm -rf ${nginx_prefix}
 }
 
-#安装nignx
-install_nginx()
+#编译安装nignx
+compile_nginx()
 {
-    green "正在编译和安装nginx。。。。"
+    green "正在编译Nginx。。。。"
     if ! wget -O ${nginx_version}.tar.gz https://nginx.org/download/${nginx_version}.tar.gz; then
         red    "获取nginx失败"
         yellow "按回车键继续或者按ctrl+c终止"
@@ -1023,11 +1028,6 @@ install_nginx()
         green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
         exit 1
     fi
-    if [ $update == 1 ]; then
-        backup_domains_web
-    fi
-    remove_nginx
-    make install
     cd ..
 }
 config_service_nginx()
@@ -1061,6 +1061,32 @@ EOF
     chmod 0644 $nginx_service
     systemctl daemon-reload
     systemctl enable nginx
+}
+install_nginx_part1()
+{
+    green "正在安装Nginx。。。"
+    cd ${nginx_version}
+    make install
+    cd ..
+}
+install_nginx_part2()
+{
+    mkdir ${nginx_prefix}/conf.d
+    touch $nginx_config
+    mkdir ${nginx_prefix}/certs
+    mkdir ${nginx_prefix}/html/issue_certs
+cat > ${nginx_prefix}/conf/issue_certs.conf << EOF
+events {
+    worker_connections  1024;
+}
+http {
+    server {
+        listen [::]:80 ipv6only=off;
+        root ${nginx_prefix}/html/issue_certs;
+    }
+}
+EOF
+    config_service_nginx
 }
 
 #安装/更新Xray
@@ -1674,99 +1700,55 @@ install_update_xray_tls_web()
 
     green "正在安装依赖。。。。"
     if [ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        install_dependence "gperftools-devel libatomic_ops-devel pcre-devel zlib-devel libxslt-devel gd-devel perl-ExtUtils-Embed perl-Data-Dumper perl-IPC-Cmd geoip-devel lksctp-tools-devel libxml2-devel gcc gcc-c++ wget unzip curl make openssl crontabs"
-        ##libxml2-devel非必须
+        install_dependence "gcc gcc-c++ gperftools-devel libatomic_ops-devel pcre-devel libxml2-devel libxslt-devel zlib-devel gd-devel perl-ExtUtils-Embed perl-Data-Dumper perl-IPC-Cmd geoip-devel lksctp-tools-devel wget unzip curl make openssl crontabs"
     else
-        if [ "$release" == "ubuntu" ] && [ "$systemVersion" == "20.04" ] && [ "$(uname -m)" == "x86_64" ]; then
-            install_dependence "gcc-10 g++-10"
-            apt -y purge gcc g++ gcc-9 g++-9 gcc-8 g++-8 gcc-7 g++-7
-            apt -y autopurge
-            install_dependence "gcc-10 g++-10 libgoogle-perftools-dev libatomic-ops-dev libperl-dev libxslt-dev zlib1g-dev libpcre3-dev libgeoip-dev libgd-dev libxml2-dev libsctp-dev wget unzip curl make openssl cron"
-            ln -s -f /usr/bin/gcc-10                         /usr/bin/gcc
-            ln -s -f /usr/bin/gcc-10                         /usr/bin/cc
-            ln -s -f /usr/bin/x86_64-linux-gnu-gcc-10        /usr/bin/x86_64-linux-gnu-gcc
-            ln -s -f /usr/bin/g++-10                         /usr/bin/g++
-            ln -s -f /usr/bin/g++-10                         /usr/bin/c++
-            ln -s -f /usr/bin/x86_64-linux-gnu-g++-10        /usr/bin/x86_64-linux-gnu-g++
-            ln -s -f /usr/bin/gcc-ar-10                      /usr/bin/gcc-ar
-            ln -s -f /usr/bin/x86_64-linux-gnu-gcc-ar-10     /usr/bin/x86_64-linux-gnu-gcc-ar
-            ln -s -f /usr/bin/gcc-nm-10                      /usr/bin/gcc-nm
-            ln -s -f /usr/bin/x86_64-linux-gnu-gcc-nm-10     /usr/bin/x86_64-linux-gnu-gcc-nm
-            ln -s -f /usr/bin/gcc-ranlib-10                  /usr/bin/gcc-ranlib
-            ln -s -f /usr/bin/x86_64-linux-gnu-gcc-ranlib-10 /usr/bin/x86_64-linux-gnu-gcc-ranlib
-            ln -s -f /usr/bin/cpp-10                         /usr/bin/cpp
-            ln -s -f /usr/bin/x86_64-linux-gnu-cpp-10        /usr/bin/x86_64-linux-gnu-cpp
-            ln -s -f /usr/bin/gcov-10                        /usr/bin/gcov
-            ln -s -f /usr/bin/gcov-dump-10                   /usr/bin/gcov-dump
-            ln -s -f /usr/bin/gcov-tool-10                   /usr/bin/gcov-tool
-            ln -s -f /usr/bin/x86_64-linux-gnu-gcov-10       /usr/bin/x86_64-linux-gnu-gcov
-            ln -s -f /usr/bin/x86_64-linux-gnu-gcov-dump-10  /usr/bin/x86_64-linux-gnu-gcov-dump
-            ln -s -f /usr/bin/x86_64-linux-gnu-gcov-tool-10  /usr/bin/x86_64-linux-gnu-gcov-tool
-        else
-            install_dependence "gcc g++ libgoogle-perftools-dev libatomic-ops-dev libperl-dev libxslt-dev zlib1g-dev libpcre3-dev libgeoip-dev libgd-dev libxml2-dev libsctp-dev wget unzip curl make openssl cron"
-            ##libxml2-dev非必须
-        fi
+        install_dependence "gcc g++ libgoogle-perftools-dev libatomic-ops-dev libperl-dev libxml2-dev libxslt-dev zlib1g-dev libpcre3-dev libgeoip-dev libgd-dev libsctp-dev wget unzip curl make openssl cron"
     fi
     apt clean
     $redhat_package_manager clean all
 
-##安装nginx
-    if [ $nginx_is_installed -eq 0 ]; then
-        install_nginx
-    else
-        choice=""
-        if [ $update -eq 1 ]; then
-            while [ "$choice" != "y" ] && [ "$choice" != "n" ]
-            do
-                tyblue "是否更新Nginx?(y/n)"
-                read choice
-            done
-        else
-            tyblue "---------------检测到nginx已存在---------------"
-            tyblue " 1. 尝试使用现有nginx"
-            tyblue " 2. 卸载现有nginx并重新编译安装"
-            echo
-            yellow " 若安装完成后Nginx无法启动，请卸载并重新安装"
-            echo
-            while [ "$choice" != "1" ] && [ "$choice" != "2" ]
-            do
-                read -p "您的选择是：" choice
-            done
-        fi
-        if [ "$choice" == "y" ] || [ "$choice" == "2" ]; then
-            install_nginx
-        else
-            [ $update -eq 1 ] && backup_domains_web
-            local temp_domain_bak=("${domain_list[@]}")
-            local temp_domainconfig_bak=("${domainconfig_list[@]}")
-            local temp_pretend_bak=("${pretend_list[@]}")
-            get_domainlist
-            remove_all_domains
-            domain_list=("${temp_domain_bak[@]}")
-            domainconfig_list=("${temp_domainconfig_bak[@]}")
-            pretend_list=("${temp_pretend_bak[@]}")
-            rm -rf ${nginx_prefix}/conf.d
-            rm -rf ${nginx_prefix}/certs
-            rm -rf ${nginx_prefix}/html/issue_certs
-            rm -rf ${nginx_prefix}/conf/issue_certs.conf
-            cp ${nginx_prefix}/conf/nginx.conf.default ${nginx_prefix}/conf/nginx.conf
-        fi
+    local use_existed_nginx=0
+    choice=""
+    if [ $update -eq 1 ]; then
+        while [ "$choice" != "y" ] && [ "$choice" != "n" ]
+        do
+            tyblue "是否更新Nginx?(y/n)"
+            read choice
+        done
+        [ $choice == n ] && use_existed_nginx=1
+    elif [ $nginx_is_installed -eq 1 ]; then
+        tyblue "---------------检测到nginx已存在---------------"
+        tyblue " 1. 尝试使用现有Nginx"
+        tyblue " 2. 卸载现有Nginx并重新编译安装"
+        echo
+        yellow " 若安装完成后Nginx无法启动，请卸载并重新安装"
+        echo
+        while [ "$choice" != "1" ] && [ "$choice" != "2" ]
+        do
+            read -p "您的选择是：" choice
+        done
+        [ $choice -eq 1 ] && use_existed_nginx=1
     fi
-    mkdir ${nginx_prefix}/conf.d
-    mkdir ${nginx_prefix}/certs
-    mkdir ${nginx_prefix}/html/issue_certs
-cat > ${nginx_prefix}/conf/issue_certs.conf << EOF
-events {
-    worker_connections  1024;
-}
-http {
-    server {
-        listen [::]:80 ipv6only=off;
-        root ${nginx_prefix}/html/issue_certs;
-    }
-}
-EOF
-    config_service_nginx
+
+    [ $use_existed_nginx -eq 0 ] && compile_nginx
+    #[ $use_existed_php -eq 0 ] && compile_php
+    if [ $use_existed_nginx -eq 0 ]; then
+        [ $update -eq 1 ] && backup_domains_web
+        remove_nginx
+        install_nginx_part1
+    else
+        rm -rf ${nginx_prefix}/conf.d
+        rm -rf ${nginx_prefix}/certs
+        rm -rf ${nginx_prefix}/html/issue_certs
+        rm -rf ${nginx_prefix}/conf/issue_certs.conf
+        cp ${nginx_prefix}/conf/nginx.conf.default ${nginx_prefix}/conf/nginx.conf
+    fi
+    install_nginx_part2
+    if [ $update == 1 ]; then
+        [ $use_existed_nginx -eq 0 ] && mv "${temp_dir}/domain_backup/"* ${nginx_prefix}/html 2>/dev/null
+    else
+        get_all_webs
+    fi
 
 #安装Xray
     remove_xray
@@ -1790,11 +1772,6 @@ EOF
     fi
     config_nginx
     config_xray
-    if [ $update == 1 ]; then
-        mv "${temp_dir}/domain_backup/"* ${nginx_prefix}/html 2>/dev/null
-    else
-        get_all_webs
-    fi
     sleep 2s
     systemctl restart nginx
     systemctl restart xray
