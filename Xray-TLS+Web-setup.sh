@@ -4,7 +4,7 @@
 nginx_version="nginx-1.19.6"
 openssl_version="openssl-openssl-3.0.0-alpha9"
 xray_config="/usr/local/etc/xray/config.json"
-nginx_prefix="/etc/nginx"
+nginx_prefix="/usr/local/nginx"
 nginx_config="${nginx_prefix}/conf.d/xray.conf"
 nginx_service="/etc/systemd/system/nginx.service"
 temp_dir="/temp_install_update_xray_tls_web"
@@ -12,6 +12,10 @@ xray_is_installed=""
 nginx_is_installed=""
 is_installed=""
 update=""
+if [ -e /etc/nginx/conf.d/v2ray.conf ] || [ -e /etc/nginx/conf.d/xray.conf ]; then
+    nginx_prefix="/etc/nginx"
+    nginx_config="${nginx_prefix}/conf.d/xray.conf"
+fi
 
 #配置信息
 unset domain_list
@@ -1001,6 +1005,8 @@ remove_nginx()
     rm -rf $nginx_service
     systemctl daemon-reload
     rm -rf ${nginx_prefix}
+    nginx_prefix="/usr/local/nginx"
+    nginx_config="${nginx_prefix}/conf.d/xray.conf"
 }
 
 #编译安装nignx
@@ -1021,7 +1027,7 @@ compile_nginx()
     tar -zxf ${openssl_version}.tar.gz
     cd ${nginx_version}
     sed -i "s/OPTIMIZE[ \t]*=>[ \t]*'-O'/OPTIMIZE          => '-O3'/g" src/http/modules/perl/Makefile.PL
-    ./configure --prefix=${nginx_prefix} --with-openssl=../$openssl_version --with-openssl-opt="enable-ec_nistp_64_gcc_128 shared threads zlib-dynamic sctp" --with-mail=dynamic --with-mail_ssl_module --with-stream=dynamic --with-stream_ssl_module --with-stream_realip_module --with-stream_geoip_module=dynamic --with-stream_ssl_preread_module --with-http_ssl_module --with-http_v2_module --with-http_realip_module --with-http_addition_module --with-http_xslt_module=dynamic --with-http_image_filter_module=dynamic --with-http_geoip_module=dynamic --with-http_sub_module --with-http_dav_module --with-http_flv_module --with-http_mp4_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_auth_request_module --with-http_random_index_module --with-http_secure_link_module --with-http_degradation_module --with-http_slice_module --with-http_stub_status_module --with-http_perl_module=dynamic --with-pcre --with-libatomic --with-compat --with-cpp_test_module --with-google_perftools_module --with-file-aio --with-threads --with-poll_module --with-select_module --with-cc-opt="-Wno-error -g0 -O3"
+    ./configure --prefix=/usr/local/nginx --with-openssl=../$openssl_version --with-openssl-opt="enable-ec_nistp_64_gcc_128 shared threads zlib-dynamic sctp" --with-mail=dynamic --with-mail_ssl_module --with-stream=dynamic --with-stream_ssl_module --with-stream_realip_module --with-stream_geoip_module=dynamic --with-stream_ssl_preread_module --with-http_ssl_module --with-http_v2_module --with-http_realip_module --with-http_addition_module --with-http_xslt_module=dynamic --with-http_image_filter_module=dynamic --with-http_geoip_module=dynamic --with-http_sub_module --with-http_dav_module --with-http_flv_module --with-http_mp4_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_auth_request_module --with-http_random_index_module --with-http_secure_link_module --with-http_degradation_module --with-http_slice_module --with-http_stub_status_module --with-http_perl_module=dynamic --with-pcre --with-libatomic --with-compat --with-cpp_test_module --with-google_perftools_module --with-file-aio --with-threads --with-poll_module --with-select_module --with-cc-opt="-Wno-error -g0 -O3"
     if ! make; then
         red    "nginx编译失败！"
         yellow "请尝试更换系统，建议使用Ubuntu最新版系统"
