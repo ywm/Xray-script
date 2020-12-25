@@ -106,12 +106,13 @@ fi
 check_important_dependence_installed()
 {
     if [ $release == "ubuntu" ] || [ $release == "other-debian" ]; then
-        if ! dpkg -s $1 > /dev/null 2>&1; then
+        if dpkg -s $1 > /dev/null 2>&1; then
+            apt-mark manual $1
+        else
             if ! apt -y --no-install-recommends install $1; then
                 apt update
                 if ! apt -y --no-install-recommends install $1; then
-                    yellow "重要组件安装失败！！"
-                    red "不支持的系统！！"
+                    red "重要组件\"$1\"安装失败！！"
                     exit 1
                 fi
             fi
@@ -119,8 +120,7 @@ check_important_dependence_installed()
     else
         if ! rpm -q $2 > /dev/null 2>&1; then
             if ! $redhat_package_manager -y install $2; then
-                yellow "重要组件安装失败！！"
-                red "不支持的系统！！"
+                red "重要组件\"$2\"安装失败！！"
                 exit 1
             fi
         fi
@@ -611,8 +611,9 @@ install_bbr()
     remove_other_kernel()
     {
         if [ $release == "ubuntu" ] || [ $release == "other-debian" ]; then
-            local kernel_list_image=($(dpkg --list | grep 'linux-image' | awk '{print $2}'))
-            local kernel_list_modules=($(dpkg --list | grep 'linux-modules' | awk '{print $2}'))
+            check_important_dependence_installed grub2-common
+            local kernel_list_image=($(dpkg --list | awk '{print $2}' | grep '^linux-image'))
+            local kernel_list_modules=($(dpkg --list | awk '{print $2}' | grep '^linux-modules'))
             local kernel_now=$(uname -r)
             local ok_install=0
             for ((i=${#kernel_list_image[@]}-1;i>=0;i--))
@@ -628,25 +629,18 @@ install_bbr()
                 read -s
                 return 1
             fi
-            ok_install=0
             for ((i=${#kernel_list_modules[@]}-1;i>=0;i--))
             do
                 if [[ "${kernel_list_modules[$i]}" =~ "$kernel_now" ]]; then
                     unset kernel_list_modules[$i]
-                    ((ok_install++))
                 fi
             done
-            if [ $ok_install -lt 1 ]; then
-                red "未发现正在使用的内核，可能已经被卸载"
-                yellow "按回车键继续。。。"
-                read -s
-                return 1
-            fi
             if [ ${#kernel_list_modules[@]} -eq 0 ] && [ ${#kernel_list_image[@]} -eq 0 ]; then
                 yellow "没有内核可卸载"
                 return 0
             fi
             apt -y purge ${kernel_list_image[@]} ${kernel_list_modules[@]}
+            update-grub
         else
             local kernel_list=($(rpm -qa |grep '^kernel-[0-9]\|^kernel-ml-[0-9]'))
             local kernel_list_devel=($(rpm -qa | grep '^kernel-devel\|^kernel-ml-devel'))
@@ -717,6 +711,33 @@ install_bbr()
         fi
         green "-------------------卸载完成-------------------"
     }
+    change_qdisc()
+    {
+        local list=('fq' 'fq_pie' 'cake' 'fq_codel')
+        tyblue "==============请选择你要使用的qdisc算法=============="
+        green  " 1.fq"
+        green  " 2.fq_pie"
+        tyblue " 3.cake"
+        tyblue " 4.fq_codel"
+        choice=""
+        while [ "$choice" != "1" -a "$choice" != "2" -a "$choice" != "3" -a "$choice" != "4" ]
+        do
+            read -p "您的选择是：" choice
+        done
+        local qdisc=${list[((choice-1))]}
+        sed -i '/^[ \t]*net.core.default_qdisc[ \t]*=/d' /etc/sysctl.conf
+        echo "net.core.default_qdisc = $qdisc" >> /etc/sysctl.conf
+        sysctl -p
+        sleep 1s
+        if [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$qdisc" ]; then
+            green "更换成功！"
+        else
+            red "更换失败，内核不支持"
+            sed -i '/^[ \t]*net.core.default_qdisc[ \t]*=/d' /etc/sysctl.conf
+            echo "net.core.default_qdisc = $default_qdisc" >> /etc/sysctl.conf
+            return 1
+        fi
+    }
     local your_kernel_version
     local latest_kernel_version
     get_kernel_info
@@ -729,17 +750,19 @@ install_bbr()
         echo -e "\n\n\n"
         tyblue "------------------请选择要使用的bbr版本------------------"
         green  " 1. 升级最新版内核并启用bbr(推荐)"
+        green  " 2. 安装xanmod内核并启用bbr(推荐)"
         if version_ge $your_kernel_version 4.9; then
-            tyblue " 2. 启用bbr"
+            tyblue " 3. 启用bbr"
         else
-            tyblue " 2. 升级内核启用bbr"
+            tyblue " 3. 升级内核启用bbr"
         fi
-        tyblue " 3. 启用bbr2(需更换第三方内核)"
-        tyblue " 4. 启用bbrplus/bbr魔改版/暴力bbr魔改版/锐速(需更换第三方内核)"
-        tyblue " 5. 卸载多余内核"
-        tyblue " 6. 退出bbr安装"
+        tyblue " 4. 安装第三方内核并启用bbr2"
+        tyblue " 5. 安装第三方内核并启用bbrplus/bbr魔改版/暴力bbr魔改版/锐速"
+        tyblue " 6. 卸载多余内核"
+        tyblue " 7. 更换qdisc算法"
+        tyblue " 8. 退出bbr安装"
         tyblue "------------------关于安装bbr加速的说明------------------"
-        green  " bbr加速可以大幅提升网络速度，建议安装"
+        green  " bbr拥塞算法可以大幅提升网络速度，建议启用"
         yellow " 更换第三方内核可能造成系统不稳定，甚至无法开机"
         yellow " 更换/升级内核需重启，重启后，请再次运行此脚本完成剩余安装"
         tyblue "---------------------------------------------------------"
@@ -751,22 +774,24 @@ install_bbr()
         else
             red "     否，需升级内核"
         fi
-        tyblue "  bbr启用状态："
-        if sysctl net.ipv4.tcp_congestion_control | grep -Eq "bbr|nanqinlang|tsunami"; then
-            local bbr_info=$(sysctl net.ipv4.tcp_congestion_control)
-            bbr_info=${bbr_info#*=}
-            if [ $bbr_info == nanqinlang ]; then
-                bbr_info="暴力bbr魔改版"
-            elif [ $bbr_info == tsunami ]; then
-                bbr_info="bbr魔改版"
+        tyblue "   当前TCP拥塞算法："
+        local tcp_congestion_control=$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')
+        if [[ "$tcp_congestion_control" =~ bbr|nanqinlang|tsunami ]]; then
+            if [ $tcp_congestion_control == nanqinlang ]; then
+                tcp_congestion_control="${tcp_congestion_control} \033[35m(暴力bbr魔改版)"
+            elif [ $tcp_congestion_control == tsunami ]; then
+                tcp_congestion_control="${tcp_congestion_control} \033[35m(bbr魔改版)"
             fi
-            green "   正在使用：${bbr_info}"
+            green  "       ${tcp_congestion_control}"
         else
-            red "   bbr未启用"
+            tyblue "       ${tcp_congestion_control} \033[33m(bbr未启用)"
         fi
+        tyblue "   当前qdisc算法："
+        local default_qdisc=$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')
+        green "       $default_qdisc"
         echo
         choice=""
-        while [ "$choice" != "1" -a "$choice" != "2" -a "$choice" != "3" -a "$choice" != "4" -a "$choice" != "5" -a "$choice" != "6" ]
+        while [ "$choice" != "1" -a "$choice" != "2" -a "$choice" != "3" -a "$choice" != "4" -a "$choice" != "5" -a "$choice" != "6" -a "$choice" != "7" -a "$choice" != "8" ]
         do
             read -p "您的选择是：" choice
         done
@@ -796,8 +821,28 @@ install_bbr()
             echo 'net.core.default_qdisc = fq' >> /etc/sysctl.conf
             echo 'net.ipv4.tcp_congestion_control = bbr' >> /etc/sysctl.conf
             sysctl -p
-            sleep 1s
+            if ! wget -O xanmod-install.sh https://github.com/kirin10000/xanmod-install/raw/main/xanmod-install.sh; then
+                red    "获取xanmod内核安装脚本失败"
+                yellow "按回车键继续或者按ctrl+c终止"
+                read -s
+            fi
+            chmod +x xanmod-install.sh
+            ./xanmod-install.sh
             if ! sysctl net.ipv4.tcp_congestion_control | grep -q "bbr"; then
+                red "开启bbr失败"
+                red "如果刚安装完内核，请先重启"
+                red "如果重启仍然无效，请尝试选择2选项"
+            else
+                green "--------------------bbr已安装--------------------"
+            fi
+        elif [ $choice -eq 3 ]; then
+            sed -i '/^[ \t]*net.core.default_qdisc[ \t]*=/d' /etc/sysctl.conf
+            sed -i '/^[ \t]*net.ipv4.tcp_congestion_control[ \t]*=/d' /etc/sysctl.conf
+            echo 'net.core.default_qdisc = fq' >> /etc/sysctl.conf
+            echo 'net.ipv4.tcp_congestion_control = bbr' >> /etc/sysctl.conf
+            sysctl -p
+            sleep 1s
+            if ! sysctl net.ipv4.tcp_congestion_control | grep -wq "bbr"; then
                 if ! wget -O bbr.sh https://github.com/teddysun/across/raw/master/bbr.sh; then
                     red    "获取bbr脚本失败"
                     yellow "按回车键继续或者按ctrl+c终止"
@@ -808,7 +853,7 @@ install_bbr()
             else
                 green "--------------------bbr已安装--------------------"
             fi
-        elif [ $choice -eq 3 ]; then
+        elif [ $choice -eq 4 ]; then
             tyblue "--------------------即将安装bbr2加速，安装完成后服务器将会重启--------------------"
             tyblue " 重启后，请再次选择这个选项完成bbr2剩余部分安装(开启bbr和ECN)"
             yellow " 按回车键以继续。。。。"
@@ -826,7 +871,7 @@ install_bbr()
             fi
             chmod +x bbr2.sh
             ./bbr2.sh
-        elif [ $choice -eq 4 ]; then
+        elif [ $choice -eq 5 ]; then
             if ! wget -O tcp.sh "https://raw.githubusercontent.com/chiakge/Linux-NetSpeed/master/tcp.sh"; then
                 red    "获取脚本失败"
                 yellow "按回车键继续或者按ctrl+c终止"
@@ -834,7 +879,7 @@ install_bbr()
             fi
             chmod +x tcp.sh
             ./tcp.sh
-        elif [ $choice -eq 5 ]; then
+        elif [ $choice -eq 6 ]; then
             tyblue " 该操作将会卸载除现在正在使用的内核外的其余内核"
             tyblue "    您正在使用的内核是：$(uname -r)"
             choice=""
@@ -845,6 +890,8 @@ install_bbr()
             if [ $choice == y ]; then
                 remove_other_kernel
             fi
+        elif [ $choice -eq 7 ]; then
+            change_qdisc
         else
             break
         fi
