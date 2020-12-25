@@ -108,21 +108,23 @@ check_important_dependence_installed()
     if [ $release == "ubuntu" ] || [ $release == "other-debian" ]; then
         if dpkg -s $1 > /dev/null 2>&1; then
             apt-mark manual $1
-        else
+        elif ! apt -y --no-install-recommends install $1; then
+            apt update
             if ! apt -y --no-install-recommends install $1; then
-                apt update
-                if ! apt -y --no-install-recommends install $1; then
-                    red "重要组件\"$1\"安装失败！！"
-                    exit 1
-                fi
+                red "重要组件\"$1\"安装失败！！"
+                exit 1
             fi
         fi
     else
         if ! rpm -q $2 > /dev/null 2>&1; then
-            if ! $redhat_package_manager -y install $2; then
-                red "重要组件\"$2\"安装失败！！"
-                exit 1
+            if [ "$redhat_package_manager" == "dnf" ]; then
+                dnf mark install $2
+            else
+                yumdb set reason user $2
             fi
+        elif ! $redhat_package_manager -y install $2; then
+            red "重要组件\"$2\"安装失败！！"
+            exit 1
         fi
     fi
 }
@@ -624,7 +626,7 @@ install_bbr()
                 fi
             done
             if [ $ok_install -lt 1 ]; then
-                red "未发现正在使用的内核，可能已经被卸载"
+                red "未发现正在使用的内核，可能已经被卸载，请先重新启动"
                 yellow "按回车键继续。。。"
                 read -s
                 return 1
@@ -658,7 +660,7 @@ install_bbr()
                 fi
             done
             if [ $ok_install -lt 1 ]; then
-                red "未发现正在使用的内核，可能已经被卸载"
+                red "未发现正在使用的内核，可能已经被卸载，请先重新启动"
                 yellow "按回车键继续。。。"
                 read -s
                 return 1
@@ -679,7 +681,7 @@ install_bbr()
                     fi
                 done
                 if [ $ok_install -lt 1 ]; then
-                    red "未发现正在使用的内核，可能已经被卸载"
+                    red "未发现正在使用的内核，可能已经被卸载，请先重新启动"
                     yellow "按回车键继续。。。"
                     read -s
                     return 1
@@ -693,7 +695,7 @@ install_bbr()
                     fi
                 done
                 if [ $ok_install -lt 1 ]; then
-                    red "未发现正在使用的内核，可能已经被卸载"
+                    red "未发现正在使用的内核，可能已经被卸载，请先重新启动"
                     yellow "按回车键继续。。。"
                     read -s
                     return 1
@@ -784,7 +786,7 @@ install_bbr()
             fi
             green  "       ${tcp_congestion_control}"
         else
-            tyblue "       ${tcp_congestion_control} \033[33m(bbr未启用)"
+            tyblue "       ${tcp_congestion_control} \033[31m(bbr未启用)"
         fi
         tyblue "   当前qdisc算法："
         local default_qdisc=$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')
