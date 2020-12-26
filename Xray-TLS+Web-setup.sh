@@ -237,18 +237,23 @@ check_SELinux()
 #检查80端口和443端口是否被占用
 check_port()
 {
-    local i=2
-    local temp_port=443
-    while ((i!=0))
+    local xray_status=0
+    local nginx_status=0
+    systemctl -q is-active xray && xray_status=1 && systemctl stop xray
+    systemctl -q is-active nginx && nginx_status=1 && systemctl stop nginx
+    ([ $xray_status -eq 1 ] || [ $nginx_status -eq 1 ]) && sleep 2s
+    local check_list=('80' '443')
+    local i
+    for i in ${!check_list[@]}
     do
-        ((i--))
-        if netstat -tuln | tail -n +3 | awk '{print $4}' | awk -F : '{print $NF}' | grep -wq "$temp_port"; then
-            red "$temp_port端口被占用！"
-            yellow "请用 lsof -i:$temp_port 命令检查"
+        if netstat -tuln | awk '{print $4}'  | awk -F : '{print $NF}' | grep -E "^[0-9]+$" | grep -wq "${check_list[$i]}"; then
+            red "${check_list[$i]}端口被占用！"
+            yellow "请用 lsof -i:${check_list[$i]} 命令检查"
             exit 1
         fi
-        temp_port=80
     done
+    [ $xray_status -eq 1 ] && systemctl start xray
+    [ $nginx_status -eq 1 ] && systemctl start nginx
 }
 
 #将域名列表转化为一个数组
@@ -257,12 +262,8 @@ get_all_domains()
     unset all_domains
     for ((i=0;i<${#domain_list[@]};i++))
     do
-        if [ ${domainconfig_list[i]} -eq 1 ]; then
-            all_domains+=("www.${domain_list[i]}")
-            all_domains+=("${domain_list[i]}")
-        else
-            all_domains+=("${domain_list[i]}")
-        fi
+        [ ${domainconfig_list[i]} -eq 1 ] && all_domains+=("www.${domain_list[i]}")
+        all_domains+=("${domain_list[i]}")
     done
 }
 
@@ -605,6 +606,7 @@ install_bbr()
                 rc_version=${rc_version##*'rc'}
                 your_kernel_version=${your_kernel_version}-rc${rc_version}
             fi
+            uname -r | grep -q xanmod && your_kernel_version="${your_kernel_version}-xanmod"
         else
             latest_kernel_version=${latest_kernel_version%%-*}
         fi
@@ -1167,7 +1169,7 @@ install_update_xray()
         echo "LimitNOFILE=1000000" >> /etc/systemd/system/xray@.service
         systemctl daemon-reload
         sleep 1s
-        if systemctl is-active xray > /dev/null 2>&1; then
+        if systemctl -q is-active xray; then
             systemctl restart xray
         fi
     fi
@@ -1729,8 +1731,6 @@ install_update_xray_tls_web()
             fi
         fi
     }
-    systemctl stop nginx
-    systemctl stop xray
     check_port
     apt -y -f install
     get_system_info
@@ -1828,8 +1828,7 @@ install_update_xray_tls_web()
     config_nginx
     config_xray
     sleep 2s
-    systemctl restart nginx
-    systemctl restart xray
+    systemctl restart xray nginx
     if [ $update == 1 ]; then
         green "-------------------升级完成-------------------"
     else
@@ -1893,7 +1892,7 @@ start_menu()
     else
         local xray_status="\033[31m未安装"
     fi
-    if systemctl is-active xray > /dev/null 2>&1; then
+    if systemctl -q is-active xray; then
         xray_status="${xray_status}                \033[32m运行中"
     else
         xray_status="${xray_status}                \033[31m未运行"
@@ -1903,7 +1902,7 @@ start_menu()
     else
         local nginx_status="\033[31m未安装"
     fi
-    if systemctl is-active nginx > /dev/null 2>&1; then
+    if systemctl -q is-active nginx; then
         nginx_status="${nginx_status}                \033[32m运行中"
     else
         nginx_status="${nginx_status}                \033[31m未运行"
@@ -1937,7 +1936,7 @@ start_menu()
     red    "   5. 卸载Xray-TLS+Web"
     echo
     tyblue " --------------启动/停止-------------"
-    if systemctl is-active xray > /dev/null 2>&1 && systemctl is-active nginx > /dev/null 2>&1; then
+    if systemctl -q is-active xray && systemctl -q is-active nginx; then
         tyblue "   6. 重新启动Xray-TLS+Web"
     else
         tyblue "   6. 启动Xray-TLS+Web"
@@ -2012,28 +2011,19 @@ start_menu()
         rm -rf $HOME/.acme.sh
         green "删除完成！"
     elif [ $choice -eq 6 ]; then
-        if systemctl is-active xray > /dev/null 2>&1 && systemctl is-active nginx > /dev/null 2>&1; then
-            local temp_is_active=1
-        else
-            local temp_is_active=0
-        fi
-        systemctl restart nginx
-        systemctl restart xray
+        local temp_is_active=0
+        systemctl -q is-active xray && systemctl -q is-active nginx && temp_is_active=1
+        systemctl restart xray nginx
         sleep 1s
-        if ! systemctl is-active xray > /dev/null 2>&1; then
+        if ! systemctl -q is-active xray; then
             red "Xray启动失败！！"
-        elif ! systemctl is-active nginx > /dev/null 2>&1; then
-            red "nginx启动失败！！"
+        elif ! systemctl -q is-active nginx; then
+            red "Nginx启动失败！！"
         else
-            if [ $temp_is_active -eq 1 ]; then
-                green "重启成功！！"
-            else
-                green "启动成功！！"
-            fi
+            ([ $temp_is_active -eq 1 ] && green "重启成功！！") || green "启动成功！！"
         fi
     elif [ $choice -eq 7 ]; then
-        systemctl stop nginx
-        systemctl stop xray
+        systemctl stop xray nginx
         green "已停止！"
     elif [ $choice -eq 8 ]; then
         get_base_information
@@ -2068,8 +2058,7 @@ start_menu()
         config_nginx
         config_xray
         sleep 2s
-        systemctl restart nginx
-        systemctl restart xray
+        systemctl restart xray nginx
         green "域名重置完成！！"
         echo_end
     elif [ $choice -eq 10 ]; then
@@ -2085,8 +2074,7 @@ start_menu()
         config_nginx
         config_xray
         sleep 2s
-        systemctl restart nginx
-        systemctl restart xray
+        systemctl restart xray nginx
         green "域名添加完成！！"
         echo_end
     elif [ $choice -eq 11 ]; then
@@ -2129,8 +2117,7 @@ start_menu()
         pretend_list=(${pretend_list[@]})
         config_nginx
         config_xray
-        systemctl restart nginx
-        systemctl restart xray
+        systemctl restart xray nginx
         green "域名删除完成！！"
         echo_end
     elif [ $choice -eq 12 ]; then
