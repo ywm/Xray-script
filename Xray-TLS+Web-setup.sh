@@ -1420,7 +1420,6 @@ cat >> $xray_config <<EOF
                     ],
                     "minVersion": "1.2",
                     "cipherSuites": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384:TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
-                    "ocspStapling": 3600,
                     "certificates": [
 EOF
     for ((i=0;i<${#domain_list[@]};i++))
@@ -1428,7 +1427,8 @@ EOF
 cat >> $xray_config <<EOF
                         {
                             "certificateFile": "${nginx_prefix}/certs/${domain_list[i]}.cer",
-                            "keyFile": "${nginx_prefix}/certs/${domain_list[i]}.key"
+                            "keyFile": "${nginx_prefix}/certs/${domain_list[i]}.key",
+                            "ocspStapling": 3600
 EOF
         if (($i==${#domain_list[@]}-1)); then
             echo "                        }" >> $xray_config
