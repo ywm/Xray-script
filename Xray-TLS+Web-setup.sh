@@ -1038,14 +1038,16 @@ backup_domains_web()
 #卸载xray和nginx
 remove_xray()
 {
-    systemctl stop xray
-    systemctl disable xray
-    bash <(curl -L https://raw.githubusercontent.com/XTLS/Xray-install/main/install-release.sh) --remove
-    rm -rf /usr/local/bin/xray
-    rm -rf /usr/local/etc/xray
-    rm -rf /etc/systemd/system/xray.service
-    rm -rf /etc/systemd/system/xray@.service
-    systemctl daemon-reload
+    if ! bash <(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh) remove --purge; then
+        systemctl stop xray
+        systemctl disable xray
+        rm -rf /usr/local/bin/xray
+        rm -rf /usr/local/etc/xray
+        rm -rf /etc/systemd/system/xray.service
+        rm -rf /etc/systemd/system/xray@.service
+        rm -rf /var/log/xray
+        systemctl daemon-reload
+    fi
 }
 remove_nginx()
 {
@@ -1150,28 +1152,11 @@ EOF
 install_update_xray()
 {
     green "正在安装/更新Xray。。。。"
-    if ! bash <(curl -L https://raw.githubusercontent.com/XTLS/Xray-install/main/install-release.sh) && ! bash <(curl -L https://raw.githubusercontent.com/XTLS/Xray-install/main/install-release.sh); then
+    if ! bash <(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh) install -u root --without-geodata && ! bash <(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh) install -u root --without-geodata; then
         red    "安装/更新Xray失败"
         yellow "按回车键继续或者按ctrl+c终止"
         read -s
         return 1
-    fi
-    #解决透明代理 Too many files 问题
-    #https://guide.v2fly.org/app/tproxy.html#%E8%A7%A3%E5%86%B3-too-many-open-files-%E9%97%AE%E9%A2%98
-    if ! grep -qE 'LimitNPROC|LimitNOFILE' /etc/systemd/system/xray.service /etc/systemd/system/xray@.service; then
-        echo >> /etc/systemd/system/xray.service
-        echo "[Service]" >> /etc/systemd/system/xray.service
-        echo "LimitNPROC=10000" >> /etc/systemd/system/xray.service
-        echo "LimitNOFILE=1000000" >> /etc/systemd/system/xray.service
-        echo >> /etc/systemd/system/xray@.service
-        echo "[Service]" >> /etc/systemd/system/xray@.service
-        echo "LimitNPROC=10000" >> /etc/systemd/system/xray@.service
-        echo "LimitNOFILE=1000000" >> /etc/systemd/system/xray@.service
-        systemctl daemon-reload
-        sleep 1s
-        if systemctl -q is-active xray; then
-            systemctl restart xray
-        fi
     fi
 }
 
@@ -1188,12 +1173,7 @@ get_cert()
     if ! $HOME/.acme.sh/acme.sh --issue -d $1 $temp -w ${nginx_prefix}/html/issue_certs -k ec-256 -ak ec-256 --pre-hook "mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak && cp ${nginx_prefix}/conf/issue_certs.conf ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --post-hook "mv ${nginx_prefix}/conf/nginx.conf.bak ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --ocsp; then
         $HOME/.acme.sh/acme.sh --issue -d $1 $temp -w ${nginx_prefix}/html/issue_certs -k ec-256 -ak ec-256 --pre-hook "mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak && cp ${nginx_prefix}/conf/issue_certs.conf ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --post-hook "mv ${nginx_prefix}/conf/nginx.conf.bak ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --ocsp --debug
     fi
-    if id nobody | grep -qw 'nogroup'; then
-        temp="chown -R nobody:nogroup ${nginx_prefix}/certs"
-    else
-        temp="chown -R nobody:nobody ${nginx_prefix}/certs"
-    fi
-    if ! $HOME/.acme.sh/acme.sh --installcert -d $1 --key-file ${nginx_prefix}/certs/${1}.key --fullchain-file ${nginx_prefix}/certs/${1}.cer --reloadcmd "$temp && sleep 2s && systemctl restart xray" --ecc; then
+    if ! $HOME/.acme.sh/acme.sh --installcert -d $1 --key-file ${nginx_prefix}/certs/${1}.key --fullchain-file ${nginx_prefix}/certs/${1}.cer --reloadcmd "sleep 2s && systemctl restart xray" --ecc; then
         yellow "证书安装失败，请检查您的域名，确保80端口未打开并且未被占用。并在安装完成后，使用选项9修复"
         yellow "按回车键继续。。。"
         read -s
@@ -1440,6 +1420,7 @@ cat >> $xray_config <<EOF
                     ],
                     "minVersion": "1.2",
                     "cipherSuites": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384:TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
+                    "ocspStapling": 3600,
                     "certificates": [
 EOF
     for ((i=0;i<${#domain_list[@]};i++))
