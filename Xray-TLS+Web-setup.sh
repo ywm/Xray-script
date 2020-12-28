@@ -615,7 +615,6 @@ install_bbr()
     remove_other_kernel()
     {
         if [ $release == "ubuntu" ] || [ $release == "other-debian" ]; then
-            check_important_dependence_installed grub2-common
             local kernel_list_image=($(dpkg --list | awk '{print $2}' | grep '^linux-image'))
             local kernel_list_modules=($(dpkg --list | awk '{print $2}' | grep '^linux-modules'))
             local kernel_now=$(uname -r)
@@ -644,7 +643,7 @@ install_bbr()
                 return 0
             fi
             apt -y purge ${kernel_list_image[@]} ${kernel_list_modules[@]}
-            update-grub
+            apt-mark manual "^grub"
         else
             local kernel_list=($(rpm -qa |grep '^kernel-[0-9]\|^kernel-ml-[0-9]'))
             local kernel_list_devel=($(rpm -qa | grep '^kernel-devel\|^kernel-ml-devel'))
