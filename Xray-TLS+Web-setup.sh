@@ -717,7 +717,7 @@ install_bbr()
     change_qdisc()
     {
         local list=('fq' 'fq_pie' 'cake' 'fq_codel')
-        tyblue "==============请选择你要使用的qdisc算法=============="
+        tyblue "==============请选择你要使用的队列算法=============="
         green  " 1.fq"
         green  " 2.fq_pie"
         tyblue " 3.cake"
@@ -762,7 +762,7 @@ install_bbr()
         tyblue " 4. 安装第三方内核并启用bbr2"
         tyblue " 5. 安装第三方内核并启用bbrplus/bbr魔改版/暴力bbr魔改版/锐速"
         tyblue " 6. 卸载多余内核"
-        tyblue " 7. 更换qdisc算法"
+        tyblue " 7. 更换队列算法"
         tyblue " 8. 退出bbr安装"
         tyblue "------------------关于安装bbr加速的说明------------------"
         green  " bbr拥塞算法可以大幅提升网络速度，建议启用"
@@ -777,7 +777,7 @@ install_bbr()
         else
             red "     否，需升级内核"
         fi
-        tyblue "   当前TCP拥塞算法："
+        tyblue "   当前拥塞控制算法："
         local tcp_congestion_control=$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')
         if [[ "$tcp_congestion_control" =~ bbr|nanqinlang|tsunami ]]; then
             if [ $tcp_congestion_control == nanqinlang ]; then
@@ -789,7 +789,7 @@ install_bbr()
         else
             tyblue "       ${tcp_congestion_control} \033[31m(bbr未启用)"
         fi
-        tyblue "   当前qdisc算法："
+        tyblue "   当前队列算法："
         local default_qdisc=$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')
         green "       $default_qdisc"
         echo
@@ -1151,7 +1151,9 @@ EOF
 install_update_xray()
 {
     green "正在安装/更新Xray。。。。"
-    if ! bash <(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh) install -u root --without-geodata && ! bash <(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh) install -u root --without-geodata; then
+    local temp=""
+    [[ ! -f '/usr/local/bin/xray' ]] && temp="-u root --without-geodata"
+    if ! bash <(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh) install $temp && ! bash <(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh) install $temp; then
         red    "安装/更新Xray失败"
         yellow "按回车键继续或者按ctrl+c终止"
         read -s
