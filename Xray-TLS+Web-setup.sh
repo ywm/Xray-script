@@ -116,7 +116,7 @@ check_important_dependence_installed()
             fi
         fi
     else
-        if ! rpm -q $2 > /dev/null 2>&1; then
+        if rpm -q $2 > /dev/null 2>&1; then
             if [ "$redhat_package_manager" == "dnf" ]; then
                 dnf mark install $2
             else
