@@ -304,13 +304,13 @@ check_ssh_timeout()
 #删除防火墙和阿里云盾
 uninstall_firewall()
 {
-    #green "正在删除防火墙。。。"
-    #ufw disable
-    #apt -y purge firewalld
-    #apt -y purge ufw
-    #systemctl stop firewalld
-    #systemctl disable firewalld
-    #$redhat_package_manager -y remove firewalld
+    green "正在删除防火墙。。。"
+    ufw disable
+    apt -y purge firewalld
+    apt -y purge ufw
+    systemctl stop firewalld
+    systemctl disable firewalld
+    $redhat_package_manager -y remove firewalld
     green "正在删除阿里云盾和腾讯云盾 (仅对阿里云和腾讯云服务器有效)。。。"
 #阿里云盾
     if [ $release == "ubuntu" ] || [ $release == "other-debian" ]; then
@@ -1173,7 +1173,10 @@ get_cert()
         $HOME/.acme.sh/acme.sh --issue -d $1 $temp -w ${nginx_prefix}/html/issue_certs -k ec-256 -ak ec-256 --pre-hook "mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak && cp ${nginx_prefix}/conf/issue_certs.conf ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --post-hook "mv ${nginx_prefix}/conf/nginx.conf.bak ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --ocsp --debug
     fi
     if ! $HOME/.acme.sh/acme.sh --installcert -d $1 --key-file ${nginx_prefix}/certs/${1}.key --fullchain-file ${nginx_prefix}/certs/${1}.cer --reloadcmd "sleep 2s && systemctl restart xray" --ecc; then
-        yellow "证书安装失败，请检查您的域名，确保80端口未打开并且未被占用。并在安装完成后，使用选项9修复"
+        yellow "证书安装失败，请检查："
+        yellow "    1.域名是否解析正确"
+        yellow "    2.vps防火墙80端口是否开放"
+        yellow "并在安装完成后，使用选项9修复"
         yellow "按回车键继续。。。"
         read -s
     fi
