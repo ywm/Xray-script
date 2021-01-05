@@ -1151,7 +1151,7 @@ EOF
 install_update_xray()
 {
     green "正在安装/更新Xray。。。。"
-    if ! bash <(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh) install -u root --without-geodata && ! bash <(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh) install -u root --without-geodata; then
+    if ! bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u root --without-geodata && ! bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u root --without-geodata; then
         red    "安装/更新Xray失败"
         yellow "按回车键继续或者按ctrl+c终止"
         read -s
