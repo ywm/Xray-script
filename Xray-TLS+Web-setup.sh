@@ -178,7 +178,7 @@ get_system_info()
 }
 
 #检查Nginx是否已通过apt/dnf/yum安装
-check_nginx()
+check_nginx_installed_system()
 {
     if [[ ! -f /usr/lib/systemd/system/nginx.service ]] && [[ ! -f /lib/systemd/system/nginx.service ]]; then
         return 0
@@ -1019,6 +1019,18 @@ readProtocolConfig()
     fi
 }
 
+#检查Nginx更新
+check_nginx_update()
+{
+    local nginx_version_now="nginx-$(${nginx_perfix}/sbin/nginx -V 2>&1 | grep "^nginx version:" | cut -d / -f 2)"
+    local openssl_version_now="openssl-openssl-$(${nginx_perfix}/sbin/nginx -V 2>&1 | grep "^built with OpenSSL" | awk '{print $4}')"
+    if [ "$nginx_version_now" == "$nginx_version" ] && [ "$openssl_version_now" == "$openssl_version" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 #备份域名伪装网站
 backup_domains_web()
 {
@@ -1718,7 +1730,7 @@ install_update_xray_tls_web()
     apt -y -f install
     get_system_info
     check_important_dependence_installed ca-certificates ca-certificates
-    check_nginx
+    check_nginx_installed_system
     check_SELinux
     check_ssh_timeout
     uninstall_firewall
@@ -1746,14 +1758,19 @@ install_update_xray_tls_web()
     $redhat_package_manager clean all
 
     local use_existed_nginx=0
-    choice=""
     if [ $update -eq 1 ]; then
-        while [ "$choice" != "y" ] && [ "$choice" != "n" ]
-        do
-            tyblue "是否更新Nginx?(y/n)"
-            read choice
-        done
-        [ $choice == n ] && use_existed_nginx=1
+        if check_nginx_update; then
+            choice=""
+            while [ "$choice" != "y" ] && [ "$choice" != "n" ]
+            do
+                tyblue "检测到Nginx有新版本，是否更新?(y/n)"
+                read choice
+            done
+            [ $choice == n ] && use_existed_nginx=1
+        else
+            green "Nginx已经是最新版本，不更新"
+            use_existed_nginx=1
+        fi
     elif [ $nginx_is_installed -eq 1 ]; then
         tyblue "---------------检测到nginx已存在---------------"
         tyblue " 1. 尝试使用现有Nginx"
@@ -1761,6 +1778,7 @@ install_update_xray_tls_web()
         echo
         yellow " 若安装完成后Nginx无法启动，请卸载并重新安装"
         echo
+        choice=""
         while [ "$choice" != "1" ] && [ "$choice" != "2" ]
         do
             read -p "您的选择是：" choice
