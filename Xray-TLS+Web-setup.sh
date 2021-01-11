@@ -1260,7 +1260,7 @@ compile_php()
             tyblue "内存不足1.5G，自动申请swap。。"
             use_swap=1
             swapoff -a
-            dd if=/dev/zero of=${temp_dir}/swap bs=1M count=((1400-$(free -m | sed -n 2p | awk '{print $2}')))
+            dd if=/dev/zero of=${temp_dir}/swap bs=1M count=$((1400-$(free -m | sed -n 2p | awk '{print $2}')))
             chmod 0644 ${temp_dir}/swap
             mkswap ${temp_dir}/swap
             swapon ${temp_dir}/swap
