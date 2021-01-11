@@ -1325,7 +1325,6 @@ install_php_part2()
     echo "listen = /dev/shm/php-fpm_unixsocket/php.sock" >> ${php_prefix}/etc/php-fpm.d/www.conf
     sed -i '/^[ \t]*env\[PATH\][ \t]*=/d' ${php_prefix}/etc/php-fpm.d/www.conf
     echo "env[PATH] = $PATH" >> ${php_prefix}/etc/php-fpm.d/www.conf
-    systemctl disable php-fpm
     rm -rf /etc/systemd/system/php-fpm.service
     cp ${php_prefix}/php-fpm.service.default /etc/systemd/system/php-fpm.service
 cat >> /etc/systemd/system/php-fpm.service <<EOF
@@ -1338,7 +1337,6 @@ ExecStartPre=/bin/chmod 711 /dev/shm/php-fpm_unixsocket
 ExecStopPost=/bin/rm -rf /dev/shm/php-fpm_unixsocket
 EOF
     systemctl daemon-reload
-    systemctl enable php-fpm
 }
 
 #安装/更新Xray
@@ -2088,10 +2086,15 @@ install_update_xray_tls_web()
     config_nginx
     config_xray
     sleep 2s
-    systemctl restart xray nginx php-fpm
-    if [ $update -eq 0 ] && [ $install_php -eq 1 ]; then
-        let_init_nextcloud "0"
-    fi
+    systemctl restart xray nginx
+    local need_php=0
+    local i
+    for i in ${!pretend_list[@]}
+    do
+        [ ${pretend_list[$i]} -eq 4 ] && need_php=1 && break
+    done
+    [ $need_php -eq 1 ] && systemctl --now enable php-fpm || systemctl --now disable php-fpm
+    [ $update -eq 0 ] && [ $install_php -eq 1 ] && let_init_nextcloud "0"
     if [ $update == 1 ]; then
         green "-------------------升级完成-------------------"
     else
