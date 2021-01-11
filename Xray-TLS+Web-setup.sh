@@ -1715,6 +1715,18 @@ get_all_webs()
     done
 }
 
+#参数 1:域名在列表中的位置
+let_init_nextcloud()
+{
+    local temp_domain="${domain_list[$1]}"
+    [ ${domainconfig_list[$1]} -eq 1 ] && temp_domain+="www"
+    green "请打开 \"https://${temp_domain}\" 进行Nextcloud初始化设置"
+    sleep 10s
+    green "按两次回车键以继续。。。"
+    read -s
+    read -s
+}
+
 echo_end()
 {
     get_all_domains
@@ -2078,12 +2090,7 @@ install_update_xray_tls_web()
     sleep 2s
     systemctl restart xray nginx php-fpm
     if [ $update -eq 0 ] && [ $install_php -eq 1 ]; then
-        get_all_domains
-        green "请打开 \"https://${all_domains[0]}\" 进行Nextcloud初始化设置"
-        sleep 5s
-        green "按两次回车键以继续。。。"
-        read -s
-        read -s
+        let_init_nextcloud "0"
     fi
     if [ $update == 1 ]; then
         green "-------------------升级完成-------------------"
@@ -2207,6 +2214,10 @@ start_menu()
     do
         read -p "您的选择是：" choice
     done
+    if [ $choice -eq 6 ] || ((8<=$choice&&$choice<=11)); then
+        get_base_information
+        get_domainlist
+    fi
     if [ $choice -eq 1 ]; then
         install_update_xray_tls_web
     elif [ $choice -eq 2 ]; then
@@ -2250,28 +2261,34 @@ start_menu()
         fi
         remove_xray
         remove_nginx
+        remove_php
         $HOME/.acme.sh/acme.sh --uninstall
         rm -rf $HOME/.acme.sh
         green "删除完成！"
     elif [ $choice -eq 6 ]; then
+        local need_php=0
+        local i
+        for i in ${!pretend_list[@]}
+        do
+            [ ${pretend_list[$i]} -eq 4 ] && need_php=1 && break
+        done
         systemctl restart xray nginx
-        [ $php_is_installed -eq 1 ] && systemctl restart php-fpm
+        [ $need_php -eq 1 ] && systemctl restart php-fpm || systemctl stop php-fpm
         sleep 1s
         if ! systemctl -q is-active xray; then
             red "Xray启动失败！！"
         elif ! systemctl -q is-active nginx; then
             red "Nginx启动失败！！"
-        elif [ $php_is_installed -eq 1 ] && ! systemctl -q is-active php-fpm; then
+        elif [ $need_php -eq 1 ] && ! systemctl -q is-active php-fpm; then
             red "php启动失败！！"
         else
             green "重启/启动成功！！"
         fi
     elif [ $choice -eq 7 ]; then
         systemctl stop xray nginx
+        [ $php_is_installed -eq 1 ] && systemctl stop php-fpm
         green "已停止！"
     elif [ $choice -eq 8 ]; then
-        get_base_information
-        get_domainlist
         echo_end
     elif [ $choice -eq 9 ]; then
         if [ $is_installed == 0 ]; then
@@ -2293,45 +2310,70 @@ start_menu()
         rm -rf $HOME/.acme.sh
         curl https://get.acme.sh | sh
         $HOME/.acme.sh/acme.sh --upgrade --auto-upgrade
-        get_base_information
-        get_domainlist
         remove_all_domains
         readDomain
+        local new_install_php=0
+        if [ ${pretend_list[0]} -eq 4 ] && [ $php_is_installed -eq 0 ]; then
+            enter_temp_dir
+            compile_php
+            remove_php
+            install_php_part1
+            install_php_part2
+            new_install_php=1
+        fi
         get_all_certs
         get_all_webs
         config_nginx
         config_xray
         sleep 2s
         systemctl restart xray nginx
+        if [ ${pretend_list[0]} -eq 4 ]; then
+            systemctl --now enable php-fpm
+            let_init_nextcloud "0"
+        else
+            systemctl --now disable php-fpm
+        fi
         green "域名重置完成！！"
         echo_end
+        [ ${new_install_php} -eq 1 ] && rm -rf "$temp_dir"
     elif [ $choice -eq 10 ]; then
         if [ $is_installed == 0 ]; then
             red "请先安装Xray-TLS+Web！！"
             exit 1
         fi
-        get_base_information
-        get_domainlist
         readDomain
+        local new_install_php=0
+        if [ ${pretend_list[-1]} -eq 4 ] && [ $php_is_installed -eq 0 ]; then
+            enter_temp_dir
+            compile_php
+            remove_php
+            install_php_part1
+            install_php_part2
+            new_install_php=1
+        fi
         get_cert ${domain_list[-1]} ${domainconfig_list[-1]}
         get_web ${domain_list[-1]} ${pretend_list[-1]}
         config_nginx
         config_xray
         sleep 2s
         systemctl restart xray nginx
+        if [ ${pretend_list[-1]} -eq 4 ]; then
+            systemctl --now enable php-fpm
+            let_init_nextcloud "-1"
+        fi
         green "域名添加完成！！"
         echo_end
+        [ ${new_install_php} -eq 1 ] && rm -rf "$temp_dir"
     elif [ $choice -eq 11 ]; then
         if [ $is_installed == 0 ]; then
             red "请先安装Xray-TLS+Web！！"
             exit 1
         fi
-        get_base_information
-        get_domainlist
         if [ ${#domain_list[@]} -le 1 ]; then
             red "只有一个域名"
             exit 1
         fi
+        local i
         tyblue "-----------------------请选择要删除的域名-----------------------"
         for i in ${!domain_list[@]}
         do
@@ -2362,6 +2404,12 @@ start_menu()
         config_nginx
         config_xray
         systemctl restart xray nginx
+        local need_php=0
+        for i in ${!pretend_list[@]}
+        do
+            [ ${pretend_list[$i]} -eq 4 ] && need_php=1 && break
+        done
+        [ $need_php -eq 0 ] && systemctl --now disable php-fpm
         green "域名删除完成！！"
         echo_end
     elif [ $choice -eq 12 ]; then
