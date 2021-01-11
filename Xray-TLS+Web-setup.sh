@@ -977,6 +977,7 @@ readDomain()
             tyblue "安装Nextcloud需要安装php"
             yellow "编译&&安装php可能需要额外消耗15-30分钟"
             yellow "php将占用一定系统资源，不建议内存<512M的机器使用"
+            queren=""
             while [ "$queren" != "y" -a "$queren" != "n" ]
             do
                 tyblue "确定选择吗？(y/n)"
