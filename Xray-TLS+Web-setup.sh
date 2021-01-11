@@ -910,9 +910,9 @@ readDomain()
             return 1
         fi
     }
-    local domain=""
-    local domainconfig=""
-    local pretend=""
+    local domain
+    local domainconfig
+    local pretend
     echo -e "\n\n\n"
     tyblue "--------------------请选择域名解析情况--------------------"
     tyblue " 1. 一级域名 和 www.一级域名 都解析到此服务器上"
@@ -920,6 +920,7 @@ readDomain()
     tyblue " 2. 仅某个域名解析到此服务器上"
     green  "    如：123.com 或 www.123.com 或 xxx.123.com 中的某一个解析到此服务器上"
     echo
+    domainconfig=""
     while [ "$domainconfig" != "1" -a "$domainconfig" != "2" ]
     do
         read -p "您的选择是：" domainconfig
@@ -962,6 +963,7 @@ readDomain()
         tyblue " 4. Nextcloud"
         green  "    说明：最强伪装，没有之一"
         echo
+        pretend=""
         while [[ "$pretend" != "1" && "$pretend" != "2" && "$pretend" != "3" && "$pretend" != "4" ]]
         do
             read -p "您的选择是：" pretend
