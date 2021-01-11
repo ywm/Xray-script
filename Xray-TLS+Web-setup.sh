@@ -1265,8 +1265,14 @@ compile_php()
             tyblue "内存不足1.5G，自动申请swap。。"
             use_swap=1
             swapoff -a
-            dd if=/dev/zero of=${temp_dir}/swap bs=1M count=$((1400-$(free -m | sed -n 2p | awk '{print $2}')))
-            chmod 0644 ${temp_dir}/swap
+            if ! dd if=/dev/zero of=${temp_dir}/swap bs=1M count=$((1400-$(free -m | sed -n 2p | awk '{print $2}'))); then
+                red   "开启swap失败！"
+                yellow "可能是机器内存和硬盘空间都不足"
+                green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
+                yellow "按回车键继续或者Ctrl+c退出"
+                read -s
+            fi
+            chmod 0600 ${temp_dir}/swap
             mkswap ${temp_dir}/swap
             swapon ${temp_dir}/swap
         fi
@@ -2071,7 +2077,7 @@ install_update_xray_tls_web()
     config_xray
     sleep 2s
     systemctl restart xray nginx php-fpm
-    if [ $update -eq 0 ] && [ install_php -eq 1 ]; then
+    if [ $update -eq 0 ] && [ $install_php -eq 1 ]; then
         get_all_domains
         green "请打开 \"https://${all_domains[0]}\" 进行Nextcloud初始化设置"
         sleep 5s
@@ -2137,31 +2143,22 @@ start_menu()
             green "修改完成！！"
         fi
     }
-    if [ $xray_is_installed -eq 1 ]; then
-        local xray_status="\033[32m已安装"
-    else
-        local xray_status="\033[31m未安装"
-    fi
-    if systemctl -q is-active xray; then
-        xray_status="${xray_status}                \033[32m运行中"
-    else
-        xray_status="${xray_status}                \033[31m未运行"
-    fi
-    if [ $nginx_is_installed -eq 1 ]; then
-        local nginx_status="\033[32m已安装"
-    else
-        local nginx_status="\033[31m未安装"
-    fi
-    if systemctl -q is-active nginx; then
-        nginx_status="${nginx_status}                \033[32m运行中"
-    else
-        nginx_status="${nginx_status}                \033[31m未运行"
-    fi
+    local xray_status
+    [ $xray_is_installed -eq 1 ] && xray_status="\033[32m已安装" || xray_status="\033[31m未安装"
+    systemctl -q is-active xray && xray_status+="                \033[32m运行中" || xray_status+="                \033[31m未运行"
+    local nginx_status
+    [ $nginx_is_installed -eq 1 ] && nginx_status="\033[32m已安装" || nginx_status="\033[31m未安装"
+    systemctl -q is-active nginx && nginx_status+="                \033[32m运行中" || nginx_status+="                \033[31m未运行"
+    local php_status
+    [ $php_is_installed -eq 1 ] && php_status="\033[32m已安装" || php_status="\033[31m未安装"
+    systemctl -q is-active php-fpm && php_status+="                \033[32m运行中" || php_status+="                \033[31m未运行"
     tyblue "---------------------- Xray-TLS(1.3)+Web 搭建/管理脚本 ---------------------"
     echo
     tyblue "            Xray  ：           ${xray_status}"
     echo
     tyblue "            Nginx ：           ${nginx_status}"
+    echo
+    tyblue "            php   ：           ${php_status}"
     echo
     tyblue "       官网：https://github.com/kirin10000/Xray-script"
     echo
@@ -2186,11 +2183,7 @@ start_menu()
     red    "   5. 卸载Xray-TLS+Web"
     echo
     tyblue " --------------启动/停止-------------"
-    if systemctl -q is-active xray && systemctl -q is-active nginx; then
-        tyblue "   6. 重新启动Xray-TLS+Web"
-    else
-        tyblue "   6. 启动Xray-TLS+Web"
-    fi
+    tyblue "   6. 启动/重启Xray-TLS+Web"
     tyblue "   7. 停止Xray-TLS+Web"
     echo
     tyblue " ----------------管理----------------"
@@ -2261,16 +2254,17 @@ start_menu()
         rm -rf $HOME/.acme.sh
         green "删除完成！"
     elif [ $choice -eq 6 ]; then
-        local temp_is_active=0
-        systemctl -q is-active xray && systemctl -q is-active nginx && temp_is_active=1
         systemctl restart xray nginx
+        [ $php_is_installed -eq 1 ] && systemctl restart php-fpm
         sleep 1s
         if ! systemctl -q is-active xray; then
             red "Xray启动失败！！"
         elif ! systemctl -q is-active nginx; then
             red "Nginx启动失败！！"
+        elif [ $php_is_installed -eq 1 ] && ! systemctl -q is-active php-fpm; then
+            red "php启动失败！！"
         else
-            ([ $temp_is_active -eq 1 ] && green "重启成功！！") || green "启动成功！！"
+            green "重启/启动成功！！"
         fi
     elif [ $choice -eq 7 ]; then
         systemctl stop xray nginx
