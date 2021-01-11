@@ -2,14 +2,18 @@
 
 #安装选项
 nginx_version="nginx-1.19.6"
-openssl_version="openssl-openssl-3.0.0-alpha9"
-xray_config="/usr/local/etc/xray/config.json"
+openssl_version="openssl-openssl-3.0.0-alpha10"
 nginx_prefix="/usr/local/nginx"
 nginx_config="${nginx_prefix}/conf.d/xray.conf"
 nginx_service="/etc/systemd/system/nginx.service"
+php_version="php-7.4.14"
+php_prefix="/usr/local/php"
+nextcloud_version="nextcloud-20.0.4"
+xray_config="/usr/local/etc/xray/config.json"
 temp_dir="/temp_install_update_xray_tls_web"
-xray_is_installed=""
 nginx_is_installed=""
+php_is_installed=""
+xray_is_installed=""
 is_installed=""
 update=""
 if [ -e /etc/nginx/conf.d/v2ray.conf ] || [ -e /etc/nginx/conf.d/xray.conf ]; then
@@ -87,21 +91,10 @@ if [ "$(cat /proc/meminfo | grep 'MemTotal' | awk '{print $3}' | tr [:upper:] [:
 else
     mem_ok=2
 fi
-if [ -e /usr/local/bin/xray ]; then
-    xray_is_installed=1
-else
-    xray_is_installed=0
-fi
-if [ -e $nginx_config ] || [ -e $nginx_prefix/conf.d/v2ray.conf ]; then
-    nginx_is_installed=1
-else
-    nginx_is_installed=0
-fi
-if [ $xray_is_installed -eq 1 ] && [ $nginx_is_installed -eq 1 ]; then
-    is_installed=1
-else
-    is_installed=0
-fi
+([ -e $nginx_config ] || [ -e $nginx_prefix/conf.d/v2ray.conf ]) && nginx_is_installed=1 || nginx_is_installed=0
+[ -e ${php_prefix}/php-fpm.service.default ] && php_is_installed=1 || php_is_installed=0
+[ -e /usr/local/bin/xray ] && xray_is_installed=1 || xray_is_installed=0
+([ $xray_is_installed -eq 1 ] && [ $nginx_is_installed -eq 1 ]) && is_installed=1 || is_installed=0
 
 check_important_dependence_installed()
 {
@@ -954,19 +947,40 @@ readDomain()
             read queren
         done
     done
-    echo -e "\n\n\n"
-    tyblue "------------------------------请选择要伪装的网站页面------------------------------"
-    tyblue " 1. 403页面 (模拟网站后台)"
-    green  "    说明：大型网站几乎都有使用网站后台，比如bilibili的每个视频都是由"
-    green  "    另外一个域名提供的，直接访问那个域名的根目录将返回403或其他错误页面"
-    tyblue " 2. 镜像腾讯视频网站"
-    green  "    说明：是真镜像站，非链接跳转，默认为腾讯视频，搭建完成后可以自己修改，可能构成侵权"
-    tyblue " 3. nextcloud登陆页面"
-    green  "    说明：nextclound是开源的私人网盘服务，假装你搭建了一个私人网盘(可以换成别的自定义网站)"
-    echo
-    while [[ x"$pretend" != x"1" && x"$pretend" != x"2" && x"$pretend" != x"3" ]]
+    queren=""
+    while [ "$queren" != "y" ]
     do
-        read -p "您的选择是：" pretend
+        echo -e "\n\n\n"
+        tyblue "------------------------------请选择要伪装的网站页面------------------------------"
+        tyblue " 1. 403页面 (模拟网站后台)"
+        green  "    说明：大型网站几乎都有使用网站后台，比如bilibili的每个视频都是由"
+        green  "    另外一个域名提供的，直接访问那个域名的根目录将返回403或其他错误页面"
+        tyblue " 2. 镜像腾讯视频网站"
+        green  "    说明：是真镜像站，非链接跳转，默认为腾讯视频，搭建完成后可以自己修改，可能构成侵权"
+        tyblue " 3. Nextcloud登陆页面"
+        green  "    说明：Nextclound是开源的私人网盘服务，假装你搭建了一个私人网盘(可以换成别的自定义网站)"
+        tyblue " 4. Nextcloud"
+        green  "    说明：最强伪装，没有之一"
+        echo
+        while [[ "$pretend" != "1" && "$pretend" != "2" && "$pretend" != "3" && "$pretend" != "4" ]]
+        do
+            read -p "您的选择是：" pretend
+        done
+        if [ "$pretend" == "4" ] && ([ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]); then
+            red "Nextcloud目前仅支持Debian基系统(Ubuntu、Debian、deepin ...)"
+            sleep 3s
+            continue
+        fi
+        if [ "$pretend" == "4" ] && [ $php_is_installed -eq 0 ]; then
+            tyblue "安装Nextcloud需要安装php"
+            yellow "编译&&安装php可能需要额外消耗15-30分钟"
+            yellow "php将占用一定系统资源，不建议内存<512M的机器使用"
+            while [ "$queren" != "y" -a "$queren" != "n" ]
+            do
+                tyblue "确定选择吗？(y/n)"
+                read queren
+            done
+        fi
     done
     domain_list+=("$domain")
     domainconfig_list+=("$domainconfig")
@@ -1022,13 +1036,21 @@ readProtocolConfig()
 #检查Nginx更新
 check_nginx_update()
 {
-    local nginx_version_now="nginx-$(${nginx_perfix}/sbin/nginx -V 2>&1 | grep "^nginx version:" | cut -d / -f 2)"
-    local openssl_version_now="openssl-openssl-$(${nginx_perfix}/sbin/nginx -V 2>&1 | grep "^built with OpenSSL" | awk '{print $4}')"
+    local nginx_version_now="nginx-$(${nginx_prefix}/sbin/nginx -V 2>&1 | grep "^nginx version:" | cut -d / -f 2)"
+    local openssl_version_now="openssl-openssl-$(${nginx_prefix}/sbin/nginx -V 2>&1 | grep "^built with OpenSSL" | awk '{print $4}')"
     if [ "$nginx_version_now" == "$nginx_version" ] && [ "$openssl_version_now" == "$openssl_version" ]; then
-        return 0
-    else
         return 1
+    else
+        return 0
     fi
+}
+
+#检查php更新
+check_php_update()
+{
+    local php_version_now="php-$(${php_prefix}/bin/php -v | head -n 1 | awk '{print $2}')"
+    [ "$php_version_now" == "$php_version" ] && return 1
+    return 0
 }
 
 #备份域名伪装网站
@@ -1072,6 +1094,15 @@ remove_nginx()
     nginx_prefix="/usr/local/nginx"
     nginx_config="${nginx_prefix}/conf.d/xray.conf"
 }
+remove_php()
+{
+    systemctl stop php-fpm
+    systemctl disable php-fpm
+    pkill -9 php-fpm
+    rm -rf /etc/systemd/system/php-fpm.service
+    systemctl daemon-reload
+    rm -rf ${php_prefix}
+}
 
 #编译安装nignx
 compile_nginx()
@@ -1093,12 +1124,12 @@ compile_nginx()
     sed -i "s/OPTIMIZE[ \t]*=>[ \t]*'-O'/OPTIMIZE          => '-O3'/g" src/http/modules/perl/Makefile.PL
     ./configure --prefix=/usr/local/nginx --with-openssl=../$openssl_version --with-openssl-opt="enable-ec_nistp_64_gcc_128 shared threads zlib-dynamic sctp" --with-mail=dynamic --with-mail_ssl_module --with-stream=dynamic --with-stream_ssl_module --with-stream_realip_module --with-stream_geoip_module=dynamic --with-stream_ssl_preread_module --with-http_ssl_module --with-http_v2_module --with-http_realip_module --with-http_addition_module --with-http_xslt_module=dynamic --with-http_image_filter_module=dynamic --with-http_geoip_module=dynamic --with-http_sub_module --with-http_dav_module --with-http_flv_module --with-http_mp4_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_auth_request_module --with-http_random_index_module --with-http_secure_link_module --with-http_degradation_module --with-http_slice_module --with-http_stub_status_module --with-http_perl_module=dynamic --with-pcre --with-libatomic --with-compat --with-cpp_test_module --with-google_perftools_module --with-file-aio --with-threads --with-poll_module --with-select_module --with-cc-opt="-Wno-error -g0 -O3"
     if ! make; then
-        red    "nginx编译失败！"
-        yellow "请尝试更换系统，建议使用Ubuntu最新版系统"
+        red    "Nginx编译失败！"
         green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
+        yellow "在Bug修复前，建议使用Ubuntu最新版系统"
         exit 1
     fi
-    cd ..
+    cd -
 }
 config_service_nginx()
 {
@@ -1137,7 +1168,7 @@ install_nginx_part1()
     green "正在安装Nginx。。。"
     cd ${nginx_version}
     make install
-    cd ..
+    cd -
 }
 install_nginx_part2()
 {
@@ -1156,7 +1187,147 @@ http {
     }
 }
 EOF
+cat > ${nginx_prefix}/conf.d/nextcloud.conf <<EOF
+    client_max_body_size 512M;
+    fastcgi_buffers 64 4K;
+    gzip on;
+    gzip_vary on;
+    gzip_comp_level 4;
+    gzip_min_length 256;
+    gzip_proxied expired no-cache no-store private no_last_modified no_etag auth;
+    gzip_types application/atom+xml application/javascript application/json application/ld+json application/manifest+json application/rss+xml application/vnd.geo+json application/vnd.ms-fontobject application/x-font-ttf application/x-web-app-manifest+json application/xhtml+xml application/xml font/opentype image/bmp image/svg+xml image/x-icon text/cache-manifest text/css text/plain text/vcard text/vnd.rim.location.xloc text/vtt text/x-component text/x-cross-domain-policy;
+    add_header Referrer-Policy                      "no-referrer"   always;
+    add_header X-Content-Type-Options               "nosniff"       always;
+    add_header X-Download-Options                   "noopen"        always;
+    add_header X-Frame-Options                      "SAMEORIGIN"    always;
+    add_header X-Permitted-Cross-Domain-Policies    "none"          always;
+    add_header X-Robots-Tag                         "none"          always;
+    add_header X-XSS-Protection                     "1; mode=block" always;
+    fastcgi_hide_header X-Powered-By;
+    index index.php index.html /index.php\$request_uri;
+    expires 1m;
+    location = / {
+        if ( \$http_user_agent ~ ^DavClnt ) {
+            return 302 /remote.php/webdav/\$is_args\$args;
+        }
+    }
+    location = /robots.txt {
+        allow all;
+        log_not_found off;
+        access_log off;
+    }
+    location ~ ^/(?:build|tests|config|lib|3rdparty|templates|data)(?:$|/)  { return 404; }
+    location ~ ^/(?:\\.|autotest|occ|issue|indie|db_|console)              { return 404; }
+    location ~ \\.php(?:$|/) {
+        include fastcgi.conf;
+        fastcgi_param REMOTE_ADDR 127.0.0.1;
+        fastcgi_split_path_info ^(.+?\\.php)(/.*)$;
+        set \$path_info \$fastcgi_path_info;
+        try_files \$fastcgi_script_name =404;
+        fastcgi_param PATH_INFO \$path_info;
+        #fastcgi_param HTTPS on;
+        fastcgi_param modHeadersAvailable true;         # Avoid sending the security headers twice
+        fastcgi_param front_controller_active true;     # Enable pretty urls
+        fastcgi_pass unix:/dev/shm/php-fpm_unixsocket/php.sock;
+        fastcgi_intercept_errors on;
+        fastcgi_request_buffering off;
+    }
+    location ~ \\.(?:css|js|svg|gif)$ {
+        try_files \$uri /index.php\$request_uri;
+        expires 6M;         # Cache-Control policy borrowed from \`.htaccess\`
+        access_log off;     # Optional: Don't log access to assets
+    }
+    location ~ \\.woff2?$ {
+        try_files \$uri /index.php\$request_uri;
+        expires 7d;         # Cache-Control policy borrowed from \`.htaccess\`
+        access_log off;     # Optional: Don't log access to assets
+    }
+    location / {
+        try_files \$uri \$uri/ /index.php\$request_uri;
+    }
+EOF
     config_service_nginx
+}
+
+#编译&&安装php
+compile_php()
+{
+    local swap="$(free -b | tail -n 1 | awk '{print $2}')"
+    local use_swap=0
+    swap_on()
+    {
+        if (($(free -m | sed -n 2p | awk '{print $2}')+$(free -m | tail -n 1 | awk '{print $2}')<1400))
+            tyblue "内存不足1.5G，自动申请swap。。"
+            use_swap=1
+            swapoff -a
+            dd if=/dev/zero of=${temp_dir}/swap bs=1M count=((1400-$(free -m | sed -n 2p | awk '{print $2}')))
+            chmod 0644 ${temp_dir}/swap
+            mkswap ${temp_dir}/swap
+            swapon ${temp_dir}/swap
+        fi
+    }
+    swap_off()
+    {
+        if [ $use_swap -eq 1 ]; then
+            tyblue "恢复swap。。。"
+            swapoff -a
+            [ "$swap" -ne '0' ] && swapon -a
+        fi
+    }
+    green "正在编译php。。。。"
+    if ! wget -O "${php_version}.tar.xz" "https://www.php.net/distributions/${php_version}.tar.xz"; then
+        red    "获取php失败"
+        yellow "按回车键继续或者按ctrl+c终止"
+        read -s
+    fi
+    tar -xJf "${php_version}.tar.xz"
+    cd "${php_version}"
+    sed -i 's#if test -f $THIS_PREFIX/$PHP_LIBDIR/lib$LIB\.a || test -f $THIS_PREFIX/$PHP_LIBDIR/lib$LIB\.$SHLIB_SUFFIX_NAME#& || true#' configure
+    sed -i 's#db$THIS_VERSION/db_185.h include/db$THIS_VERSION/db_185.h include/db/db_185.h#& include/db_185.h#' configure
+    sed -i 's#if test ! -r "$PDO_FREETDS_INSTALLATION_DIR/$PHP_LIBDIR/libsybdb\.a" && test ! -r "$PDO_FREETDS_INSTALLATION_DIR/$PHP_LIBDIR/libsybdb\.so"#& \&\& false#' configure
+    ./configure --prefix=${php_prefix} --enable-embed=shared --enable-fpm --with-fpm-user=www-data --with-fpm-group=www-data --with-fpm-systemd --with-fpm-acl --with-fpm-apparmor --disable-phpdbg --with-layout=GNU --with-openssl --with-kerberos --with-external-pcre --with-pcre-jit --with-zlib --enable-bcmath --with-bz2 --enable-calendar --with-curl --enable-dba --with-qdbm --with-db4 --with-db1 --with-tcadb --with-lmdb --with-enchant --enable-exif --with-ffi --enable-ftp --enable-gd --with-external-gd --with-webp --with-jpeg --with-xpm --with-freetype --enable-gd-jis-conv --with-gettext --with-gmp --with-mhash --with-imap --with-imap-ssl --enable-intl --with-ldap --with-ldap-sasl --enable-mbstring --with-mysqli --with-mysql-sock --with-unixODBC --enable-pcntl --with-pdo-dblib --with-pdo-mysql --with-zlib-dir --with-pdo-odbc=unixODBC,/usr --with-pdo-pgsql --with-pgsql --with-pspell --with-libedit --with-readline --with-mm --enable-shmop --with-snmp --enable-soap --enable-sockets --with-sodium --with-password-argon2 --enable-sysvmsg --enable-sysvsem --enable-sysvshm --with-tidy --with-expat --with-xsl --with-zip --enable-mysqlnd --with-pear CPPFLAGS="-g0 -O3" CFLAGS="-g0 -O3" CXXFLAGS="-g0 -O3"
+    swap_on
+    if ! make; then
+        swap_off
+        red    "php编译失败！"
+        green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
+        yellow "在Bug修复前，建议使用Ubuntu最新版系统"
+        exit 1
+    fi
+    swap_off
+    cd -
+}
+install_php_part1()
+{
+    green "正在安装php。。。。"
+    cd "${php_version}"
+    make install
+    cp sapi/fpm/php-fpm.service ${php_prefix}/php-fpm.service.default
+    cd -
+}
+install_php_part2()
+{
+    useradd -r -s /bin/bash www-data
+    cp ${php_prefix}/etc/php-fpm.conf.default ${php_prefix}/etc/php-fpm.conf
+    cp ${php_prefix}/etc/php-fpm.d/www.conf.default ${php_prefix}/etc/php-fpm.d/www.conf
+    sed -i '/^[ \t]*listen[ \t]*=/d' ${php_prefix}/etc/php-fpm.d/www.conf
+    echo "listen = /dev/shm/php-fpm_unixsocket/php.sock" >> ${php_prefix}/etc/php-fpm.d/www.conf
+    sed -i '/^[ \t]*env\[PATH\][ \t]*=/d' ${php_prefix}/etc/php-fpm.d/www.conf
+    echo "env[PATH] = $PATH" >> ${php_prefix}/etc/php-fpm.d/www.conf
+    systemctl disable php-fpm
+    rm -rf /etc/systemd/system/php-fpm.service
+    cp ${php_prefix}/php-fpm.service.default /etc/systemd/system/php-fpm.service
+cat >> /etc/systemd/system/php-fpm.service <<EOF
+
+[Service]
+ProtectSystem=false
+ExecStartPre=/bin/rm -rf /dev/shm/php-fpm_unixsocket
+ExecStartPre=/bin/mkdir /dev/shm/php-fpm_unixsocket
+ExecStartPre=/bin/chmod 711 /dev/shm/php-fpm_unixsocket
+ExecStopPost=/bin/rm -rf /dev/shm/php-fpm_unixsocket
+EOF
+    systemctl daemon-reload
+    systemctl enable php-fpm
 }
 
 #安装/更新Xray
@@ -1372,8 +1543,9 @@ cat >> $nginx_config<<EOF
         proxy_set_header referer "https://v.qq.com";
     }
 EOF
-        elif [ ${pretend_list[i]} -eq 3 ]; then
+        else
             echo "    root ${nginx_prefix}/html/${domain_list[i]};" >> $nginx_config
+            [ ${pretend_list[i]} -eq 4 ] && echo "    include ${nginx_prefix}/conf.d/nextcloud.conf;" >> $nginx_config
         fi
         echo "}" >> $nginx_config
     done
@@ -1500,17 +1672,28 @@ EOF
 #下载nextcloud模板，用于伪装    参数: domain pretend
 get_web()
 {
-    if [ $2 -eq 3 ]; then
-        rm -rf ${nginx_prefix}/html/$1
-        mkdir ${nginx_prefix}/html/$1
-        if ! wget -O ${nginx_prefix}/html/$1/Website-Template.zip https://github.com/kirin10000/Xray-script/raw/main/Website-Template.zip; then
-            red    "获取网站模板失败"
-            yellow "按回车键继续或者按ctrl+c终止"
-            read -s
-        fi
-        unzip -q -d ${nginx_prefix}/html/$1 ${nginx_prefix}/html/$1/Website-Template.zip
-        rm -rf ${nginx_prefix}/html/$1/Website-Template.zip
+    ([ $2 -eq 1 ] || [ $2 -eq 2 ]) && return 0
+    local url
+    [ $2 -eq 4 ] && url="https://download.nextcloud.com/server/releases/${nextcloud_version}.zip"
+    [ $2 -eq 3 ] && url="https://github.com/kirin10000/Xray-script/raw/main/Website-Template.zip"
+    local info
+    [ $2 -eq 4 ] && info="Nextcloud"
+    [ $2 -eq 3 ] && info="网站模板"
+    if ! wget -O "${nginx_prefix}/html/Website.zip" "$url"; then
+        red    "获取${info}失败"
+        yellow "按回车键继续或者按ctrl+c终止"
+        read -s
     fi
+    rm -rf "${nginx_prefix}/html/$1"
+    if [ $2 -eq 3 ]; then
+        mkdir "${nginx_prefix}/html/$1"
+        unzip -q -d "${nginx_prefix}/html/$1" "${nginx_prefix}/html/Website.zip"
+    else
+        unzip -q -d "${nginx_prefix}/html" "${nginx_prefix}/html/Website.zip"
+        mv "${nginx_prefix}/html/nextcloud" "${nginx_prefix}/html/$1"
+        chown -R www-data:www-data "${nginx_prefix}/html/$1"
+    fi
+    rm -rf "${nginx_prefix}/html/Website.zip"
 }
 get_all_webs()
 {
@@ -1685,6 +1868,8 @@ get_domainlist()
             pretend_list[i]=1
         elif awk 'NR=='"$(($line+2))"' {print $0}' $nginx_config | grep -q "location / {"; then
             pretend_list[i]=2
+        elif awk 'NR=='"$(($line+3))"' {print $0}' $nginx_config | grep -qw "nextcloud.conf"; then
+            pretend_list[i]=4
         else
             pretend_list[i]=3
         fi
@@ -1748,11 +1933,20 @@ install_update_xray_tls_web()
         get_domainlist
     fi
 
+    local install_php
+    if [ $update -eq 0 ]; then
+        [ ${pretend_list[0]} -eq 4 ] && install_php=1 || install_php=0
+    else
+        install_php=$php_is_installed
+    fi
     green "正在安装依赖。。。。"
     if [ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         install_dependence "gcc gcc-c++ gperftools-devel libatomic_ops-devel pcre-devel libxml2-devel libxslt-devel zlib-devel gd-devel perl-ExtUtils-Embed perl-Data-Dumper perl-IPC-Cmd geoip-devel lksctp-tools-devel wget unzip curl make openssl crontabs"
     else
         install_dependence "gcc g++ libgoogle-perftools-dev libatomic-ops-dev libperl-dev libxml2-dev libxslt-dev zlib1g-dev libpcre3-dev libgeoip-dev libgd-dev libsctp-dev wget unzip curl make openssl cron"
+        if [ $install_php -eq 1 ]; then
+            install_dependence "pkg-config libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-dev libpng-dev libgd-dev libwebp-dev libgmp-dev libc-client2007e-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libreadline-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt-dev libzip-dev"
+        fi
     fi
     apt clean
     $redhat_package_manager clean all
@@ -1772,7 +1966,7 @@ install_update_xray_tls_web()
             use_existed_nginx=1
         fi
     elif [ $nginx_is_installed -eq 1 ]; then
-        tyblue "---------------检测到nginx已存在---------------"
+        tyblue "---------------检测到Nginx已存在---------------"
         tyblue " 1. 尝试使用现有Nginx"
         tyblue " 2. 卸载现有Nginx并重新编译安装"
         echo
@@ -1786,8 +1980,51 @@ install_update_xray_tls_web()
         [ $choice -eq 1 ] && use_existed_nginx=1
     fi
 
+    local use_existed_php=0
+    if [ $install_php -eq 1 ]; then
+        if [ $update -eq 1 ]; then
+            if check_php_update; then
+                choice=""
+                while [ "$choice" != "y" ] && [ "$choice" != "n" ]
+                do
+                    tyblue "检测到php有新版本，是否更新?(y/n)"
+                    read choice
+                done
+                [ $choice == n ] && use_existed_php=1
+            else
+                green "php已经是最新版本，不更新"
+                use_existed_php=1
+            fi
+        elif [ $php_is_installed -eq 1 ]; then
+            tyblue "---------------检测到php已存在---------------"
+            tyblue " 1. 尝试使用现有php"
+            tyblue " 2. 卸载现有php并重新编译安装"
+            echo
+            yellow " 若安装完成后php无法启动，请卸载并重新安装"
+            echo
+            choice=""
+            while [ "$choice" != "1" ] && [ "$choice" != "2" ]
+            do
+                read -p "您的选择是：" choice
+            done
+            [ $choice -eq 1 ] && use_existed_php=1
+        fi
+    fi
+
+    #编译Nginx
     [ $use_existed_nginx -eq 0 ] && compile_nginx
-    #[ $use_existed_php -eq 0 ] && compile_php
+
+    #编译&&安装php
+    if [ $install_php -eq 1 ]; then
+        if [ $use_existed_php -eq 0 ]; then
+            compile_php
+            remove_php
+            install_php_part1
+        fi
+        install_php_part2
+    fi
+
+    #安装Nginx
     if [ $use_existed_nginx -eq 0 ]; then
         [ $update -eq 1 ] && backup_domains_web
         remove_nginx
@@ -1809,7 +2046,6 @@ install_update_xray_tls_web()
 #安装Xray
     remove_xray
     install_update_xray
-    systemctl enable xray
 
     green "正在获取证书。。。。"
     if [ $update -eq 0 ]; then
@@ -1829,7 +2065,15 @@ install_update_xray_tls_web()
     config_nginx
     config_xray
     sleep 2s
-    systemctl restart xray nginx
+    systemctl restart xray nginx php-fpm
+    if [ $update -eq 0 ] && [ install_php -eq 1 ]; then
+        get_all_domains
+        green "请打开 \"https://${all_domains[0]}\" 进行Nextcloud初始化设置"
+        sleep 5s
+        green "按两次回车键以继续。。。"
+        read -s
+        read -s
+    fi
     if [ $update == 1 ]; then
         green "-------------------升级完成-------------------"
     else
