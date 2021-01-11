@@ -1256,7 +1256,7 @@ compile_php()
     local use_swap=0
     swap_on()
     {
-        if (($(free -m | sed -n 2p | awk '{print $2}')+$(free -m | tail -n 1 | awk '{print $2}')<1400))
+        if (($(free -m | sed -n 2p | awk '{print $2}')+$(free -m | tail -n 1 | awk '{print $2}')<1400)); then
             tyblue "内存不足1.5G，自动申请swap。。"
             use_swap=1
             swapoff -a
