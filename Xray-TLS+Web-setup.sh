@@ -1717,7 +1717,7 @@ get_all_webs()
 let_init_nextcloud()
 {
     local temp_domain="${domain_list[$1]}"
-    [ ${domainconfig_list[$1]} -eq 1 ] && temp_domain+="www"
+    [ ${domainconfig_list[$1]} -eq 1 ] && temp_domain="www.${temp_domain}"
     green "请打开 \"https://${temp_domain}\" 进行Nextcloud初始化设置"
     sleep 10s
     green "按两次回车键以继续。。。"
