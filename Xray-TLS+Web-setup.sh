@@ -932,7 +932,7 @@ readDomain()
         if [ $domainconfig -eq 1 ]; then
             tyblue '---------请输入一级域名(前面不带"www."、"http://"或"https://")---------'
             read -p "请输入域名：" domain
-            while check_domain $domain
+            while check_domain "$domain"
             do
                 read -p "请输入域名：" domain
             done
@@ -982,6 +982,8 @@ readDomain()
                 tyblue "确定选择吗？(y/n)"
                 read queren
             done
+        else
+            queren=y
         fi
     done
     domain_list+=("$domain")
