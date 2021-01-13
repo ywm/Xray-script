@@ -2193,6 +2193,33 @@ start_menu()
         green "更换成功！！"
         echo_end
     }
+    simplify_system()
+    {
+        if [ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+            yellow "该功能仅对Debian基系统(Ubuntu Debian deepin)开放"
+            return 0
+        fi
+        if systemctl -q is-active xray || systemctl -q is-active nginx || systemctl -q is-active php-fpm; then
+            yellow "请先停止Xray-TLS+Web"
+            return 0
+        fi
+        yellow "警告：如果服务器上有运行别的程序，可能会被误删"
+        tyblue "建议在纯净系统下使用此功能"
+        local choice=""
+        while [ "$choice" != "y" ] && [ "$choice" != "n" ]
+        do
+            tyblue "是否继续?(y/n)"
+            read choice
+        done
+        [ $choice == n ] && return 0
+        apt -y --autoremove purge openssl snapd kdump-tools fwupd flex open-vm-tools make automake '^cloud-init' libffi-dev pkg-config
+        apt -y -f install
+        get_system_info
+        check_important_dependence_installed ca-certificates ca-certificates
+        [ $nginx_is_installed -eq 1 ] && install_nginx_dependence
+        [ $php_is_installed -eq 1 ] && install_php_dependence
+        [ $is_installed -eq 1 ] && install_base_dependence
+    }
     change_dns()
     {
         red    "注意！！"
@@ -2269,7 +2296,7 @@ start_menu()
     tyblue " ----------------管理----------------"
     tyblue "  11. 查看配置信息"
     tyblue "  12. 重置域名"
-    tyblue "      (会覆盖原有域名配置，安装过程中域名输错了造成Xray无法启动可以用此选项修复)"
+    purple "         会覆盖原有域名配置，安装过程中域名输错了造成Xray无法启动可以用此选项修复"
     tyblue "  13. 添加域名"
     tyblue "  14. 删除域名"
     tyblue "  15. 修改id(用户ID/UUID)"
@@ -2278,16 +2305,17 @@ start_menu()
     echo
     tyblue " ----------------其它----------------"
     tyblue "  18. 尝试修复退格键无法使用的问题"
-    tyblue "  19. 修改dns"
-    yellow "  20. 退出脚本"
+    tyblue "  19. 精简系统(仅对Debian基系统(Ubuntu Debian deepin)开放)"
+    tyblue "  20. 修改dns"
+    yellow "  21. 退出脚本"
     echo
     echo
     local choice=""
-    while [[ "$choice" != "1" && "$choice" != "2" && "$choice" != "3" && "$choice" != "4" && "$choice" != "5" && "$choice" != "6" && "$choice" != "7" && "$choice" != "8" && "$choice" != "9" && "$choice" != "10" && "$choice" != "11" && "$choice" != "12" && "$choice" != "13" && "$choice" != "14" && "$choice" != "15" && "$choice" != "16" && "$choice" != "17" && "$choice" != "18" && "$choice" != "19" && "$choice" != "20" ]]
+    while [[ "$choice" != "1" && "$choice" != "2" && "$choice" != "3" && "$choice" != "4" && "$choice" != "5" && "$choice" != "6" && "$choice" != "7" && "$choice" != "8" && "$choice" != "9" && "$choice" != "10" && "$choice" != "11" && "$choice" != "12" && "$choice" != "13" && "$choice" != "14" && "$choice" != "15" && "$choice" != "16" && "$choice" != "17" && "$choice" != "18" && "$choice" != "19" && "$choice" != "20" && "$choice" != "21" ]]
     do
         read -p "您的选择是：" choice
     done
-    if [ $choice -eq 9 ] || ((11<=$choice&&$choice<=13)); then
+    if [ $choice -eq 9 ] || ((11<=$choice&&$choice<=14)); then
         get_base_information
         get_domainlist
     fi
@@ -2344,8 +2372,8 @@ start_menu()
         apt -y -f install
         get_system_info
         check_important_dependence_installed ca-certificates ca-certificates
+        check_script_update && red "脚本可升级，请先更新脚本" && exit 1
         if [ $php_is_installed -eq 1 ]; then
-            check_script_update && red "脚本可升级，请先更新脚本" && exit 1
             if check_php_update; then
                 green "检测到php有新版本！"
                 choice=""
@@ -2355,12 +2383,17 @@ start_menu()
                     read choice
                 done
                 [ $choice == n ] && return 0
+                if [ $is_installed -eq 1 ]; then
+                    get_base_information
+                    get_domainlist
+                fi
             else
                 green "php已经是最新版本" && return 0
             fi
         fi
         enter_temp_dir
         full_install_php
+        [ $is_installed -eq 1 ] && turn_on_off_php
         green "安装完成！"
         rm -rf "$temp_dir"
     elif [ $choice -eq 7 ]; then
@@ -2603,6 +2636,10 @@ start_menu()
         sleep 3s
         start_menu
     elif [ $choice -eq 19 ]; then
+        apt -y -f install
+        get_system_info
+        simplify_system
+    elif [ $choice -eq 20 ]; then
         change_dns
     fi
 }
