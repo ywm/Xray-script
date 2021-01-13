@@ -41,6 +41,7 @@ systemVersion=""
 redhat_package_manager=""
 redhat_version=""
 mem_ok=""
+[[ -z "$BASH_SOURCE" ]] && file_script="" || file_script="$(dirname "$BASH_SOURCE")/$(basename "$BASH_SOURCE")"
 
 #定义几个颜色
 purple()                           #基佬紫
@@ -1369,7 +1370,7 @@ get_cert()
         yellow "证书安装失败，请检查："
         yellow "    1.域名是否解析正确"
         yellow "    2.vps防火墙80端口是否开放"
-        yellow "并在安装完成后，使用选项9修复"
+        yellow "并在安装完成后，使用脚本主菜单\"重置域名\"选项修复"
         yellow "按回车键继续。。。"
         read -s
     fi
@@ -2139,6 +2140,37 @@ install_update_xray_tls_web()
 #开始菜单
 start_menu()
 {
+    check_script_update()
+    {
+        if [[ -z "$file_script" ]]; then
+            red "脚本不是文件，无法检查更新"
+            exit 1
+        fi
+        [ "$(md5sum "$file_script" | awk '{print $1}')" == "$(md5sum <(wget -O - "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh") | awk '{print $1}')" ] && return 1 || return 0
+    }
+    update_script()
+    {
+        if [[ -z "$file_script" ]]; then
+            red "脚本不是文件，无法更新"
+            return 1
+        fi
+        rm -rf "$file_script"
+        if ! wget -O "$file_script" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh" && ! wget -O "$file_script" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh"; then
+            red "获取脚本失败！"
+            yellow "按回车键继续或Ctrl+c中止"
+            read -s
+        fi
+        chmod +x "$file_script"
+    }
+    full_install_php()
+    {
+        install_base_dependence
+        install_php_dependence
+        compile_php
+        remove_php
+        install_php_part1
+        install_php_part2
+    }
     change_protocol()
     {
         get_base_information
@@ -2219,37 +2251,43 @@ start_menu()
     else
         green  "   1. 重新安装Xray-TLS+Web"
     fi
+    purple "         流程：[升级系统组件]->[安装bbr]->安装Nginx->[安装php]->安装Xray->申请证书->配置文件"
     green  "   2. 升级Xray-TLS+Web"
-    tyblue "   3. 仅安装bbr(包含bbr2/bbrplus/bbr魔改版/暴力bbr魔改版/锐速)"
-    tyblue "   4. 仅升级Xray"
-    red    "   5. 卸载Xray-TLS+Web"
+    purple "         流程：升级脚本->[升级系统组件]->[升级bbr]->[升级Nginx]->[升级php]->升级Xray->升级证书->更新配置文件"
+    tyblue "   3. 检查更新/升级脚本"
+    tyblue "   4. 升级系统组件"
+    tyblue "   5. 安装/检查更新/升级bbr"
+    purple "         包含：bbr2/bbrplus/bbr魔改版/暴力bbr魔改版/锐速"
+    tyblue "   6. 安装/检查更新/升级php"
+    tyblue "   7. 安装/升级Xray"
+    red    "   8. 卸载Xray-TLS+Web"
     echo
     tyblue " --------------启动/停止-------------"
-    tyblue "   6. 启动/重启Xray-TLS+Web"
-    tyblue "   7. 停止Xray-TLS+Web"
+    tyblue "   9. 启动/重启Xray-TLS+Web"
+    tyblue "  10. 停止Xray-TLS+Web"
     echo
     tyblue " ----------------管理----------------"
-    tyblue "   8. 查看配置信息"
-    tyblue "   9. 重置域名"
+    tyblue "  11. 查看配置信息"
+    tyblue "  12. 重置域名"
     tyblue "      (会覆盖原有域名配置，安装过程中域名输错了造成Xray无法启动可以用此选项修复)"
-    tyblue "  10. 添加域名"
-    tyblue "  11. 删除域名"
-    tyblue "  12. 修改id(用户ID/UUID)"
-    tyblue "  13. 修改path(路径)"
-    tyblue "  14. 修改Xray传输协议(TCP/WebSocket)"
+    tyblue "  13. 添加域名"
+    tyblue "  14. 删除域名"
+    tyblue "  15. 修改id(用户ID/UUID)"
+    tyblue "  16. 修改path(路径)"
+    tyblue "  17. 修改Xray传输协议(TCP/WebSocket)"
     echo
     tyblue " ----------------其它----------------"
-    tyblue "  15. 尝试修复退格键无法使用的问题"
-    tyblue "  16. 修改dns"
-    yellow "  17. 退出脚本"
+    tyblue "  18. 尝试修复退格键无法使用的问题"
+    tyblue "  19. 修改dns"
+    yellow "  20. 退出脚本"
     echo
     echo
-    choice=""
-    while [[ "$choice" != "1" && "$choice" != "2" && "$choice" != "3" && "$choice" != "4" && "$choice" != "5" && "$choice" != "6" && "$choice" != "7" && "$choice" != "8" && "$choice" != "9" && "$choice" != "10" && "$choice" != "11" && "$choice" != "12" && "$choice" != "13" && "$choice" != "14" && "$choice" != "15" && "$choice" != "16" && "$choice" != "17" ]]
+    local choice=""
+    while [[ "$choice" != "1" && "$choice" != "2" && "$choice" != "3" && "$choice" != "4" && "$choice" != "5" && "$choice" != "6" && "$choice" != "7" && "$choice" != "8" && "$choice" != "9" && "$choice" != "10" && "$choice" != "11" && "$choice" != "12" && "$choice" != "13" && "$choice" != "14" && "$choice" != "15" && "$choice" != "16" && "$choice" != "17" && "$choice" != "18" && "$choice" != "19" && "$choice" != "20" ]]
     do
         read -p "您的选择是：" choice
     done
-    if [ $choice -eq 6 ] || ((8<=$choice&&$choice<=11)); then
+    if [ $choice -eq 9 ] || ((11<=$choice&&$choice<=13)); then
         get_base_information
         get_domainlist
     fi
@@ -2261,16 +2299,32 @@ start_menu()
             exit 1
         fi
         yellow "升级bbr/系统可能需要重启，重启后请再次选择'升级Xray-TLS+Web'"
-        yellow "按回车键继续，或者ctrl+c中止"
+        yellow "按回车键继续，或者Ctrl+c中止"
         read -s
-        rm -rf "$0"
-        if ! wget -O "$0" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh" && ! wget -O "$0" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh"; then
-            red "获取最新脚本失败！"
-            exit 1
-        fi
-        chmod +x "$0"
-        "$0" --update
+        apt -y -f install
+        get_system_info
+        check_important_dependence_installed ca-certificates ca-certificates
+        update_script && "$file_script" --update
     elif [ $choice -eq 3 ]; then
+        apt -y -f install
+        get_system_info
+        check_important_dependence_installed ca-certificates ca-certificates
+        if check_script_update; then
+            green "脚本可升级！"
+            while [ "$choice" != "y" ] && [ "$choice" != "n" ]
+            do
+                tyblue "是否升级脚本？(y/n)"
+                read choice
+            done
+            [ $choice == y ] && update_script && green "脚本更新完成"
+        else
+            green "脚本已经是最新版本"
+        fi
+    elif [ $choice -eq 4 ]; then
+        apt -y -f install
+        get_system_info
+        doupdate
+    elif [ $choice -eq 5 ]; then
         apt -y -f install
         get_system_info
         check_important_dependence_installed ca-certificates ca-certificates
@@ -2278,14 +2332,40 @@ start_menu()
         install_bbr
         apt -y -f install
         rm -rf "$temp_dir"
-    elif [ $choice -eq 4 ]; then
-        if install_update_xray; then
-            green "Xray升级完成！"
-        else
-            red   "Xray升级失败！"
+    elif [ $choice -eq 6 ]; then
+        if [ $php_is_installed -eq 0 ]; then
+            while [ "$choice" != "y" ] && [ "$choice" != "n" ]
+            do
+                tyblue "是否安装php?(y/n)"
+                read choice
+            done
+            [ $choice == n ] && return 0
         fi
-    elif [ $choice -eq 5 ]; then
-        choice=""
+        apt -y -f install
+        get_system_info
+        check_important_dependence_installed ca-certificates ca-certificates
+        if [ $php_is_installed -eq 1 ]; then
+            check_script_update && red "脚本可升级，请先更新脚本" && exit 1
+            if check_php_update; then
+                green "检测到php有新版本！"
+                choice=""
+                while [ "$choice" != "y" ] && [ "$choice" != "n" ]
+                do
+                    tyblue "是否更新?(y/n)"
+                    read choice
+                done
+                [ $choice == n ] && return 0
+            else
+                green "php已经是最新版本" && return 0
+            fi
+        fi
+        enter_temp_dir
+        full_install_php
+        green "安装完成！"
+        rm -rf "$temp_dir"
+    elif [ $choice -eq 7 ]; then
+        install_update_xray && green "Xray安装/升级完成！"
+    elif [ $choice -eq 8 ]; then
         while [ "$choice" != "y" -a "$choice" != "n" ]
         do
             yellow "确定要删除吗?(y/n)"
@@ -2300,7 +2380,7 @@ start_menu()
         $HOME/.acme.sh/acme.sh --uninstall
         rm -rf $HOME/.acme.sh
         green "删除完成！"
-    elif [ $choice -eq 6 ]; then
+    elif [ $choice -eq 9 ]; then
         local need_php=0
         local i
         for i in ${!pretend_list[@]}
@@ -2319,19 +2399,18 @@ start_menu()
         else
             green "重启/启动成功！！"
         fi
-    elif [ $choice -eq 7 ]; then
+    elif [ $choice -eq 10 ]; then
         systemctl stop xray nginx
         [ $php_is_installed -eq 1 ] && systemctl stop php-fpm
         green "已停止！"
-    elif [ $choice -eq 8 ]; then
+    elif [ $choice -eq 11 ]; then
         echo_end
-    elif [ $choice -eq 9 ]; then
+    elif [ $choice -eq 12 ]; then
         if [ $is_installed == 0 ]; then
             red "请先安装Xray-TLS+Web！！"
             exit 1
         fi
         yellow "重置域名将删除所有现有域名(包括域名证书、伪装网站等)"
-        choice=""
         while [[ "$choice" != "y" && "$choice" != "n" ]]
         do
             tyblue "是否继续？(y/n)"
@@ -2352,13 +2431,8 @@ start_menu()
             apt -y -f install
             get_system_info
             check_important_dependence_installed ca-certificates ca-certificates
-            install_base_dependence
-            install_php_dependence
             enter_temp_dir
-            compile_php
-            remove_php
-            install_php_part1
-            install_php_part2
+            full_install_php
             new_install_php=1
         fi
         get_all_certs
@@ -2372,7 +2446,7 @@ start_menu()
         green "域名重置完成！！"
         echo_end
         [ ${new_install_php} -eq 1 ] && rm -rf "$temp_dir"
-    elif [ $choice -eq 10 ]; then
+    elif [ $choice -eq 13 ]; then
         if [ $is_installed == 0 ]; then
             red "请先安装Xray-TLS+Web！！"
             exit 1
@@ -2383,13 +2457,8 @@ start_menu()
             apt -y -f install
             get_system_info
             check_important_dependence_installed ca-certificates ca-certificates
-            install_base_dependence
-            install_php_dependence
             enter_temp_dir
-            compile_php
-            remove_php
-            install_php_part1
-            install_php_part2
+            full_install_php
             new_install_php=1
         fi
         get_cert ${domain_list[-1]} ${domainconfig_list[-1]}
@@ -2403,7 +2472,7 @@ start_menu()
         green "域名添加完成！！"
         echo_end
         [ ${new_install_php} -eq 1 ] && rm -rf "$temp_dir"
-    elif [ $choice -eq 11 ]; then
+    elif [ $choice -eq 14 ]; then
         if [ $is_installed == 0 ]; then
             red "请先安装Xray-TLS+Web！！"
             exit 1
@@ -2446,7 +2515,7 @@ start_menu()
         turn_on_off_php
         green "域名删除完成！！"
         echo_end
-    elif [ $choice -eq 12 ]; then
+    elif [ $choice -eq 15 ]; then
         if [ $is_installed == 0 ]; then
             red "请先安装Xray-TLS+Web！！"
             exit 1
@@ -2486,7 +2555,7 @@ start_menu()
         systemctl restart xray
         green "更换成功！！"
         echo_end
-    elif [ $choice -eq 13 ]; then
+    elif [ $choice -eq 16 ]; then
         if [ $is_installed == 0 ]; then
             red "请先安装Xray-TLS+Web！！"
             exit 1
@@ -2514,13 +2583,13 @@ start_menu()
         systemctl restart xray
         green "更换成功！！"
         echo_end
-    elif [ $choice -eq 14 ]; then
+    elif [ $choice -eq 17 ]; then
         if [ $is_installed == 0 ]; then
             red "请先安装Xray-TLS+Web！！"
             exit 1
         fi
         change_protocol
-    elif [ $choice -eq 15 ]; then
+    elif [ $choice -eq 18 ]; then
         echo
         yellow "尝试修复退格键异常问题，退格键正常请不要修复"
         yellow "按回车键继续或按Ctrl+c退出"
@@ -2533,7 +2602,7 @@ start_menu()
         green "修复完成！！"
         sleep 3s
         start_menu
-    elif [ $choice -eq 16 ]; then
+    elif [ $choice -eq 19 ]; then
         change_dns
     fi
 }
