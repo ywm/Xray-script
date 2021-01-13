@@ -6,9 +6,11 @@ openssl_version="openssl-openssl-3.0.0-alpha10"
 nginx_prefix="/usr/local/nginx"
 nginx_config="${nginx_prefix}/conf.d/xray.conf"
 nginx_service="/etc/systemd/system/nginx.service"
+#php_version="php-8.0.1"
 php_version="php-7.4.14"
 php_prefix="/usr/local/php"
-nextcloud_version="nextcloud-20.0.4"
+#nextcloud_url="https://download.nextcloud.com/server/prereleases/nextcloud-21.0.0beta5.zip"
+nextcloud_url="https://github.com/nextcloud/server/releases/download/v20.0.4/nextcloud-20.0.4.zip"
 xray_config="/usr/local/etc/xray/config.json"
 temp_dir="/temp_install_update_xray_tls_web"
 nginx_is_installed=""
@@ -968,11 +970,6 @@ readDomain()
         do
             read -p "您的选择是：" pretend
         done
-        if [ "$pretend" == "4" ] && ([ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]); then
-            red "Nextcloud目前仅支持Debian基系统(Ubuntu、Debian、deepin ...)"
-            sleep 3s
-            continue
-        fi
         if [ "$pretend" == "4" ] && [ $php_is_installed -eq 0 ]; then
             tyblue "安装Nextcloud需要安装php"
             yellow "编译&&安装php可能需要额外消耗15-30分钟"
@@ -1261,11 +1258,11 @@ compile_php()
     local use_swap=0
     swap_on()
     {
-        if (($(free -m | sed -n 2p | awk '{print $2}')+$(free -m | tail -n 1 | awk '{print $2}')<1400)); then
-            tyblue "内存不足1.5G，自动申请swap。。"
+        if (($(free -m | sed -n 2p | awk '{print $2}')+$(free -m | tail -n 1 | awk '{print $2}')<1800)); then
+            tyblue "内存不足2G，自动申请swap。。"
             use_swap=1
             swapoff -a
-            if ! dd if=/dev/zero of=${temp_dir}/swap bs=1M count=$((1400-$(free -m | sed -n 2p | awk '{print $2}'))); then
+            if ! dd if=/dev/zero of=${temp_dir}/swap bs=1M count=$((1800-$(free -m | sed -n 2p | awk '{print $2}'))); then
                 red   "开启swap失败！"
                 yellow "可能是机器内存和硬盘空间都不足"
                 green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
@@ -1293,10 +1290,14 @@ compile_php()
     fi
     tar -xJf "${php_version}.tar.xz"
     cd "${php_version}"
-    sed -i 's#if test -f $THIS_PREFIX/$PHP_LIBDIR/lib$LIB\.a || test -f $THIS_PREFIX/$PHP_LIBDIR/lib$LIB\.$SHLIB_SUFFIX_NAME#& || true#' configure
     sed -i 's#db$THIS_VERSION/db_185.h include/db$THIS_VERSION/db_185.h include/db/db_185.h#& include/db_185.h#' configure
-    sed -i 's#if test ! -r "$PDO_FREETDS_INSTALLATION_DIR/$PHP_LIBDIR/libsybdb\.a" && test ! -r "$PDO_FREETDS_INSTALLATION_DIR/$PHP_LIBDIR/libsybdb\.so"#& \&\& false#' configure
-    ./configure --prefix=${php_prefix} --enable-embed=shared --enable-fpm --with-fpm-user=www-data --with-fpm-group=www-data --with-fpm-systemd --with-fpm-acl --with-fpm-apparmor --disable-phpdbg --with-layout=GNU --with-openssl --with-kerberos --with-external-pcre --with-pcre-jit --with-zlib --enable-bcmath --with-bz2 --enable-calendar --with-curl --enable-dba --with-qdbm --with-db4 --with-db1 --with-tcadb --with-lmdb --with-enchant --enable-exif --with-ffi --enable-ftp --enable-gd --with-external-gd --with-webp --with-jpeg --with-xpm --with-freetype --enable-gd-jis-conv --with-gettext --with-gmp --with-mhash --with-imap --with-imap-ssl --enable-intl --with-ldap --with-ldap-sasl --enable-mbstring --with-mysqli --with-mysql-sock --with-unixODBC --enable-pcntl --with-pdo-dblib --with-pdo-mysql --with-zlib-dir --with-pdo-odbc=unixODBC,/usr --with-pdo-pgsql --with-pgsql --with-pspell --with-libedit --with-readline --with-mm --enable-shmop --with-snmp --enable-soap --enable-sockets --with-sodium --with-password-argon2 --enable-sysvmsg --enable-sysvsem --enable-sysvshm --with-tidy --with-expat --with-xsl --with-zip --enable-mysqlnd --with-pear CPPFLAGS="-g0 -O3" CFLAGS="-g0 -O3" CXXFLAGS="-g0 -O3"
+    if [ $release == "ubuntu" ] || [ $release == "other-debian" ]; then
+        sed -i 's#if test -f $THIS_PREFIX/$PHP_LIBDIR/lib$LIB\.a || test -f $THIS_PREFIX/$PHP_LIBDIR/lib$LIB\.$SHLIB_SUFFIX_NAME#& || true#' configure
+        sed -i 's#if test ! -r "$PDO_FREETDS_INSTALLATION_DIR/$PHP_LIBDIR/libsybdb\.a" && test ! -r "$PDO_FREETDS_INSTALLATION_DIR/$PHP_LIBDIR/libsybdb\.so"#& \&\& false#' configure
+        ./configure --prefix=${php_prefix} --enable-embed=shared --enable-fpm --with-fpm-user=www-data --with-fpm-group=www-data --with-fpm-systemd --with-fpm-acl --with-fpm-apparmor --disable-phpdbg --with-layout=GNU --with-openssl --with-kerberos --with-external-pcre --with-pcre-jit --with-zlib --enable-bcmath --with-bz2 --enable-calendar --with-curl --enable-dba --with-qdbm --with-db4 --with-db1 --with-tcadb --with-lmdb --with-enchant --enable-exif --with-ffi --enable-ftp --enable-gd --with-external-gd --with-webp --with-jpeg --with-xpm --with-freetype --enable-gd-jis-conv --with-gettext --with-gmp --with-mhash --with-imap --with-imap-ssl --enable-intl --with-ldap --with-ldap-sasl --enable-mbstring --with-mysqli --with-mysql-sock --with-unixODBC --enable-pcntl --with-pdo-dblib --with-pdo-mysql --with-zlib-dir --with-pdo-odbc=unixODBC,/usr --with-pdo-pgsql --with-pgsql --with-pspell --with-libedit --with-mm --enable-shmop --with-snmp --enable-soap --enable-sockets --with-sodium --with-password-argon2 --enable-sysvmsg --enable-sysvsem --enable-sysvshm --with-tidy --with-xsl --with-zip --enable-mysqlnd --with-pear CPPFLAGS="-g0 -O3" CFLAGS="-g0 -O3" CXXFLAGS="-g0 -O3"
+    else
+        ./configure --prefix=${php_prefix} --with-libdir=lib64 --enable-embed=shared --enable-fpm --with-fpm-user=www-data --with-fpm-group=www-data --with-fpm-systemd --with-fpm-acl --disable-phpdbg --with-layout=GNU --with-openssl --with-kerberos --with-external-pcre --with-pcre-jit --with-zlib --enable-bcmath --with-bz2 --enable-calendar --with-curl --enable-dba --with-gdbm --with-db4 --with-db1 --with-tcadb --with-lmdb --with-enchant --enable-exif --with-ffi --enable-ftp --enable-gd --with-external-gd --with-webp --with-jpeg --with-xpm --with-freetype --enable-gd-jis-conv --with-gettext --with-gmp --with-mhash --with-imap --with-imap-ssl --enable-intl --with-ldap --with-ldap-sasl --enable-mbstring --with-mysqli --with-mysql-sock --with-unixODBC --enable-pcntl --with-pdo-dblib --with-pdo-mysql --with-zlib-dir --with-pdo-odbc=unixODBC,/usr --with-pdo-pgsql --with-pgsql --with-pspell --with-libedit --enable-shmop --with-snmp --enable-soap --enable-sockets --with-sodium --with-password-argon2 --enable-sysvmsg --enable-sysvsem --enable-sysvshm --with-tidy --with-xsl --with-zip --enable-mysqlnd --with-pear CPPFLAGS="-g0 -O3" CFLAGS="-g0 -O3" CXXFLAGS="-g0 -O3"
+    fi
     swap_on
     if ! make; then
         swap_off
@@ -1683,7 +1684,7 @@ get_web()
 {
     ([ $2 -eq 1 ] || [ $2 -eq 2 ]) && return 0
     local url
-    [ $2 -eq 4 ] && url="https://download.nextcloud.com/server/releases/${nextcloud_version}.zip"
+    [ $2 -eq 4 ] && url="${nextcloud_url}"
     [ $2 -eq 3 ] && url="https://github.com/kirin10000/Xray-script/raw/main/Website-Template.zip"
     local info
     [ $2 -eq 4 ] && info="Nextcloud"
@@ -1897,41 +1898,65 @@ get_domainlist()
     done
 }
 
-#安装xray_tls_web
-install_update_xray_tls_web()
+install_dependence()
 {
-    install_dependence()
-    {
-        if [ $release == "ubuntu" ] || [ $release == "other-debian" ]; then
-            if ! apt -y --no-install-recommends install $1; then
-                apt update
-                if ! apt -y --no-install-recommends install $1; then
-                    yellow "依赖安装失败！！"
-                    green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
-                    yellow "按回车键继续或者ctrl+c退出"
-                    read -s
-                fi
-            fi
-        else
-            if $redhat_package_manager --help | grep -q "\-\-enablerepo="; then
-                local temp_redhat_install="$redhat_package_manager -y --enablerepo="
-            else
-                local temp_redhat_install="$redhat_package_manager -y --enablerepo "
-            fi
-            if ! $redhat_package_manager -y install $1; then
-                if [ "$release" == "centos" ] && version_ge $systemVersion 8 && $temp_redhat_install"epel,PowerTools" install $1;then
-                    return 0
-                fi
-                if $temp_redhat_install'*' install $1; then
-                    return 0
-                fi
+    if [ $release == "ubuntu" ] || [ $release == "other-debian" ]; then
+        if ! apt -y --no-install-recommends install $@; then
+            apt update
+            if ! apt -y --no-install-recommends install $@; then
                 yellow "依赖安装失败！！"
                 green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
                 yellow "按回车键继续或者ctrl+c退出"
                 read -s
             fi
         fi
-    }
+    else
+        if $redhat_package_manager --help | grep -q "\-\-enablerepo="; then
+            local temp_redhat_install="$redhat_package_manager -y --enablerepo="
+        else
+            local temp_redhat_install="$redhat_package_manager -y --enablerepo "
+        fi
+        if ! $redhat_package_manager -y install $@; then
+            if [ "$release" == "centos" ] && version_ge $systemVersion 8 && $temp_redhat_install"epel,PowerTools" install $@;then
+                return 0
+            fi
+            if $temp_redhat_install'*' install $@; then
+                return 0
+            fi
+            yellow "依赖安装失败！！"
+            green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
+            yellow "按回车键继续或者ctrl+c退出"
+            read -s
+        fi
+    fi
+}
+install_base_dependence()
+{
+    if [ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+        install_dependence wget unzip curl openssl crontabs gcc gcc-c++ pkgconf-pkg-config make
+    else
+        install_dependence wget unzip curl openssl cron gcc g++ pkg-config make
+    fi
+}
+install_nginx_dependence()
+{
+    if [ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+        install_dependence gperftools-devel libatomic_ops-devel pcre-devel libxml2-devel libxslt-devel zlib-devel gd-devel perl-ExtUtils-Embed perl-Data-Dumper perl-IPC-Cmd geoip-devel lksctp-tools-devel
+    else
+        install_dependence libgoogle-perftools-dev libatomic-ops-dev libperl-dev libxml2-dev libxslt1-dev zlib1g-dev libpcre3-dev libgeoip-dev libgd-dev libsctp-dev
+    fi
+}
+install_php_dependence()
+{
+    if [ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+        install_dependence libxml2-devel sqlite-devel systemd-devel libacl-devel openssl-devel krb5-devel pcre2-devel zlib-devel bzip2-devel libcurl-devel gdbm-devel libdb-devel tokyocabinet-devel lmdb-devel enchant-devel libffi-devel libpng-devel gd-devel libwebp-devel libjpeg-turbo-devel libXpm-devel freetype-devel gmp-devel libc-client-devel libicu-devel openldap-devel oniguruma-devel unixODBC-devel freetds-devel libpq-devel aspell-devel libedit-devel net-snmp-devel libsodium-devel libargon2-devel libtidy-devel libxslt-devel libzip-devel
+    else
+        install_dependence libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-dev libgd-dev libwebp-dev libgmp-dev libc-client2007e-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt1-dev libzip-dev
+    fi
+}
+#安装xray_tls_web
+install_update_xray_tls_web()
+{
     check_port
     apt -y -f install
     get_system_info
@@ -1961,14 +1986,9 @@ install_update_xray_tls_web()
         install_php=$php_is_installed
     fi
     green "正在安装依赖。。。。"
-    if [ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        install_dependence "gcc gcc-c++ gperftools-devel libatomic_ops-devel pcre-devel libxml2-devel libxslt-devel zlib-devel gd-devel perl-ExtUtils-Embed perl-Data-Dumper perl-IPC-Cmd geoip-devel lksctp-tools-devel wget unzip curl make openssl crontabs"
-    else
-        install_dependence "gcc g++ libgoogle-perftools-dev libatomic-ops-dev libperl-dev libxml2-dev libxslt-dev zlib1g-dev libpcre3-dev libgeoip-dev libgd-dev libsctp-dev wget unzip curl make openssl cron"
-        if [ $install_php -eq 1 ]; then
-            install_dependence "pkg-config libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-dev libpng-dev libgd-dev libwebp-dev libgmp-dev libc-client2007e-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libreadline-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt-dev libzip-dev"
-        fi
-    fi
+    install_base_dependence
+    install_nginx_dependence
+    [ $install_php -eq 1 ] && install_php_dependence
     apt clean
     $redhat_package_manager clean all
 
@@ -2317,6 +2337,11 @@ start_menu()
         readDomain
         local new_install_php=0
         if [ ${pretend_list[0]} -eq 4 ] && [ $php_is_installed -eq 0 ]; then
+            apt -y -f install
+            get_system_info
+            check_important_dependence_installed ca-certificates ca-certificates
+            install_base_dependence
+            install_php_dependence
             enter_temp_dir
             compile_php
             remove_php
@@ -2347,6 +2372,11 @@ start_menu()
         readDomain
         local new_install_php=0
         if [ ${pretend_list[-1]} -eq 4 ] && [ $php_is_installed -eq 0 ]; then
+            apt -y -f install
+            get_system_info
+            check_important_dependence_installed ca-certificates ca-certificates
+            install_base_dependence
+            install_php_dependence
             enter_temp_dir
             compile_php
             remove_php
