@@ -1991,8 +1991,8 @@ install_update_xray_tls_web()
 
 #读取信息
     if [ $update == 0 ]; then
-        readDomain
         readProtocolConfig
+        readDomain
     else
         get_base_information
         get_domainlist
@@ -2004,41 +2004,13 @@ install_update_xray_tls_web()
     else
         install_php=$php_is_installed
     fi
+
     green "正在安装依赖。。。。"
     install_base_dependence
     install_nginx_dependence
     [ $install_php -eq 1 ] && install_php_dependence
     apt clean
     $redhat_package_manager clean all
-
-    local use_existed_nginx=0
-    if [ $update -eq 1 ]; then
-        if check_nginx_update; then
-            choice=""
-            while [ "$choice" != "y" ] && [ "$choice" != "n" ]
-            do
-                tyblue "检测到Nginx有新版本，是否更新?(y/n)"
-                read choice
-            done
-            [ $choice == n ] && use_existed_nginx=1
-        else
-            green "Nginx已经是最新版本，不更新"
-            use_existed_nginx=1
-        fi
-    elif [ $nginx_is_installed -eq 1 ]; then
-        tyblue "---------------检测到Nginx已存在---------------"
-        tyblue " 1. 尝试使用现有Nginx"
-        tyblue " 2. 卸载现有Nginx并重新编译安装"
-        echo
-        yellow " 若安装完成后Nginx无法启动，请卸载并重新安装"
-        echo
-        choice=""
-        while [ "$choice" != "1" ] && [ "$choice" != "2" ]
-        do
-            read -p "您的选择是：" choice
-        done
-        [ $choice -eq 1 ] && use_existed_nginx=1
-    fi
 
     local use_existed_php=0
     if [ $install_php -eq 1 ]; then
@@ -2057,7 +2029,7 @@ install_update_xray_tls_web()
             fi
         elif [ $php_is_installed -eq 1 ]; then
             tyblue "---------------检测到php已存在---------------"
-            tyblue " 1. 尝试使用现有php"
+            tyblue " 1. 使用现有php"
             tyblue " 2. 卸载现有php并重新编译安装"
             echo
             yellow " 若安装完成后php无法启动，请卸载并重新安装"
@@ -2071,8 +2043,32 @@ install_update_xray_tls_web()
         fi
     fi
 
-    #编译Nginx
-    [ $use_existed_nginx -eq 0 ] && compile_nginx
+    local use_existed_nginx=0
+    if [ $update -eq 1 ]; then
+        if check_nginx_update; then
+            choice=""
+            while [ "$choice" != "y" ] && [ "$choice" != "n" ]
+            do
+                tyblue "检测到Nginx有新版本，是否更新?(y/n)"
+                read choice
+            done
+            [ $choice == n ] && use_existed_nginx=1
+        else
+            green "Nginx已经是最新版本，不更新"
+            use_existed_nginx=1
+        fi
+    elif [ $nginx_is_installed -eq 1 ]; then
+        tyblue "---------------检测到Nginx已存在---------------"
+        tyblue " 1. 使用现有Nginx"
+        tyblue " 2. 卸载现有Nginx并重新编译安装"
+        echo
+        choice=""
+        while [ "$choice" != "1" ] && [ "$choice" != "2" ]
+        do
+            read -p "您的选择是：" choice
+        done
+        [ $choice -eq 1 ] && use_existed_nginx=1
+    fi
 
     #编译&&安装php
     if [ $install_php -eq 1 ]; then
@@ -2084,8 +2080,9 @@ install_update_xray_tls_web()
         install_php_part2
     fi
 
-    #安装Nginx
+    #编译&&安装Nginx
     if [ $use_existed_nginx -eq 0 ]; then
+        compile_nginx
         [ $update -eq 1 ] && backup_domains_web
         remove_nginx
         install_nginx_part1
@@ -2103,7 +2100,7 @@ install_update_xray_tls_web()
         get_all_webs
     fi
 
-#安装Xray
+    #安装Xray
     remove_xray
     install_update_xray
 
@@ -2116,11 +2113,11 @@ install_update_xray_tls_web()
     $HOME/.acme.sh/acme.sh --upgrade --auto-upgrade
     get_all_certs
 
+    #配置Nginx和Xray
     if [ $update == 0 ]; then
-        path=$(cat /dev/urandom | head -c 8 | md5sum | head -c 7)
-        path="/$path"
-        xid_1=$(cat /proc/sys/kernel/random/uuid)
-        xid_2=$(cat /proc/sys/kernel/random/uuid)
+        path="/$(cat /dev/urandom | head -c 8 | md5sum | head -c 7)"
+        xid_1="$(cat /proc/sys/kernel/random/uuid)"
+        xid_2="$(cat /proc/sys/kernel/random/uuid)"
     fi
     config_nginx
     config_xray
@@ -2278,9 +2275,9 @@ start_menu()
     else
         green  "   1. 重新安装Xray-TLS+Web"
     fi
-    purple "         流程：[升级系统组件]->[安装bbr]->安装Nginx->[安装php]->安装Xray->申请证书->配置文件"
+    purple "         流程：[升级系统组件]->[安装bbr]->[安装php]->安装Nginx->安装Xray->申请证书->配置文件"
     green  "   2. 升级Xray-TLS+Web"
-    purple "         流程：升级脚本->[升级系统组件]->[升级bbr]->[升级Nginx]->[升级php]->升级Xray->升级证书->更新配置文件"
+    purple "         流程：升级脚本->[升级系统组件]->[升级bbr]->[升级php]->[升级Nginx]->升级Xray->升级证书->更新配置文件"
     tyblue "   3. 检查更新/升级脚本"
     tyblue "   4. 升级系统组件"
     tyblue "   5. 安装/检查更新/升级bbr"
