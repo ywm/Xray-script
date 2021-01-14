@@ -2180,8 +2180,7 @@ start_menu()
         fi
         [ $protocol_1_old -eq 0 ] && [ $protocol_1 -ne 0 ] && xid_1=$(cat /proc/sys/kernel/random/uuid)
         if [ $protocol_2_old -eq 0 ] && [ $protocol_2 -ne 0 ]; then
-            path=$(cat /dev/urandom | head -c 8 | md5sum | head -c 7)
-            path="/$path"
+            path="/$(cat /dev/urandom | head -c 8 | md5sum | head -c 7)"
             xid_2=$(cat /proc/sys/kernel/random/uuid)
         fi
         get_domainlist
@@ -2193,7 +2192,7 @@ start_menu()
     simplify_system()
     {
         if [ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-            yellow "该功能仅对Debian基系统(Ubuntu Debian deepin)开放"
+            yellow "该功能仅对Debian基系统(Ubuntu Debian deepin等)开放"
             return 0
         fi
         if systemctl -q is-active xray || systemctl -q is-active nginx || systemctl -q is-active php-fpm; then
@@ -2293,7 +2292,7 @@ start_menu()
     tyblue " ----------------管理----------------"
     tyblue "  11. 查看配置信息"
     tyblue "  12. 重置域名"
-    purple "         会覆盖原有域名配置，安装过程中域名输错了造成Xray无法启动可以用此选项修复"
+    purple "         将删除所有域名配置，安装过程中域名输错了造成Xray无法启动可以用此选项修复"
     tyblue "  13. 添加域名"
     tyblue "  14. 删除域名"
     tyblue "  15. 修改id(用户ID/UUID)"
@@ -2302,7 +2301,8 @@ start_menu()
     echo
     tyblue " ----------------其它----------------"
     tyblue "  18. 尝试修复退格键无法使用的问题"
-    tyblue "  19. 精简系统(仅对Debian基系统(Ubuntu Debian deepin)开放)"
+    tyblue "  19. 精简系统"
+    purple "         删除不必要的系统组件"
     tyblue "  20. 修改dns"
     yellow "  21. 退出脚本"
     echo
