@@ -6,11 +6,9 @@ openssl_version="openssl-openssl-3.0.0-alpha10"
 nginx_prefix="/usr/local/nginx"
 nginx_config="${nginx_prefix}/conf.d/xray.conf"
 nginx_service="/etc/systemd/system/nginx.service"
-#php_version="php-8.0.1"
-php_version="php-7.4.14"
+php_version="php-8.0.1"
 php_prefix="/usr/local/php"
-#nextcloud_url="https://download.nextcloud.com/server/prereleases/nextcloud-21.0.0beta5.zip"
-nextcloud_url="https://github.com/nextcloud/server/releases/download/v20.0.4/nextcloud-20.0.4.zip"
+nextcloud_url="https://download.nextcloud.com/server/prereleases/nextcloud-21.0.0beta6.zip"
 xray_config="/usr/local/etc/xray/config.json"
 temp_dir="/temp_install_update_xray_tls_web"
 nginx_is_installed=""
@@ -1136,7 +1134,7 @@ compile_nginx()
 }
 config_service_nginx()
 {
-    systemctl disable nginx
+    systemctl --now disable nginx
     rm -rf $nginx_service
 cat > $nginx_service << EOF
 [Unit]
@@ -1327,6 +1325,7 @@ install_php_part2()
     echo "listen = /dev/shm/php-fpm_unixsocket/php.sock" >> ${php_prefix}/etc/php-fpm.d/www.conf
     sed -i '/^[ \t]*env\[PATH\][ \t]*=/d' ${php_prefix}/etc/php-fpm.d/www.conf
     echo "env[PATH] = $PATH" >> ${php_prefix}/etc/php-fpm.d/www.conf
+    systemctl --now disable php-fpm
     rm -rf /etc/systemd/system/php-fpm.service
     cp ${php_prefix}/php-fpm.service.default /etc/systemd/system/php-fpm.service
 cat >> /etc/systemd/system/php-fpm.service <<EOF
@@ -2076,6 +2075,8 @@ install_update_xray_tls_web()
             compile_php
             remove_php
             install_php_part1
+        else
+            systemctl --now disable php-fpm
         fi
         install_php_part2
     fi
@@ -2087,6 +2088,7 @@ install_update_xray_tls_web()
         remove_nginx
         install_nginx_part1
     else
+        systemctl --now disable nginx
         rm -rf ${nginx_prefix}/conf.d
         rm -rf ${nginx_prefix}/certs
         rm -rf ${nginx_prefix}/html/issue_certs
