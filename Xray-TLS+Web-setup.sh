@@ -961,7 +961,7 @@ readDomain()
         green  "    说明：是真镜像站，非链接跳转，默认为腾讯视频，搭建完成后可以自己修改，可能构成侵权"
         tyblue " 3. Nextcloud登陆页面"
         green  "    说明：Nextclound是开源的私人网盘服务，假装你搭建了一个私人网盘(可以换成别的自定义网站)"
-        tyblue " 4. Nextcloud"
+        tyblue " 4. Nextcloud(需安装php)"
         green  "    说明：最强伪装，没有之一"
         echo
         pretend=""
@@ -969,7 +969,12 @@ readDomain()
         do
             read -p "您的选择是：" pretend
         done
-        if [ "$pretend" == "4" ] && [ $php_is_installed -eq 0 ]; then
+        if [ $pretend -eq 4 ] && ([ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]) && ! version_ge $redhat_version 8; then
+            red "不支持在 Red-hat版本<8 的 Red-hat基 系统上安装php"
+            yellow "如： CentOS<8 Fedora<30 的版本"
+            continue
+        fi
+        if [ $pretend -eq 4 ] && [ $php_is_installed -eq 0 ]; then
             tyblue "安装Nextcloud需要安装php"
             yellow "编译&&安装php可能需要额外消耗15-60分钟"
             yellow "php将占用一定系统资源，不建议内存<512M的机器使用"
