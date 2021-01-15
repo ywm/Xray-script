@@ -1369,21 +1369,26 @@ get_cert()
         $HOME/.acme.sh/acme.sh --remove --domain $1 --ecc
         rm -rf $HOME/.acme.sh/${1}_ecc
         rm -rf "${nginx_prefix}/certs/${1}.key" "${nginx_prefix}/certs/${1}.cer"
-        yellow "证书安装失败，请检查："
-        yellow "    1.域名是否解析正确"
-        yellow "    2.vps防火墙80端口是否开放"
-        yellow "并在安装完成后，使用脚本主菜单\"重置域名\"选项修复"
-        yellow "按回车键继续。。。"
-        read -s
+        mv $xray_config.bak $xray_config
+        return 1
     fi
     mv $xray_config.bak $xray_config
+    return 0
 }
 get_all_certs()
 {
     local i
     for ((i=0;i<${#domain_list[@]};i++))
     do
-        get_cert ${domain_list[i]} ${domainconfig_list[i]}
+        if ! get_cert ${domain_list[$i]} ${domainconfig_list[$i]}; then
+            red    "域名\"${domain_list[$i]}\"证书安装失败！"
+            yellow "请检查："
+            yellow "    1.域名是否解析正确"
+            yellow "    2.vps防火墙80端口是否开放"
+            yellow "并在安装完成后，使用脚本主菜单\"重置域名\"选项修复"
+            yellow "按回车键继续。。。"
+            read -s
+        fi
     done
 }
 
@@ -2496,7 +2501,12 @@ start_menu()
             full_install_php
             new_install_php=1
         fi
-        get_cert ${domain_list[-1]} ${domainconfig_list[-1]}
+        if ! get_cert ${domain_list[-1]} ${domainconfig_list[-1]}; then
+            red "申请证书失败！！"
+            red "域名添加失败"
+            [ ${new_install_php} -eq 1 ] && rm -rf "$temp_dir"
+            return 1
+        fi
         get_web ${domain_list[-1]} ${pretend_list[-1]}
         config_nginx
         config_xray
