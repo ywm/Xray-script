@@ -1772,14 +1772,14 @@ let_init_nextcloud()
 {
     local temp_domain="${domain_list[$1]}"
     [ ${domainconfig_list[$1]} -eq 1 ] && temp_domain="www.${temp_domain}"
-    green "请打开 \"https://${temp_domain}\" 进行Nextcloud初始化设置"
-    green " 1.自定义管理员的用户名和密码"
-    green " 2.数据库类型选择SQLite"
-    green " 3.建议不勾选\"安装推荐应用\"，因为进去之后还能再安装"
-    echo
-    echo
-    sleep 10s
-    green "请在完成初始化后，按两次回车键以继续。。。"
+    echo -e "\n\n"
+    yellow "请立即打开\"https://${temp_domain}\"进行Nextcloud初始化设置："
+    tyblue " 1.自定义管理员的用户名和密码"
+    tyblue " 2.数据库类型选择SQLite"
+    tyblue " 3.建议不勾选\"安装推荐的应用\"，因为进去之后还能再安装"
+    sleep 15s
+    echo -e "\n\n"
+    yellow "请在确认完成初始化后，再按两次回车键以继续。。。"
     read -s
     read -s
     cd "${nginx_prefix}/html/${domain_list[$1]}"
