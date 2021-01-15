@@ -1306,7 +1306,7 @@ compile_php()
         exit 1
     fi
     swap_off
-    cd -
+    cd ..
 }
 install_php_part1()
 {
@@ -1314,7 +1314,28 @@ install_php_part1()
     cd "${php_version}"
     make install
     cp sapi/fpm/php-fpm.service ${php_prefix}/php-fpm.service.default
-    cd -
+    cd ..
+}
+instal_php_imagick()
+{
+    if ! git clone https://github.com/Imagick/imagick; then
+        yellow "获取php-imagick源码失败"
+        yellow "按回车键继续或者按ctrl+c终止"
+        read -s
+    fi
+    cd imagick
+    ${php_prefix}/bin/phpize
+    ./configure --with-php-config=${php_prefix}/bin/php-config CFLAGS="-g0 -O3"
+    if ! make; then
+        yellow "php-imagick编译失败"
+        green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
+        yellow "在Bug修复前，建议使用Ubuntu最新版系统"
+        yellow "按回车键继续或者按ctrl+c终止"
+        read -s
+    fi
+    local php_lib="$(${php_prefix}/bin/php -i | grep "^extension_dir" | awk '{print $3}')"
+    mv modules/imagick.so "$php_lib"
+    cd ..
 }
 install_php_part2()
 {
@@ -1325,6 +1346,15 @@ install_php_part2()
     echo "listen = /dev/shm/php-fpm_unixsocket/php.sock" >> ${php_prefix}/etc/php-fpm.d/www.conf
     sed -i '/^[ \t]*env\[PATH\][ \t]*=/d' ${php_prefix}/etc/php-fpm.d/www.conf
     echo "env[PATH] = $PATH" >> ${php_prefix}/etc/php-fpm.d/www.conf
+    instal_php_imagick
+cat > ${php_prefix}/etc/php.ini << EOF
+[PHP]
+memory_limit=-1
+upload_max_filesize=-1
+extension=imagick.so
+zend_extension=opcache.so
+opcache.enable=1
+EOF
     systemctl --now disable php-fpm
     rm -rf /etc/systemd/system/php-fpm.service
     cp ${php_prefix}/php-fpm.service.default /etc/systemd/system/php-fpm.service
@@ -1975,9 +2005,9 @@ install_nginx_dependence()
 install_php_dependence()
 {
     if [ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        install_dependence pkgconf-pkg-config libxml2-devel sqlite-devel systemd-devel libacl-devel openssl-devel krb5-devel pcre2-devel zlib-devel bzip2-devel libcurl-devel gdbm-devel libdb-devel tokyocabinet-devel lmdb-devel enchant-devel libffi-devel libpng-devel gd-devel libwebp-devel libjpeg-turbo-devel libXpm-devel freetype-devel gmp-devel libc-client-devel libicu-devel openldap-devel oniguruma-devel unixODBC-devel freetds-devel libpq-devel aspell-devel libedit-devel net-snmp-devel libsodium-devel libargon2-devel libtidy-devel libxslt-devel libzip-devel
+        install_dependence pkgconf-pkg-config libxml2-devel sqlite-devel systemd-devel libacl-devel openssl-devel krb5-devel pcre2-devel zlib-devel bzip2-devel libcurl-devel gdbm-devel libdb-devel tokyocabinet-devel lmdb-devel enchant-devel libffi-devel libpng-devel gd-devel libwebp-devel libjpeg-turbo-devel libXpm-devel freetype-devel gmp-devel libc-client-devel libicu-devel openldap-devel oniguruma-devel unixODBC-devel freetds-devel libpq-devel aspell-devel libedit-devel net-snmp-devel libsodium-devel libargon2-devel libtidy-devel libxslt-devel libzip-devel autoconf git ImageMagick-devel
     else
-        install_dependence pkg-config libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-dev libffi-dev libpng-dev libgd-dev libwebp-dev libjpeg-turbo8-dev libxpm-dev libfreetype-dev libgmp-dev libc-client2007e-dev libicu-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt1-dev libzip-dev
+        install_dependence pkg-config libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-dev libffi-dev libpng-dev libgd-dev libwebp-dev libjpeg-turbo8-dev libxpm-dev libfreetype-dev libgmp-dev libc-client2007e-dev libicu-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt1-dev libzip-dev autoconf git libmagickwand-dev
     fi
 }
 #安装xray_tls_web
