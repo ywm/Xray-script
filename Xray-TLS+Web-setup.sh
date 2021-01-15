@@ -1740,9 +1740,6 @@ get_web()
         unzip -q -d "${nginx_prefix}/html" "${nginx_prefix}/html/Website.zip"
         mv "${nginx_prefix}/html/nextcloud" "${nginx_prefix}/html/$1"
         chown -R www-data:www-data "${nginx_prefix}/html/$1"
-        cd "${nginx_prefix}/html/$1"
-        sudo -u www-data ${php_prefix}/bin/php occ db:add-missing-indices
-        cd -
     fi
     rm -rf "${nginx_prefix}/html/Website.zip"
 }
@@ -1779,10 +1776,15 @@ let_init_nextcloud()
     green " 1.自定义管理员的用户名和密码"
     green " 2.数据库类型选择SQLite"
     green " 3.建议不勾选\"安装推荐应用\"，因为进去之后还能再安装"
+    echo
+    echo
     sleep 10s
-    green "按两次回车键以继续。。。"
+    green "请在完成初始化后，按两次回车键以继续。。。"
     read -s
     read -s
+    cd "${nginx_prefix}/html/${domain_list[$1]}"
+    sudo -u www-data ${php_prefix}/bin/php occ db:add-missing-indices
+    cd -
 }
 
 echo_end()
@@ -2008,9 +2010,9 @@ install_nginx_dependence()
 install_php_dependence()
 {
     if [ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        install_dependence pkgconf-pkg-config libxml2-devel sqlite-devel systemd-devel libacl-devel openssl-devel krb5-devel pcre2-devel zlib-devel bzip2-devel libcurl-devel gdbm-devel libdb-devel tokyocabinet-devel lmdb-devel enchant-devel libffi-devel libpng-devel gd-devel libwebp-devel libjpeg-turbo-devel libXpm-devel freetype-devel gmp-devel libc-client-devel libicu-devel openldap-devel oniguruma-devel unixODBC-devel freetds-devel libpq-devel aspell-devel libedit-devel net-snmp-devel libsodium-devel libargon2-devel libtidy-devel libxslt-devel libzip-devel autoconf git ImageMagick-devel
+        install_dependence pkgconf-pkg-config libxml2-devel sqlite-devel systemd-devel libacl-devel openssl-devel krb5-devel pcre2-devel zlib-devel bzip2-devel libcurl-devel gdbm-devel libdb-devel tokyocabinet-devel lmdb-devel enchant-devel libffi-devel libpng-devel gd-devel libwebp-devel libjpeg-turbo-devel libXpm-devel freetype-devel gmp-devel libc-client-devel libicu-devel openldap-devel oniguruma-devel unixODBC-devel freetds-devel libpq-devel aspell-devel libedit-devel net-snmp-devel libsodium-devel libargon2-devel libtidy-devel libxslt-devel libzip-devel autoconf git ImageMagick-devel sudo
     else
-        install_dependence pkg-config libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-dev libffi-dev libpng-dev libgd-dev libwebp-dev libjpeg-turbo8-dev libxpm-dev libfreetype-dev libgmp-dev libc-client2007e-dev libicu-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt1-dev libzip-dev autoconf git libmagickwand-dev
+        install_dependence pkg-config libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-dev libffi-dev libpng-dev libgd-dev libwebp-dev libjpeg-turbo8-dev libxpm-dev libfreetype-dev libgmp-dev libc-client2007e-dev libicu-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt1-dev libzip-dev autoconf git libmagickwand-dev sudo
     fi
 }
 #安装xray_tls_web
