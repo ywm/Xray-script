@@ -1189,7 +1189,7 @@ http {
 }
 EOF
 cat > ${nginx_prefix}/conf.d/nextcloud.conf <<EOF
-    client_max_body_size 512M;
+    client_max_body_size 0;
     fastcgi_buffers 64 4K;
     gzip on;
     gzip_vary on;
@@ -1226,7 +1226,7 @@ cat > ${nginx_prefix}/conf.d/nextcloud.conf <<EOF
         set \$path_info \$fastcgi_path_info;
         try_files \$fastcgi_script_name =404;
         fastcgi_param PATH_INFO \$path_info;
-        #fastcgi_param HTTPS on;
+        fastcgi_param HTTPS on;
         fastcgi_param modHeadersAvailable true;         # Avoid sending the security headers twice
         fastcgi_param front_controller_active true;     # Enable pretty urls
         fastcgi_pass unix:/dev/shm/php-fpm_unixsocket/php.sock;
@@ -1740,6 +1740,9 @@ get_web()
         unzip -q -d "${nginx_prefix}/html" "${nginx_prefix}/html/Website.zip"
         mv "${nginx_prefix}/html/nextcloud" "${nginx_prefix}/html/$1"
         chown -R www-data:www-data "${nginx_prefix}/html/$1"
+        cd "${nginx_prefix}/html/$1"
+        sudo -u www-data ${php_prefix}/bin/php occ db:add-missing-indices
+        cd -
     fi
     rm -rf "${nginx_prefix}/html/Website.zip"
 }
