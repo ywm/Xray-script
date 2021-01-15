@@ -1366,6 +1366,9 @@ get_cert()
         $HOME/.acme.sh/acme.sh --issue -d $1 $temp -w ${nginx_prefix}/html/issue_certs -k ec-256 -ak ec-256 --pre-hook "mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak && cp ${nginx_prefix}/conf/issue_certs.conf ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --post-hook "mv ${nginx_prefix}/conf/nginx.conf.bak ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --ocsp --debug
     fi
     if ! $HOME/.acme.sh/acme.sh --installcert -d $1 --key-file ${nginx_prefix}/certs/${1}.key --fullchain-file ${nginx_prefix}/certs/${1}.cer --reloadcmd "sleep 2s && systemctl restart xray" --ecc; then
+        $HOME/.acme.sh/acme.sh --remove --domain $1 --ecc
+        rm -rf $HOME/.acme.sh/${1}_ecc
+        rm -rf "${nginx_prefix}/certs/${1}.key" "${nginx_prefix}/certs/${1}.cer"
         yellow "证书安装失败，请检查："
         yellow "    1.域名是否解析正确"
         yellow "    2.vps防火墙80端口是否开放"
@@ -2534,6 +2537,7 @@ start_menu()
         fi
         $HOME/.acme.sh/acme.sh --remove --domain ${domain_list[$delete]} --ecc
         rm -rf $HOME/.acme.sh/${domain_list[$delete]}_ecc
+        rm -rf "${nginx_prefix}/certs/${domain_list[$delete]}.key" "${nginx_prefix}/certs/${domain_list[$delete]}.cer"
         rm -rf ${nginx_prefix}/html/${domain_list[$delete]}
         unset domain_list[$delete]
         unset domainconfig_list[$delete]
