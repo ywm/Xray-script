@@ -2500,6 +2500,9 @@ start_menu()
             return 0
         fi
         green "重置域名中。。。"
+        apt -y -f install
+        get_system_info
+        check_important_dependence_installed ca-certificates ca-certificates
         $HOME/.acme.sh/acme.sh --uninstall
         rm -rf $HOME/.acme.sh
         curl https://get.acme.sh | sh
@@ -2508,9 +2511,6 @@ start_menu()
         readDomain
         local new_install_php=0
         if [ ${pretend_list[0]} -eq 4 ] && [ $php_is_installed -eq 0 ]; then
-            apt -y -f install
-            get_system_info
-            check_important_dependence_installed ca-certificates ca-certificates
             enter_temp_dir
             full_install_php
             new_install_php=1
@@ -2531,12 +2531,12 @@ start_menu()
             red "请先安装Xray-TLS+Web！！"
             exit 1
         fi
+        apt -y -f install
+        get_system_info
+        check_important_dependence_installed ca-certificates ca-certificates
         readDomain
         local new_install_php=0
         if [ ${pretend_list[-1]} -eq 4 ] && [ $php_is_installed -eq 0 ]; then
-            apt -y -f install
-            get_system_info
-            check_important_dependence_installed ca-certificates ca-certificates
             enter_temp_dir
             full_install_php
             new_install_php=1
