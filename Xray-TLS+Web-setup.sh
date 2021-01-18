@@ -274,7 +274,7 @@ let_change_cloudreve_domain()
     read -s
     read -s
 }
-let_init_cloudreve()
+init_cloudreve()
 {
     local temp
     temp="$(timeout 5s $cloudreve_prefix/cloudreve | grep "初始管理员密码：" | awk '{print $4}')"
@@ -2052,7 +2052,7 @@ install_init_cloudreve()
     remove_cloudreve
     mkdir -p $cloudreve_prefix
     update_cloudreve
-    let_init_cloudreve "$1"
+    init_cloudreve "$1"
     cloudreve_is_installed=1
 }
 
@@ -2320,20 +2320,27 @@ install_update_xray_tls_web()
     sleep 2s
     systemctl restart xray nginx
     if [ $update -eq 0 ]; then
-        turn_on_off_php
         if [ "${pretend_list[0]}" == "2" ]; then
+            systemctl --now enable php-fpm
             let_init_nextcloud "0"
-        elif [ "${pretend_list[0]}" == "1" ]; then
+        else
+            systemctl --now disable php-fpm
+        fi
+        if [ "${pretend_list[0]}" == "1" ]; then
             if [ $temp_remove_cloudreve -eq 1 ]; then
                 install_init_cloudreve "0"
             else
+                systemctl --now enable cloudreve
                 update_cloudreve
                 let_change_cloudreve_domain "0"
             fi
+        else
+            systemctl --now disable cloudreve
         fi
         green "-------------------安装完成-------------------"
     else
         [ $cloudreve_is_installed -eq 1 ] && update_cloudreve
+        turn_on_off_cloudreve
         green "-------------------更新完成-------------------"
     fi
     print_config_info
@@ -2561,7 +2568,7 @@ reinit_cloudreve()
     shopt -s extglob
     temp="rm -rf $cloudreve_prefix/!(cloudreve|conf.ini)"
     $temp
-    let_init_cloudreve "$i"
+    init_cloudreve "$i"
     green "重置完成！"
 }
 change_pretend()
