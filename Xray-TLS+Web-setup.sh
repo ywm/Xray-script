@@ -2442,9 +2442,9 @@ reinit_domain()
 {
     yellow "重置域名将删除所有现有域名(包括域名证书、伪装网站等)"
     ! ask_if "是否继续？(y/n)" && return 0
-    green "重置域名中。。。"
     readDomain
     [ "${pretend_list[-1]}" == "2" ] && [ $php_is_installed -eq 0 ] && full_install_php
+    green "重置域名中。。。"
     local temp_domain="${domain_list[-1]}"
     local temp_true_domain="${true_domain_list[-1]}"
     local temp_domain_config="${domain_config_list[-1]}"
@@ -2464,17 +2464,16 @@ reinit_domain()
     init_all_webs
     sleep 2s
     systemctl restart xray nginx
-    turn_on_off_php
-    [ "${pretend_list[0]}" == "2" ] && let_init_nextcloud "0"
-    if [ "${pretend_list[0]}" == "1" ]; then
+    if [ "${pretend_list[0]}" == "2" ]; then
+        systemctl --now enable php-fpm
+        let_init_nextcloud "0"
+    elif [ "${pretend_list[0]}" == "1" ]; then
         if [ $cloudreve_is_installed -eq 0 ]; then
             full_install_init_cloudreve "0"
         else
             systemctl --now enable cloudreve
             let_change_cloudreve_domain "0"
         fi
-    else
-        systemctl --now disable cloudreve
     fi
     green "域名重置完成！！"
     print_config_info
@@ -2874,7 +2873,7 @@ start_menu()
     elif [ $choice -eq 8 ]; then
         if [ $cloudreve_is_installed -eq 0 ]; then
             red    "请先安装Cloudreve！"
-            tyblue "在 修改伪装网站类型/重置域名/添加域名里 选择Cloudreve"
+            tyblue "在 修改伪装网站类型/重置域名/添加域名 里选择Cloudreve"
             return 1
         fi
         update_cloudreve
