@@ -393,6 +393,10 @@ get_config_info()
 #删除所有域名
 remove_all_domains()
 {
+    systemctl stop xray
+    systemctl stop nginx
+    systemctl --now disable php-fpm
+    systemctl --now disable cloudreve
     local i
     for i in ${!true_domain_list[@]}
     do
@@ -2455,9 +2459,9 @@ reinit_domain()
     true_domain_list+=("$temp_true_domain")
     pretend_list+=("$temp_pretend")
     get_all_certs
-    init_all_webs
     config_nginx
     config_xray
+    init_all_webs
     sleep 2s
     systemctl restart xray nginx
     turn_on_off_php
