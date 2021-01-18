@@ -16,6 +16,8 @@ mem="$(free -m | sed -n 2p | awk '{print $2}')"
 mem_total="$(($(free -m | sed -n 2p | awk '{print $2}')+$(free -m | tail -n 1 | awk '{print $2}')))"
 #在运行脚本前是否有启用swap
 [[ "$(free -b | tail -n 1 | awk '{print $2}')" -ne "0" ]] && using_swap=1 || using_swap=0
+#现在有没有通过脚本启动swap
+using_swap_now=0
 
 #安装信息
 nginx_version="nginx-1.19.6"
@@ -128,9 +130,9 @@ check_important_dependence_installed()
 install_dependence()
 {
     if [ $release == "ubuntu" ] || [ $release == "other-debian" ]; then
-        if ! $debian_package_manager -y --no-install-recommends install $@; then
+        if ! $debian_package_manager -y --no-install-recommends install "$@"; then
             $debian_package_manager update
-            if ! $debian_package_manager -y --no-install-recommends install $@; then
+            if ! $debian_package_manager -y --no-install-recommends install "$@"; then
                 yellow "依赖安装失败！！"
                 green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
                 yellow "按回车键继续或者ctrl+c退出"
@@ -143,11 +145,11 @@ install_dependence()
         else
             local temp_redhat_install="$redhat_package_manager -y --enablerepo "
         fi
-        if ! $redhat_package_manager -y install $@; then
-            if [ "$release" == "centos" ] && version_ge $systemVersion 8 && $temp_redhat_install"epel,PowerTools" install $@;then
+        if ! $redhat_package_manager -y install "$@"; then
+            if [ "$release" == "centos" ] && version_ge $systemVersion 8 && $temp_redhat_install"epel,PowerTools" install "$@";then
                 return 0
             fi
-            if $temp_redhat_install'*' install $@; then
+            if $temp_redhat_install'*' install "$@"; then
                 return 0
             fi
             yellow "依赖安装失败！！"
@@ -209,6 +211,12 @@ check_php_update()
 }
 swap_on()
 {
+    if [ $using_swap_now -ne 0 ]; then
+        red    "开启swap错误发生"
+        green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
+        yellow "按回车键继续或者Ctrl+c退出"
+        read -s
+    fi
     if [ $mem_total -lt $1 ]; then
         tyblue "内存不足$1M，自动申请swap。。"
         if dd if=/dev/zero of=${temp_dir}/swap bs=1M count=$(($1-mem)); then
@@ -216,6 +224,7 @@ swap_on()
             mkswap ${temp_dir}/swap
             swapoff -a
             swapon ${temp_dir}/swap
+            using_swap_now=1
         else
             rm -rf ${temp_dir}/swap
             red   "开启swap失败！"
@@ -228,9 +237,12 @@ swap_on()
 }
 swap_off()
 {
-    tyblue "正在恢复swap。。。"
-    swapoff -a
-    [ $using_swap -ne 0 ] && swapon -a
+    if [ $using_swap_now -eq 1 ]; then
+        tyblue "正在恢复swap。。。"
+        swapoff -a
+        [ $using_swap -ne 0 ] && swapon -a
+        using_swap_now=0
+    fi
 }
 #启用/禁用php cloudreve
 turn_on_off_php()
@@ -900,7 +912,7 @@ install_bbr()
                 yellow "没有内核可卸载"
                 return 0
             fi
-            $debian_package_manager -y purge ${kernel_list_image[@]} ${kernel_list_modules[@]}
+            $debian_package_manager -y purge "${kernel_list_image[@]}" "${kernel_list_modules[@]}"
             apt-mark manual "^grub"
         else
             local kernel_list
@@ -908,8 +920,10 @@ install_bbr()
             local kernel_list_devel
             kernel_list_devel=($(rpm -qa | grep '^kernel-devel\|^kernel-ml-devel'))
             if version_ge $redhat_version 8; then
-                local kernel_list_modules=($(rpm -qa |grep '^kernel-modules\|^kernel-ml-modules'))
-                local kernel_list_core=($(rpm -qa | grep '^kernel-core\|^kernel-ml-core'))
+                local kernel_list_modules
+                kernel_list_modules=($(rpm -qa |grep '^kernel-modules\|^kernel-ml-modules'))
+                local kernel_list_core
+                kernel_list_core=($(rpm -qa | grep '^kernel-core\|^kernel-ml-core'))
             fi
             local kernel_now
             kernel_now=$(uname -r)
@@ -968,9 +982,9 @@ install_bbr()
                 return 0
             fi
             if version_ge $redhat_version 8; then
-                $redhat_package_manager -y remove ${kernel_list[@]} ${kernel_list_modules[@]} ${kernel_list_core[@]} ${kernel_list_devel[@]}
+                $redhat_package_manager -y remove "${kernel_list[@]}" "${kernel_list_modules[@]}" "${kernel_list_core[@]}" "${kernel_list_devel[@]}"
             else
-                $redhat_package_manager -y remove ${kernel_list[@]} ${kernel_list_devel[@]}
+                $redhat_package_manager -y remove "${kernel_list[@]}" "${kernel_list_devel[@]}"
             fi
         fi
         green "-------------------卸载完成-------------------"
