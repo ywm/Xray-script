@@ -10,8 +10,12 @@ systemVersion=""
 redhat_version=""
 debian_package_manager=""
 redhat_package_manager=""
-#内存大小
+#物理内存大小
 mem="$(free -m | sed -n 2p | awk '{print $2}')"
+#在运行脚本前物理内存+swap大小
+mem_total="$(($(free -m | sed -n 2p | awk '{print $2}')+$(free -m | tail -n 1 | awk '{print $2}')))"
+#在运行脚本前是否有启用swap
+[[ "$(free -b | tail -n 1 | awk '{print $2}')" -ne "0" ]] && using_swap=1 || using_swap=0
 
 #安装信息
 nginx_version="nginx-1.19.6"
@@ -98,23 +102,23 @@ version_ge()
 check_important_dependence_installed()
 {
     if [ $release == "ubuntu" ] || [ $release == "other-debian" ]; then
-        if dpkg -s $1 > /dev/null 2>&1; then
-            apt-mark manual $1
-        elif ! $debian_package_manager -y --no-install-recommends install $1; then
+        if dpkg -s "$1" > /dev/null 2>&1; then
+            apt-mark manual "$1"
+        elif ! $debian_package_manager -y --no-install-recommends install "$1"; then
             $debian_package_manager update
-            if ! $debian_package_manager -y --no-install-recommends install $1; then
+            if ! $debian_package_manager -y --no-install-recommends install "$1"; then
                 red "重要组件\"$1\"安装失败！！"
                 exit 1
             fi
         fi
     else
-        if rpm -q $2 > /dev/null 2>&1; then
+        if rpm -q "$2" > /dev/null 2>&1; then
             if [ "$redhat_package_manager" == "dnf" ]; then
-                dnf mark install $2
+                dnf mark install "$2"
             else
-                yumdb set reason user $2
+                yumdb set reason user "$2"
             fi
-        elif ! $redhat_package_manager -y install $2; then
+        elif ! $redhat_package_manager -y install "$2"; then
             red "重要组件\"$2\"安装失败！！"
             exit 1
         fi
@@ -202,6 +206,31 @@ check_php_update()
     php_version_now="php-$(${php_prefix}/bin/php -v | head -n 1 | awk '{print $2}')"
     [ "$php_version_now" == "$php_version" ] && return 1
     return 0
+}
+swap_on()
+{
+    if [ $mem_total -lt $1 ]; then
+        tyblue "内存不足$1M，自动申请swap。。"
+        if dd if=/dev/zero of=${temp_dir}/swap bs=1M count=$(($1-mem)); then
+            chmod 0600 ${temp_dir}/swap
+            mkswap ${temp_dir}/swap
+            swapoff -a
+            swapon ${temp_dir}/swap
+        else
+            rm -rf ${temp_dir}/swap
+            red   "开启swap失败！"
+            yellow "可能是机器内存和硬盘空间都不足"
+            green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
+            yellow "按回车键继续或者Ctrl+c退出"
+            read -s
+        fi
+    fi
+}
+swap_off()
+{
+    tyblue "正在恢复swap。。。"
+    swapoff -a
+    [ $using_swap -ne 0 ] && swapon -a
 }
 #启用/禁用php cloudreve
 turn_on_off_php()
@@ -393,6 +422,11 @@ fi
 [ -e ${cloudreve_prefix}/cloudreve.db ] && cloudreve_is_installed=1 || cloudreve_is_installed=0
 [ -e /usr/local/bin/xray ] && xray_is_installed=1 || xray_is_installed=0
 ([ $xray_is_installed -eq 1 ] && [ $nginx_is_installed -eq 1 ]) && is_installed=1 || is_installed=0
+if [ $is_installed -eq 1 ] && ! grep -q "domain_list=" $nginx_config; then
+    red "脚本进行了一次不向下兼容的更新"
+    yellow "请选择 \"重新安装\" 来升级"
+    sleep 3s
+fi
 
 #检查80端口和443端口是否被占用
 check_port()
@@ -475,15 +509,7 @@ check_nginx_installed_system()
     yellow " 如果您不记得之前有安装过Nginx，那么可能是使用别的一键脚本时安装的"
     yellow " 建议使用纯净的系统运行此脚本"
     echo
-    local choice=""
-    while [ "$choice" != "y" ] && [ "$choice" != "n" ]
-    do
-        tyblue "是否尝试卸载？(y/n)"
-        read choice
-    done
-    if [ $choice == "n" ]; then
-        exit 0
-    fi
+    ! ask_if "是否尝试卸载？(y/n)" && exit 0
     $debian_package_manager -y purge nginx
     $redhat_package_manager -y remove nginx
     if [[ ! -f /usr/lib/systemd/system/nginx.service ]] && [[ ! -f /lib/systemd/system/nginx.service ]]; then
@@ -507,14 +533,8 @@ check_SELinux()
         $debian_package_manager -y purge selinux-utils
     }
     if getenforce 2>/dev/null | grep -wqi Enforcing || grep -Eq '^[ '$'\t]*SELINUX[ '$'\t]*=[ '$'\t]*enforcing[ '$'\t]*$' /etc/sysconfig/selinux 2>/dev/null; then
-        yellow "检测到SELinux开启，脚本可能无法正常运行"
-        choice=""
-        while [[ "$choice" != "y" && "$choice" != "n" ]]
-        do
-            tyblue "尝试关闭SELinux?(y/n)"
-            read choice
-        done
-        if [ $choice == y ]; then
+        yellow "检测到SELinux已开启，脚本可能无法正常运行"
+        if ask_if "尝试关闭SELinux?(y/n)"; then
             turn_off_selinux
         else
             exit 0
@@ -760,7 +780,8 @@ install_bbr()
     {
         green "正在获取最新版本内核版本号。。。。(60内秒未获取成功自动跳过)"
         local kernel_list
-        local kernel_list_temp=($(timeout 60 wget -qO- https://kernel.ubuntu.com/~kernel-ppa/mainline/ | awk -F'\"v' '/v[0-9]/{print $2}' | cut -d '"' -f1 | cut -d '/' -f1 | sort -rV))
+        local kernel_list_temp
+        kernel_list_temp=($(timeout 60 wget -qO- https://kernel.ubuntu.com/~kernel-ppa/mainline/ | awk -F'\"v' '/v[0-9]/{print $2}' | cut -d '"' -f1 | cut -d '/' -f1 | sort -rV))
         if [ ${#kernel_list_temp[@]} -le 1 ]; then
             latest_kernel_version="error"
             your_kernel_version=$(uname -r | cut -d - -f 1)
@@ -1127,14 +1148,7 @@ install_bbr()
         elif [ $choice -eq 6 ]; then
             tyblue " 该操作将会卸载除现在正在使用的内核外的其余内核"
             tyblue "    您正在使用的内核是：$(uname -r)"
-            choice=""
-            while [[ "$choice" != "y" && "$choice" != "n" ]]
-            do
-                read -p "是否继续？(y/n)" choice
-            done
-            if [ $choice == y ]; then
-                remove_other_kernel
-            fi
+            ask_if "是否继续？(y/n)" && remove_other_kernel
         elif [ $choice -eq 7 ]; then
             change_qdisc
         else
@@ -1246,18 +1260,17 @@ readDomain()
 {
     check_domain()
     {
-        local temp=${1%%.*}
-        if [ "$temp" == "www" ]; then
-            red "域名前面不要带www！"
-            return 0
-        elif [ "$1" == "" ]; then
-            return 0
-        else
+        if [ -z "$1" ]; then
             return 1
+        elif [ "${1%%.*}" == "www" ]; then
+            red "域名前面不要带www！"
+            return 1
+        else
+            return 0
         fi
     }
     local domain
-    local domain_config
+    local domain_config=""
     local pretend
     echo -e "\\n\\n\\n"
     tyblue "--------------------请选择域名解析情况--------------------"
@@ -1266,33 +1279,30 @@ readDomain()
     tyblue " 2. 仅某个域名解析到此服务器上"
     green  "    如：123.com 或 www.123.com 或 xxx.123.com 中的某一个解析到此服务器上"
     echo
-    domain_config=""
     while [ "$domain_config" != "1" ] && [ "$domain_config" != "2" ]
     do
         read -p "您的选择是：" domain_config
     done
-    local queren=""
-    while [ "$queren" != "y" ]
+    local queren=0
+    while [ $queren -ne 1 ]
     do
+        domain=""
         echo
         if [ $domain_config -eq 1 ]; then
             tyblue '---------请输入一级域名(前面不带"www."、"http://"或"https://")---------'
-            read -p "请输入域名：" domain
-            while check_domain "$domain"
+            while ! check_domain "$domain"
             do
                 read -p "请输入域名：" domain
             done
         else
             tyblue '-------请输入解析到此服务器的域名(前面不带"http://"或"https://")-------'
-            read -p "请输入域名：" domain
+            while [ -z "$domain" ]
+            do
+                read -p "请输入域名：" domain
+            done
         fi
         echo
-        queren=""
-        while [ "$queren" != "y" ] && [ "$queren" != "n" ]
-        do
-            tyblue "您输入的域名是\"$domain\"，确认吗？(y/n)"
-            read queren
-        done
+        ask_if "您输入的域名是\"$domain\"，确认吗？(y/n)" && queren=1
     done
     readPretend
     true_domain_list+=("$domain")
@@ -1330,35 +1340,6 @@ install_php_dependence()
 #编译&&安装php
 compile_php()
 {
-    local swap
-    swap="$(free -b | tail -n 1 | awk '{print $2}')"
-    local use_swap=0
-    swap_on()
-    {
-        if (($(free -m | sed -n 2p | awk '{print $2}')+$(free -m | tail -n 1 | awk '{print $2}')<1800)); then
-            tyblue "内存不足2G，自动申请swap。。"
-            use_swap=1
-            swapoff -a
-            if ! dd if=/dev/zero of=${temp_dir}/swap bs=1M count=$((1800-$(free -m | sed -n 2p | awk '{print $2}'))); then
-                red   "开启swap失败！"
-                yellow "可能是机器内存和硬盘空间都不足"
-                green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
-                yellow "按回车键继续或者Ctrl+c退出"
-                read -s
-            fi
-            chmod 0600 ${temp_dir}/swap
-            mkswap ${temp_dir}/swap
-            swapon ${temp_dir}/swap
-        fi
-    }
-    swap_off()
-    {
-        if [ $use_swap -eq 1 ]; then
-            tyblue "恢复swap。。。"
-            swapoff -a
-            [ "$swap" -ne '0' ] && swapon -a
-        fi
-    }
     green "正在编译php。。。。"
     if ! wget -O "${php_version}.tar.xz" "https://www.php.net/distributions/${php_version}.tar.xz"; then
         red    "获取php失败"
@@ -1375,7 +1356,7 @@ compile_php()
     else
         ./configure --prefix=${php_prefix} --with-libdir=lib64 --enable-embed=shared --enable-fpm --with-fpm-user=www-data --with-fpm-group=www-data --with-fpm-systemd --with-fpm-acl --disable-phpdbg --with-layout=GNU --with-openssl --with-kerberos --with-external-pcre --with-pcre-jit --with-zlib --enable-bcmath --with-bz2 --enable-calendar --with-curl --enable-dba --with-gdbm --with-db4 --with-db1 --with-tcadb --with-lmdb --with-enchant --enable-exif --with-ffi --enable-ftp --enable-gd --with-external-gd --with-webp --with-jpeg --with-xpm --with-freetype --enable-gd-jis-conv --with-gettext --with-gmp --with-mhash --with-imap --with-imap-ssl --enable-intl --with-ldap --with-ldap-sasl --enable-mbstring --with-mysqli --with-mysql-sock --with-unixODBC --enable-pcntl --with-pdo-dblib --with-pdo-mysql --with-zlib-dir --with-pdo-odbc=unixODBC,/usr --with-pdo-pgsql --with-pgsql --with-pspell --with-libedit --enable-shmop --with-snmp --enable-soap --enable-sockets --with-sodium --with-password-argon2 --enable-sysvmsg --enable-sysvsem --enable-sysvshm --with-tidy --with-xsl --with-zip --enable-mysqlnd --with-pear CPPFLAGS="-g0 -O3" CFLAGS="-g0 -O3" CXXFLAGS="-g0 -O3"
     fi
-    swap_on
+    swap_on 1800
     if ! make; then
         swap_off
         red    "php编译失败！"
@@ -1405,12 +1386,16 @@ instal_php_imagick()
     cd imagick
     ${php_prefix}/bin/phpize
     ./configure --with-php-config=${php_prefix}/bin/php-config CFLAGS="-g0 -O3"
+    swap_on 380
     if ! make; then
+        swap_off
         yellow "php-imagick编译失败"
         green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
         yellow "在Bug修复前，建议使用Ubuntu最新版系统"
         yellow "按回车键继续或者按ctrl+c终止"
         read -s
+    else
+        swap_off
     fi
     mv modules/imagick.so "$(${php_prefix}/bin/php -i | grep "^extension_dir" | awk '{print $3}')"
     cd ..
@@ -1465,12 +1450,15 @@ compile_nginx()
     cd ${nginx_version}
     sed -i "s/OPTIMIZE[ \\t]*=>[ \\t]*'-O'/OPTIMIZE          => '-O3'/g" src/http/modules/perl/Makefile.PL
     ./configure --prefix=/usr/local/nginx --with-openssl=../$openssl_version --with-openssl-opt="enable-ec_nistp_64_gcc_128 shared threads zlib-dynamic sctp" --with-mail=dynamic --with-mail_ssl_module --with-stream=dynamic --with-stream_ssl_module --with-stream_realip_module --with-stream_geoip_module=dynamic --with-stream_ssl_preread_module --with-http_ssl_module --with-http_v2_module --with-http_realip_module --with-http_addition_module --with-http_xslt_module=dynamic --with-http_image_filter_module=dynamic --with-http_geoip_module=dynamic --with-http_sub_module --with-http_dav_module --with-http_flv_module --with-http_mp4_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_auth_request_module --with-http_random_index_module --with-http_secure_link_module --with-http_degradation_module --with-http_slice_module --with-http_stub_status_module --with-http_perl_module=dynamic --with-pcre --with-libatomic --with-compat --with-cpp_test_module --with-google_perftools_module --with-file-aio --with-threads --with-poll_module --with-select_module --with-cc-opt="-Wno-error -g0 -O3"
+    swap_on 480
     if ! make; then
+        swap_off
         red    "Nginx编译失败！"
         green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
         yellow "在Bug修复前，建议使用Ubuntu最新版系统"
         exit 1
     fi
+    swap_off
     cd ..
 }
 config_service_nginx()
@@ -1566,8 +1554,8 @@ cat > ${nginx_prefix}/conf.d/nextcloud.conf <<EOF
         try_files \$fastcgi_script_name =404;
         fastcgi_param PATH_INFO \$path_info;
         fastcgi_param HTTPS on;
-        fastcgi_param modHeadersAvailable true;         # Avoid sending the security headers twice
-        fastcgi_param front_controller_active true;     # Enable pretty urls
+        fastcgi_param modHeadersAvailable true;
+        fastcgi_param front_controller_active true;
         fastcgi_pass unix:/dev/shm/php-fpm_unixsocket/php.sock;
         fastcgi_intercept_errors on;
         fastcgi_request_buffering off;
@@ -1606,7 +1594,7 @@ install_update_xray()
 #获取证书 参数: 域名位置
 get_cert()
 {
-    mv $xray_config $xray_config.bak
+    mv $xray_config ${xray_config}.bak
     echo "{}" > $xray_config
     local temp=""
     [ ${domain_config_list[$1]} -eq 1 ] && temp="-d ${domain_list[$1]}"
@@ -1617,10 +1605,10 @@ get_cert()
         $HOME/.acme.sh/acme.sh --remove --domain ${true_domain_list[$1]} --ecc
         rm -rf $HOME/.acme.sh/${true_domain_list[$1]}_ecc
         rm -rf "${nginx_prefix}/certs/${true_domain_list[$1]}.key" "${nginx_prefix}/certs/${true_domain_list[$1]}.cer"
-        mv $xray_config.bak $xray_config
+        mv ${xray_config}.bak $xray_config
         return 1
     fi
-    mv $xray_config.bak $xray_config
+    mv ${xray_config}.bak $xray_config
     return 0
 }
 get_all_certs()
@@ -1781,7 +1769,7 @@ server {
     return 301 https://\$host\$request_uri;
 }
 EOF
-    local temp_domain_list2
+    local temp_domain_list2=()
     for i in ${!domain_config_list[@]}
     do
         [ ${domain_config_list[$i]} -eq 1 ] && temp_domain_list2+=("${true_domain_list[$i]}")
@@ -2051,6 +2039,7 @@ install_init_cloudreve()
     mkdir -p $cloudreve_prefix
     update_cloudreve
     let_init_cloudreve "$1"
+    cloudreve_is_installed=1
 }
 
 #初始化nextcloud 参数 1:域名在列表中的位置
@@ -2355,7 +2344,7 @@ update_script()
     fi
     rm -rf "${BASH_SOURCE[0]}"
     if ! wget -O "${BASH_SOURCE[0]}" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh" && ! wget -O "${BASH_SOURCE[0]}" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh"; then
-        red "获取脚本失败！"
+        red "更新脚本失败！"
         yellow "按回车键继续或Ctrl+c中止"
         read -s
     fi
@@ -2393,7 +2382,7 @@ install_check_update_update_php()
 check_update_update_nginx()
 {
     check_script_update && red "脚本可升级，请先更新脚本" && return 1
-    if check_update_nginx; then
+    if check_nginx_update; then
         green "Nginx有新版本"
         ! ask_if "是否更新？(y/n)" && return 0
     else
@@ -2754,13 +2743,13 @@ start_menu()
     systemctl -q is-active cloudreve && cloudreve_status+="                \\033[32m运行中" || cloudreve_status+="                \\033[31m未运行"
     tyblue "---------------------- Xray-TLS(1.3)+Web 搭建/管理脚本 ---------------------"
     echo
-    tyblue "            Xray  ：           ${xray_status}"
+    tyblue "           Xray   ：           ${xray_status}"
     echo
-    tyblue "            Nginx ：           ${nginx_status}"
+    tyblue "           Nginx  ：           ${nginx_status}"
     echo
-    tyblue "            php   ：           ${php_status}"
+    tyblue "           php    ：           ${php_status}"
     echo
-    tyblue "         Cloudreve：           ${cloudreve_status}"
+    tyblue "        Cloudreve ：           ${cloudreve_status}"
     echo
     tyblue "       官网：https://github.com/kirin10000/Xray-script"
     echo
