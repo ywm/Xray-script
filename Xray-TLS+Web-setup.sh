@@ -358,6 +358,7 @@ backup_domains_web()
 #获取配置信息
 get_config_info()
 {
+    [ $is_installed -eq 0 ] && return
     if [ $(grep -c '"clients"' $xray_config) -eq 2 ] || [ $(grep -Ec '"(vmess|vless)"' $xray_config) -eq 1 ]; then
         protocol_1=1
         xid_1=$(grep '"id"' $xray_config | head -n 1 | cut -d : -f 2)
@@ -2843,7 +2844,7 @@ start_menu()
         get_system_info
         (( choice==2 || choice==3 || (5<=choice&&choice<=9) || choice==16 || choice==17 || choice==19 )) && check_important_dependence_installed ca-certificates ca-certificates
     fi
-    (( choice==7 || (11<=choice&&choice<=13) || (15<=choice&&choice<=23) )) && get_config_info
+    (( choice==6 || choice==7 || (11<=choice&&choice<=13) || (15<=choice&&choice<=23) )) && get_config_info
     if [ $choice -eq 1 ]; then
         install_update_xray_tls_web
     elif [ $choice -eq 2 ]; then
