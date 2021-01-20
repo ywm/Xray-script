@@ -2,7 +2,7 @@
 
 #系统信息
 #指令集
-machine="$(uname -m)"
+machine=""
 #什么系统
 release=""
 #系统版本号
@@ -11,11 +11,11 @@ redhat_version=""
 debian_package_manager=""
 redhat_package_manager=""
 #物理内存大小
-mem="$(free -m | sed -n 2p | awk '{print $2}')"
+mem=""
 #在运行脚本前物理内存+swap大小
-mem_total="$(($(free -m | sed -n 2p | awk '{print $2}')+$(free -m | tail -n 1 | awk '{print $2}')))"
+mem_total=""
 #在运行脚本前是否有启用swap
-[[ "$(free -b | tail -n 1 | awk '{print $2}')" -ne "0" ]] && using_swap=1 || using_swap=0
+using_swap=""
 #现在有没有通过脚本启动swap
 using_swap_now=0
 
@@ -32,15 +32,7 @@ php_prefix="/usr/local/php"
 php_service="/etc/systemd/system/php-fpm.service"
 php_is_installed=""
 
-if [[ "$machine" =~ ^(amd64|x86_64)$ ]]; then
-    cloudreve_url="https://github.com/cloudreve/Cloudreve/releases/download/3.2.1/cloudreve_3.2.1_linux_amd64.tar.gz"
-elif [[ "$machine" =~ ^(armv8|aarch64)$ ]]; then
-    cloudreve_url="https://github.com/cloudreve/Cloudreve/releases/download/3.2.1/cloudreve_3.2.1_linux_arm64.tar.gz"
-elif [[ "$machine" =~ ^(armv5tel|armv6l|armv7|armv7l)$ ]] ;then
-    cloudreve_url="https://github.com/cloudreve/Cloudreve/releases/download/3.2.1/cloudreve_3.2.1_linux_arm.tar.gz"
-else
-    cloudreve_url=""
-fi
+cloudreve_version="3.2.1"
 cloudreve_prefix="/usr/local/cloudreve"
 cloudreve_service="/etc/systemd/system/cloudreve.service"
 cloudreve_is_installed=""
@@ -94,6 +86,20 @@ yellow()                           #鸭屎黄
 red()                              #姨妈红
 {
     echo -e "\\033[31;1m${*}\\033[0m"
+}
+#检查基本命令
+check_base_command()
+{
+    local i
+    local temp_command_list=('bash' 'true' 'false' 'exit' 'echo' 'test' 'free' 'sort' 'sed' 'awk' 'grep' 'cut' 'cd' 'rm' 'cp' 'mv' 'head' 'tail' 'uname' 'tr' 'md5sum' 'tar' 'cat' 'find' 'type' 'command' 'kill' 'pkill' 'wc' 'ls')
+    for i in ${!temp_command_list[@]}
+    do
+        if ! command -V "${temp_command_list[$i]}" > /dev/null; then
+            red "命令\"${temp_command_list[$i]}\"未找到"
+            red "不是标准的Linux系统"
+            exit 1
+        fi
+    done
 }
 #版本比较函数
 version_ge()
@@ -414,6 +420,7 @@ remove_all_domains()
     unset pretend_list
 }
 
+check_base_command
 if [ "$EUID" != "0" ]; then
     red "请用root用户运行此脚本！！"
     exit 1
@@ -434,16 +441,76 @@ if [[ ! -d /dev/shm ]]; then
     red "/dev/shm不存在，不支持的系统"
     exit 1
 fi
+if [[ "$(type -P apt)" ]]; then
+    if [[ "$(type -P dnf)" ]] || [[ "$(type -P yum)" ]]; then
+        red "同时存在apt和yum/dnf"
+        red "不支持的系统！"
+        exit 1
+    fi
+    release="other-debian"
+    debian_package_manager="apt"
+    redhat_package_manager="true"
+elif [[ "$(type -P dnf)" ]]; then
+    release="other-redhat"
+    redhat_package_manager="dnf"
+    debian_package_manager="true"
+elif [[ "$(type -P yum)" ]]; then
+    release="other-redhat"
+    redhat_package_manager="yum"
+    debian_package_manager="true"
+else
+    red "apt yum dnf命令均不存在"
+    red "不支持的系统"
+    exit 1
+fi
 [ -e $nginx_config ] && nginx_is_installed=1 || nginx_is_installed=0
 [ -e ${php_prefix}/php-fpm.service.default ] && php_is_installed=1 || php_is_installed=0
 [ -e ${cloudreve_prefix}/cloudreve.db ] && cloudreve_is_installed=1 || cloudreve_is_installed=0
 [ -e /usr/local/bin/xray ] && xray_is_installed=1 || xray_is_installed=0
 ([ $xray_is_installed -eq 1 ] && [ $nginx_is_installed -eq 1 ]) && is_installed=1 || is_installed=0
+if [[ "$(uname -m)" =~ ^(amd64|x86_64)$ ]]; then
+    machine="amd64"
+elif [[ "$(uname -m)" =~ ^(armv8|aarch64)$ ]]; then
+    machine="arm64"
+elif [[ "$(uname -m)" =~ ^(armv5tel|armv6l|armv7|armv7l)$ ]] ;then
+    machine="arm"
+else
+    machine=""
+fi
+mem="$(free -m | sed -n 2p | awk '{print $2}')"
+mem_total="$(($(free -m | sed -n 2p | awk '{print $2}')+$(free -m | tail -n 1 | awk '{print $2}')))"
+[[ "$(free -b | tail -n 1 | awk '{print $2}')" -ne "0" ]] && using_swap=1 || using_swap=0
 if [ $is_installed -eq 1 ] && ! grep -q "domain_list=" $nginx_config; then
     red "脚本进行了一次不向下兼容的更新"
     yellow "请选择 \"重新安装\" 来升级"
     sleep 3s
 fi
+
+#获取系统版本信息
+get_system_info()
+{
+    if lsb_release -a 2>/dev/null | grep -qi "ubuntu"; then
+        release="ubuntu"
+    elif lsb_release -a 2>/dev/null | grep -qi "centos"; then
+        release="centos"
+    elif lsb_release -a 2>/dev/null | grep -qi "fedora"; then
+        release="fedora"
+    fi
+    systemVersion=$(lsb_release -r -s)
+    if [ $release == "fedora" ]; then
+        if version_ge $systemVersion 30; then
+            redhat_version=8
+        elif version_ge $systemVersion 19; then
+            redhat_version=7
+        elif version_ge $systemVersion 12; then
+            redhat_version=6
+        else
+            redhat_version=5
+        fi
+    else
+        redhat_version=$systemVersion
+    fi
+}
 
 #检查80端口和443端口是否被占用
 check_port()
@@ -466,54 +533,6 @@ check_port()
     done
     [ $xray_status -eq 1 ] && systemctl start xray
     [ $nginx_status -eq 1 ] && systemctl start nginx
-}
-
-#获取系统信息
-get_system_info()
-{
-    if [[ "$(type -P apt)" ]]; then
-        if [[ "$(type -P dnf)" ]] || [[ "$(type -P yum)" ]]; then
-            red "同时存在apt和yum/dnf"
-            red "不支持的系统！"
-            exit 1
-        fi
-        release="other-debian"
-        debian_package_manager="apt"
-        redhat_package_manager="true"
-    elif [[ "$(type -P dnf)" ]]; then
-        release="other-redhat"
-        redhat_package_manager="dnf"
-        debian_package_manager="true"
-    elif [[ "$(type -P yum)" ]]; then
-        release="other-redhat"
-        redhat_package_manager="yum"
-        debian_package_manager="true"
-    else
-        red "不支持的系统或apt/yum/dnf缺失"
-        exit 1
-    fi
-    check_important_dependence_installed lsb-release redhat-lsb-core
-    if lsb_release -a 2>/dev/null | grep -qi "ubuntu"; then
-        release="ubuntu"
-    elif lsb_release -a 2>/dev/null | grep -qi "centos"; then
-        release="centos"
-    elif lsb_release -a 2>/dev/null | grep -qi "fedora"; then
-        release="fedora"
-    fi
-    systemVersion=$(lsb_release -r -s)
-    if [ $release == "fedora" ]; then
-        if version_ge $systemVersion 30; then
-            redhat_version=8
-        elif version_ge $systemVersion 19; then
-            redhat_version=7
-        elif version_ge $systemVersion 12; then
-            redhat_version=6
-        else
-            redhat_version=5
-        fi
-    else
-        redhat_version=$systemVersion
-    fi
 }
 
 #检查Nginx是否已通过apt/dnf/yum安装
@@ -1248,7 +1267,7 @@ readPretend()
         done
         queren=1
         if [ $pretend -eq 1 ]; then
-            if [ -z "$cloudreve_url" ]; then
+            if [ -z "$machine" ]; then
                 red "您的VPS指令集不支持Cloudreve！"
                 sleep 3s
                 queren=0
@@ -1614,6 +1633,8 @@ install_update_xray()
 get_cert()
 {
     mv $xray_config ${xray_config}.bak
+    mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak2
+    cp ${nginx_prefix}/conf/nginx.conf.default ${nginx_prefix}/conf/nginx.conf
     echo "{}" > $xray_config
     local temp=""
     [ ${domain_config_list[$1]} -eq 1 ] && temp="-d ${domain_list[$1]}"
@@ -1625,9 +1646,11 @@ get_cert()
         rm -rf $HOME/.acme.sh/${true_domain_list[$1]}_ecc
         rm -rf "${nginx_prefix}/certs/${true_domain_list[$1]}.key" "${nginx_prefix}/certs/${true_domain_list[$1]}.cer"
         mv ${xray_config}.bak $xray_config
+        mv ${nginx_prefix}/conf/nginx.conf.bak2 ${nginx_prefix}/conf/nginx.conf
         return 1
     fi
     mv ${xray_config}.bak $xray_config
+    mv ${nginx_prefix}/conf/nginx.conf.bak2 ${nginx_prefix}/conf/nginx.conf
     return 0
 }
 get_all_certs()
@@ -2010,7 +2033,11 @@ init_all_webs()
 #安装/更新Cloudreve
 update_cloudreve()
 {
-    wget -O cloudreve.tar.gz "$cloudreve_url"
+    if ! wget -O cloudreve.tar.gz "https://github.com/cloudreve/Cloudreve/releases/download/${cloudreve_version}/cloudreve_${cloudreve_version}_linux_${machine}.tar.gz"; then
+        red "获取Cloudreve失败！！"
+        yellow "按回车键继续或者按ctrl+c终止"
+        read -s
+    fi
     tar -zxf cloudreve.tar.gz
     local temp_cloudreve_status=0
     systemctl -q is-active cloudreve && temp_cloudreve_status=1
@@ -2178,11 +2205,14 @@ print_config_info()
 
 install_update_xray_tls_web()
 {
-    check_port
-    get_system_info
-    check_important_dependence_installed ca-certificates ca-certificates
     check_nginx_installed_system
     check_SELinux
+    check_important_dependence_installed net-tools net-tools
+    check_port
+    check_important_dependence_installed lsb-release redhat-lsb-core
+    get_system_info
+    check_important_dependence_installed ca-certificates ca-certificates
+    check_important_dependence_installed wget wget
     check_ssh_timeout
     uninstall_firewall
     doupdate
@@ -2401,8 +2431,15 @@ install_check_update_update_php()
             return 0
         fi
     fi
+    local php_status=0
+    systemctl -q is-active php-fpm && php_status=1
     full_install_php
     turn_on_off_php
+    if [ $php_status -eq 1 ]; then
+        systemctl start php-fpm
+    else
+        systemctl stop php-fpm
+    fi
     green "更新完成！"
 }
 check_update_update_nginx()
@@ -2415,6 +2452,10 @@ check_update_update_nginx()
         green "Nginx已是最新版本"
         return 0
     fi
+    local nginx_status=0
+    local xray_status=0
+    systemctl -q is-active nginx && nginx_status=1
+    systemctl -q is-active xray && xray_status=1
     install_base_dependence
     install_nginx_dependence
     enter_temp_dir
@@ -2426,7 +2467,16 @@ check_update_update_nginx()
     config_nginx
     mv "${temp_dir}/domain_backup/"* ${nginx_prefix}/html 2>/dev/null
     get_all_certs
-    systemctl restart nginx
+    if [ $nginx_status -eq 1 ]; then
+        systemctl restart nginx
+    else
+        systemctl stop nginx
+    fi
+    if [ $xray_status -eq 1 ]; then
+        systemctl restart xray
+    else
+        systemctl stop xray
+    fi
     cd /
     rm -rf "$temp_dir"
     green "更新完成！"
@@ -2490,6 +2540,8 @@ add_domain()
     fi
     [ "${pretend_list[-1]}" == "2" ] && [ $php_is_installed -eq 0 ] && full_install_php
     if ! get_cert "-1"; then
+        sleep 2s
+        systemctl restart xray nginx
         red "申请证书失败！！"
         red "域名添加失败"
         return 1
@@ -2659,7 +2711,7 @@ change_xray_id()
     done
     [ $flag -eq 1 ] && xid_1="$xid" || xid_2="$xid"
     config_xray
-    systemctl restart xray
+    systemctl -q is-active xray && systemctl restart xray
     green "更换成功！！"
     print_config_info
 }
@@ -2678,7 +2730,7 @@ change_xray_path()
         read path
     done
     config_xray
-    systemctl restart xray
+    systemctl -q is-active xray && systemctl restart xray
     green "更换成功！！"
 }
 change_xray_protocol()
@@ -2696,7 +2748,7 @@ change_xray_protocol()
         xid_2=$(cat /proc/sys/kernel/random/uuid)
     fi
     config_xray
-    systemctl restart xray
+    systemctl -q is-active xray && systemctl restart xray
     green "更换成功！！"
 }
 simplify_system()
@@ -2714,7 +2766,6 @@ simplify_system()
     ! ask_if "是否要继续?(y/n)" && return 0
     $debian_package_manager -y --autoremove purge openssl snapd kdump-tools fwupd flex open-vm-tools make automake '^cloud-init' libffi-dev pkg-config
     $debian_package_manager -y -f install
-    get_system_info
     check_important_dependence_installed openssh-server openssh-server
     check_important_dependence_installed ca-certificates ca-certificates
     [ $nginx_is_installed -eq 1 ] && install_nginx_dependence
@@ -2843,10 +2894,20 @@ start_menu()
         red "请先安装Xray-TLS+Web！！"
         return 1
     fi
-    if (( (2<=choice&&choice<=9) || choice==16 || choice==17 || choice==19 || choice==24 )); then
-        get_system_info
-        (( choice==2 || choice==3 || (5<=choice&&choice<=9) || choice==16 || choice==17 || choice==19 )) && check_important_dependence_installed ca-certificates ca-certificates
+    if (( 16<=choice&&choice<=20 )) && ! (systemctl -q is-active nginx && systemctl -q is-active xray); then
+        red "请先启动Xray-TLS+Web！！"
+        return 1
     fi
+    (( 4<=choice&&choice<=6 )) && check_important_dependence_installed lsb-release redhat-lsb-core
+    if (( choice==3 || choice==5 || choice==6 || choice==10 )); then
+        check_important_dependence_installed ca-certificates ca-certificates
+        if [ $choice -eq 10 ]; then
+            check_important_dependence_installed curl curl
+        else
+            check_important_dependence_installed wget wget
+        fi
+    fi
+    (( (4<=choice&&choice<=7) || choice==16 || choice==17 || choice==19 || choice==24 )) && get_system_info
     (( choice==6 || choice==7 || (11<=choice&&choice<=13) || (15<=choice&&choice<=23) )) && get_config_info
     if [ $choice -eq 1 ]; then
         install_update_xray_tls_web
