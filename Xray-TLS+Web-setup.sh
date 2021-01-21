@@ -2108,6 +2108,44 @@ let_init_nextcloud()
     cd -
 }
 
+print_share_link()
+{
+    if [ $protocol_1 -eq 1 ]; then
+        local ip=""
+        while [ -z "$ip" ]
+        do
+            read -p "请输入您的VPS IP：" ip
+        done
+    fi
+    echo
+    tyblue "分享链接："
+    if [ $protocol_1 -eq 1 ]; then
+        green  "VLESS-TCP+XTLS\\033[35m(不走CDN)\\033[32m："
+        yellow " Linux/安卓/路由器："
+        for i in ${!domain_list[@]}
+        do
+            tyblue " vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&flow=xtls-rprx-splice"
+        done
+        yellow " 其他："
+        for i in ${!domain_list[@]}
+        do
+            tyblue " vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&flow=xtls-rprx-direct"
+        done
+    fi
+    if [ $protocol_2 -eq 1 ]; then
+        green  "VLESS-WebSocket+TLS\\033[35m(有CDN则走CDN，否则直连)\\033[32m："
+        for i in ${!domain_list[@]}
+        do
+            tyblue "vless://${xid_2}@${domain_list[$i]}:443?type=ws&security=tls&path=%2F${path#/}"
+        done
+    elif [ $protocol_2 -eq 2 ]; then
+        green  "VMess-WebSocket+TLS\\033[35m(有CDN则走CDN，否则直连)\\033[32m："
+        for i in ${!domain_list[@]}
+        do
+            tyblue "vmess://${xid_2}@${domain_list[$i]}:443?type=ws&security=tls&path=%2F${path#/}"
+        done
+    fi
+}
 print_config_info()
 {
     echo -e "\\n\\n\\n"
@@ -2139,13 +2177,13 @@ print_config_info()
         purple "   (Qv2ray:允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
         tyblue " ------------------------其他-----------------------"
         tyblue "  Mux(多路复用)                 ：使用XTLS必须关闭;不使用XTLS也建议关闭"
-        tyblue "  Sniffing(流量探测)            ：建议开启"
+        tyblue "  socks入站的Sniffing(流量探测) ：建议开启"
         purple "   (Qv2ray:首选项-入站设置-SOCKS设置-嗅探)"
         tyblue "------------------------------------------------------------------------"
     fi
     if [ $protocol_2 -ne 0 ]; then
         echo
-        tyblue "-------------- Xray-WebSocket+TLS+Web (如果有CDN，会走CDN) -------------"
+        tyblue "------------ Xray-WebSocket+TLS+Web (有CDN则走CDN，否则直连) -----------"
         if [ $protocol_2 -eq 1 ]; then
             tyblue " 服务器类型            ：VLESS"
         else
@@ -2181,10 +2219,12 @@ print_config_info()
         purple "   (Qv2ray:允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
         tyblue " ------------------------其他-----------------------"
         tyblue "  Mux(多路复用)                 ：建议关闭"
-        tyblue "  Sniffing(流量探测)            ：建议开启"
+        tyblue "  socks入站的Sniffing(流量探测) ：建议开启"
         purple "   (Qv2ray:首选项-入站设置-SOCKS设置-嗅探)"
         tyblue "------------------------------------------------------------------------"
     fi
+    echo
+    ask_if "是否生成分享链接？(y/n)" && print_share_link
     echo
     green  " 目前支持支持XTLS的图形化客户端："
     green  "   Windows    ：Qv2ray       v2.7.0-pre1+    V2RayN  v3.26+"
@@ -2732,6 +2772,7 @@ change_xray_path()
     config_xray
     systemctl -q is-active xray && systemctl restart xray
     green "更换成功！！"
+    print_config_info
 }
 change_xray_protocol()
 {
@@ -2750,6 +2791,7 @@ change_xray_protocol()
     config_xray
     systemctl -q is-active xray && systemctl restart xray
     green "更换成功！！"
+    print_config_info
 }
 simplify_system()
 {
