@@ -36,7 +36,7 @@
 
 2.有些服务器443端口被阻断，使用这个脚本搭建的无法连接
 
-3.此脚本安装时间较长，见 [安装时长说明](#安装时长说明)
+3.此脚本安装时间较长，见 **[安装时长说明](#安装时长说明)**
 
 4.建议在纯净的系统上使用此脚本 (VPS控制台-重置系统)
 ## 安装时长说明
@@ -68,15 +68,15 @@
 ### 安装时长参考
 安装流程：
 
-`[升级系统组件]->[安装bbr]->[安装php]->安装Nginx->安装Xray->申请证书->配置文件`
+`[升级系统组件]->[安装bbr]->[安装php]->安装Nginx->安装Xray->申请证书->配置文件->[配置伪装网站]`
 
 其中`[]`包裹的部分是可选项。
 
 **这是一台单核1G的服务器的平均安装时长，仅供参考：**
 |项目|时长|
 |-|-|
-| 升级已安装软件 | 5-10分钟 |
-| 升级系统 | 10-20分钟 |
+|升级已安装软件|5-10分钟|
+|升级系统|10-20分钟|
 |安装bbr|3-5分钟|
 |安装php|Centos8(gcc8.3 4.19内核):20-60分钟|
 ||Ubuntu20.10(gcc10.2 5.11-rc3内核):15-20分钟|
@@ -84,7 +84,9 @@
 |安装Nginx|13-15分钟|
 |安装Xray|<半分钟|
 |申请证书|1-2分钟|
-|配置文件|1-2分钟|
+|配置文件|<100毫秒|
+|配置伪装网站|Nextcloud:1-3分钟|
+||Cloudreve:1-2分钟|
 ## 脚本使用说明
 ### 1. 安装wget
 Debian基系统(包括Ubuntu、Debian、deepin)：
@@ -99,15 +101,11 @@ Red Hat基系统(包括CentOS、fedora)：
 ```bash
 wget -O Xray-TLS+Web-setup.sh --no-check-certificate https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh
 ```
-### 3. 增加脚本可执行权限
+### 3. 执行脚本
 ```bash
-chmod +x Xray-TLS+Web-setup.sh
+bash Xray-TLS+Web-setup.sh
 ```
-### 4. 执行脚本
-```bash
-./Xray-TLS+Web-setup.sh
-```
-### 5. 根据脚本提示完成安装
+### 4. 根据脚本提示完成安装
 ## 运行截图
 <div>
     <img width="400" src="https://github.com/kirin10000/Xray-script/blob/main/image/menu.jpg">
@@ -119,7 +117,7 @@ chmod +x Xray-TLS+Web-setup.sh
 ## 注
 1.本文链接(官网)：https://github.com/kirin10000/Xray-script
 
-2.参考教程：https://www.v2fly.org/config/overview.html https://guide.v2fly.org/ https://docs.nextcloud.com/server/20/admin_manual/installation/source_installation.html
+2.参考教程：https://www.v2fly.org/config/overview.html https://guide.v2fly.org/ https://docs.nextcloud.com/server/20/admin_manual/installation/source_installation.html https://docs.cloudreve.org/
 
 3.域名证书申请：https://github.com/acmesh-official/acme.sh
 
