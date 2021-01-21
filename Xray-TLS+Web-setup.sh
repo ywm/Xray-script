@@ -1353,9 +1353,9 @@ readDomain()
 install_base_dependence()
 {
     if [ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        install_dependence wget unzip curl openssl crontabs gcc gcc-c++ make
+        install_dependence net-tools redhat-lsb-core ca-certificates wget unzip curl openssl crontabs gcc gcc-c++ make
     else
-        install_dependence wget unzip curl openssl cron gcc g++ make
+        install_dependence net-tools lsb-release ca-certificates wget unzip curl openssl cron gcc g++ make
     fi
 }
 install_nginx_dependence()
@@ -2767,7 +2767,6 @@ simplify_system()
     $debian_package_manager -y --autoremove purge openssl snapd kdump-tools fwupd flex open-vm-tools make automake '^cloud-init' libffi-dev pkg-config
     $debian_package_manager -y -f install
     check_important_dependence_installed openssh-server openssh-server
-    check_important_dependence_installed ca-certificates ca-certificates
     [ $nginx_is_installed -eq 1 ] && install_nginx_dependence
     [ $php_is_installed -eq 1 ] && install_php_dependence
     [ $is_installed -eq 1 ] && install_base_dependence
