@@ -157,9 +157,10 @@ bash Xray-TLS+Web-setup.sh
 |curl|curl|curl|
 |acme.sh依赖|openssl|openssl|
 |acme.sh依赖|crontabs|crontabs|
-|编译基础|gcc|gcc|
-|编译基础|g++|gcc-c++|
-|编译基础|make|make|
+|编译基础：|||
+|gcc|gcc|gcc|
+|g++|g++|gcc-c++|
+|make|make|make|
 |编译openssl：|||
 |||perl-IPC-Cmd|
 |||perl-Getopt-Long|
@@ -222,8 +223,8 @@ bash Xray-TLS+Web-setup.sh
 |编译php-imagick：|||
 ||autoconf|autoconf|
 ||git|git|
-||ImageMagick-devel|ImageMagick-devel|
-||sudo|sudo|
+||libmagickwand-dev|ImageMagick-devel|
+|Nextcloud初始化|sudo|sudo|
 ## 注
 1.本文链接(官网)：https://github.com/kirin10000/Xray-script
 
