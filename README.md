@@ -44,11 +44,11 @@
 
 4.建议在纯净的系统上使用此脚本 (VPS控制台-重置系统)
 ## 安装时长说明
-此脚本的安装时间比较长，根据VPS的配置以及安装时的选项不同，安装时长在 **5-120分钟** 不等，原因见[这里](#为什么脚本安装时间那么长)
+此脚本的安装时间比较长 (**[安装时长参考](#安装时长参考)**) ，原因见[这里](#为什么脚本安装时间那么长)。
 
-所以本脚本不适合反复重置系统安装，这会消耗您的大量时间。
+此脚本适合安装一次后长期使用，不适合反复重置系统安装，这会消耗您的大量时间。如果需要更换配置和域名等，在管理界面都有相应的选项。
 
-本脚本适合安装一次后长期使用，如果需要更换配置和域名等，在管理界面都有相应的选项。
+如果有快速安装的需求，推荐在 **[Xray-core#Installation](https://github.com/XTLS/Xray-core#Installation)** 中选择其他脚本
 ### 安装时长参考
 安装流程：
 
@@ -62,7 +62,7 @@
 |升级已安装软件|5-10分钟|
 |升级系统|10-20分钟|
 |安装bbr|3-5分钟|
-|安装php|Centos8(gcc8.3 4.19内核):20-60分钟|
+|安装php|Centos8(gcc8.3 4.18内核):20-60分钟|
 ||Ubuntu20.10(gcc10.2 5.11-rc3内核):15-20分钟|
 ||Debian10(gcc8.3 4.19内核):10-15分钟|
 |安装Nginx|13-15分钟|
@@ -89,8 +89,6 @@
 2.软件版本新 (可以对比本脚本与其他脚本Nginx的版本)
 ```
 缺点就是编译耗时长
-
-如果有快速安装的需求，推荐在 **[Xray-core#Installation](https://github.com/XTLS/Xray-core#Installation)** 中选择其他脚本
 ## 脚本使用说明
 ### 1. 安装wget
 Debian基系统(包括Ubuntu、Debian、deepin)：
@@ -134,15 +132,17 @@ bash Xray-TLS+Web-setup.sh
 
 他们的区别是：Nextcloud功能更强大，用的人更多，但是需要安装php，安装php需要额外很多时间，同时也比Cloudreve占用更多系统资源。
 
-2. 403页面(模拟网站后台)
+2. **403页面(模拟网站后台)**
 
-基本上大网站都有网站后台。比如哔哩哔哩，他的网址是www.bilibili.com 。但是在播放视频时，提供视频文件的却是另外一个网址，在播放视频时右键点击`视频统计信息`，其中的`Video Host`就是。这类网址只有打开特定的url后缀才有内容，如果url不对，返回的就是403页面。也就是403页面，没人知道你的网站到底有没有东西，只有你自己知道。
+基本上大网站都有网站后台。比如哔哩哔哩的网址是`www.bilibili.com`。但是在播放视频时，提供视频文件的却是另外一个网址，在播放视频时右键点击`视频统计信息`，其中的`Video Host`就是。这类网址只有打开特定的url后缀才有内容，如果url不对，返回的就是一个错误页面。
 
-3. 自定义静态网站
+也就是说伪装成403页面，除了你自己，没人知道你的网站到底有没有东西。
+
+3. **自定义静态网站**
 
 自定义的静态网站，不建议小白选择。默认是Nextcloud的登陆界面，强烈建议自行更换，因为这里Nextcloud是静态网站，没有php，无法进行交互，很容易被主动探测出来。
 
-4. 自定义反向代理网站
+4. **自定义反向代理网站**
 
 不建议选择，因为反向代理往往只是反向代理几个html和js文件，网站里面的大部分内容依然是网站后台提供的。不符合大流量特点。
 ## 依赖列表
@@ -170,6 +170,7 @@ bash Xray-TLS+Web-setup.sh
 |--with-http_xslt_module|libxml2-dev|libxml2-devel|
 |--with-http_xslt_module|libxslt1-dev|libxslt-devel|
 |--with-http_image_filter_module|libgd-dev|gd-devel|
+|--with-google_perftools_module|libgoogle-perftools-dev|gperftools-devel|
 |--with-http_geoip_module|libgeoip-dev|geoip-devel|
 |--with-http_perl_module||perl-ExtUtils-Embed|
 |--with-libatomic|libatomic-ops-dev|libatomic_ops-devel|
@@ -211,7 +212,6 @@ bash Xray-TLS+Web-setup.sh
 |--with-pdo-pgsql,--with-pgsql|libpq-dev|libpq-devel|
 |--with-pspell|libpspell-dev|aspell-devel|
 |--with-libedit|libedit-dev|libedit-devel|
-|--with-readline|libreadline-dev|readline-devel|
 |--with-mm|libmm-dev||
 |--with-snmp|libsnmp-dev|net-snmp-devel|
 |--with-sodium|libsodium-dev|libsodium-devel|
@@ -219,6 +219,11 @@ bash Xray-TLS+Web-setup.sh
 |--with-tidy|libtidy-dev|libtidy-devel|
 |--with-xsl|libxslt1-dev|libxslt-devel|
 |--with-zip|libzip-dev|libzip-devel|
+|编译php-imagick：|||
+||autoconf|autoconf|
+||git|git|
+||ImageMagick-devel|ImageMagick-devel|
+||sudo|sudo|
 ## 注
 1.本文链接(官网)：https://github.com/kirin10000/Xray-script
 
