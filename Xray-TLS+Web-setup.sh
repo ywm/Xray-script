@@ -116,7 +116,8 @@ check_important_dependence_installed()
             $debian_package_manager update
             if ! $debian_package_manager -y --no-install-recommends install "$1"; then
                 red "重要组件\"$1\"安装失败！！"
-                exit 1
+                yellow "按回车键继续或者Ctrl+c退出"
+                read -s
             fi
         fi
     else
@@ -128,7 +129,8 @@ check_important_dependence_installed()
             fi
         elif ! $redhat_package_manager -y install "$2"; then
             red "重要组件\"$2\"安装失败！！"
-            exit 1
+            yellow "按回车键继续或者Ctrl+c退出"
+            read -s
         fi
     fi
 }
@@ -141,7 +143,7 @@ install_dependence()
             if ! $debian_package_manager -y --no-install-recommends install "$@"; then
                 yellow "依赖安装失败！！"
                 green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
-                yellow "按回车键继续或者ctrl+c退出"
+                yellow "按回车键继续或者Ctrl+c退出"
                 read -s
             fi
         fi
@@ -160,7 +162,7 @@ install_dependence()
             fi
             yellow "依赖安装失败！！"
             green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
-            yellow "按回车键继续或者ctrl+c退出"
+            yellow "按回车键继续或者Ctrl+c退出"
             read -s
         fi
     fi
@@ -1107,7 +1109,7 @@ install_bbr()
             sysctl -p
             if ! wget -O update-kernel.sh https://github.com/kirin10000/update-kernel/raw/master/update-kernel.sh; then
                 red    "获取内核升级脚本失败"
-                yellow "按回车键继续或者按ctrl+c终止"
+                yellow "按回车键继续或者按Ctrl+c终止"
                 read -s
             fi
             chmod +x update-kernel.sh
@@ -1127,7 +1129,7 @@ install_bbr()
             sysctl -p
             if ! wget -O xanmod-install.sh https://github.com/kirin10000/xanmod-install/raw/main/xanmod-install.sh; then
                 red    "获取xanmod内核安装脚本失败"
-                yellow "按回车键继续或者按ctrl+c终止"
+                yellow "按回车键继续或者按Ctrl+c终止"
                 read -s
             fi
             chmod +x xanmod-install.sh
@@ -1149,7 +1151,7 @@ install_bbr()
             if ! sysctl net.ipv4.tcp_congestion_control | grep -wq "bbr"; then
                 if ! wget -O bbr.sh https://github.com/teddysun/across/raw/master/bbr.sh; then
                     red    "获取bbr脚本失败"
-                    yellow "按回车键继续或者按ctrl+c终止"
+                    yellow "按回车键继续或者按Ctrl+c终止"
                     read -s
                 fi
                 chmod +x bbr.sh
@@ -1170,7 +1172,7 @@ install_bbr()
             fi
             if ! wget -O bbr2.sh $temp_bbr2; then
                 red    "获取bbr2脚本失败"
-                yellow "按回车键继续或者按ctrl+c终止"
+                yellow "按回车键继续或者按Ctrl+c终止"
                 read -s
             fi
             chmod +x bbr2.sh
@@ -1178,7 +1180,7 @@ install_bbr()
         elif [ $choice -eq 5 ]; then
             if ! wget -O tcp.sh "https://raw.githubusercontent.com/chiakge/Linux-NetSpeed/master/tcp.sh"; then
                 red    "获取脚本失败"
-                yellow "按回车键继续或者按ctrl+c终止"
+                yellow "按回车键继续或者按Ctrl+c终止"
                 read -s
             fi
             chmod +x tcp.sh
@@ -1361,7 +1363,7 @@ install_base_dependence()
 install_nginx_dependence()
 {
     if [ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        install_dependence perl-IPC-Cmd perl-Getopt-Long perl-ExtUtils-Embed pcre-devel zlib-devel libxml2-devel libxslt-devel gd-devel geoip-devel gperftools-devel libatomic_ops-devel perl-devel
+        install_dependence perl-IPC-Cmd perl-Getopt-Long pcre-devel zlib-devel libxml2-devel libxslt-devel gd-devel geoip-devel perl-ExtUtils-Embed gperftools-devel libatomic_ops-devel perl-devel
     else
         install_dependence libpcre3-dev zlib1g-dev libxml2-dev libxslt1-dev libgd-dev libgeoip-dev libgoogle-perftools-dev libatomic-ops-dev libperl-dev
     fi
@@ -1381,7 +1383,7 @@ compile_php()
     green "正在编译php。。。。"
     if ! wget -O "${php_version}.tar.xz" "https://www.php.net/distributions/${php_version}.tar.xz"; then
         red    "获取php失败"
-        yellow "按回车键继续或者按ctrl+c终止"
+        yellow "按回车键继续或者按Ctrl+c终止"
         read -s
     fi
     tar -xJf "${php_version}.tar.xz"
@@ -1418,7 +1420,7 @@ instal_php_imagick()
 {
     if ! git clone https://github.com/Imagick/imagick; then
         yellow "获取php-imagick源码失败"
-        yellow "按回车键继续或者按ctrl+c终止"
+        yellow "按回车键继续或者按Ctrl+c终止"
         read -s
     fi
     cd imagick
@@ -1430,7 +1432,7 @@ instal_php_imagick()
         yellow "php-imagick编译失败"
         green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
         yellow "在Bug修复前，建议使用Ubuntu最新版系统"
-        yellow "按回车键继续或者按ctrl+c终止"
+        yellow "按回车键继续或者按Ctrl+c终止"
         read -s
     else
         swap_off
@@ -1475,13 +1477,13 @@ compile_nginx()
     green "正在编译Nginx。。。。"
     if ! wget -O ${nginx_version}.tar.gz https://nginx.org/download/${nginx_version}.tar.gz; then
         red    "获取nginx失败"
-        yellow "按回车键继续或者按ctrl+c终止"
+        yellow "按回车键继续或者按Ctrl+c终止"
         read -s
     fi
     tar -zxf ${nginx_version}.tar.gz
     if ! wget -O ${openssl_version}.tar.gz https://github.com/openssl/openssl/archive/${openssl_version#*-}.tar.gz; then
         red    "获取openssl失败"
-        yellow "按回车键继续或者按ctrl+c终止"
+        yellow "按回车键继续或者按Ctrl+c终止"
         read -s
     fi
     tar -zxf ${openssl_version}.tar.gz
@@ -1623,7 +1625,7 @@ install_update_xray()
     green "正在安装/更新Xray。。。。"
     if ! bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u root --without-geodata && ! bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u root --without-geodata; then
         red    "安装/更新Xray失败"
-        yellow "按回车键继续或者按ctrl+c终止"
+        yellow "按回车键继续或者按Ctrl+c终止"
         read -s
         return 1
     fi
@@ -2007,7 +2009,7 @@ init_web()
     [ ${pretend_list[$1]} -eq 2 ] && info="Nextcloud" || info="网站模板"
     if ! wget -O "${nginx_prefix}/html/Website.zip" "$url"; then
         red    "获取${info}失败"
-        yellow "按回车键继续或者按ctrl+c终止"
+        yellow "按回车键继续或者按Ctrl+c终止"
         read -s
     fi
     rm -rf "${nginx_prefix}/html/${true_domain_list[$1]}"
@@ -2035,7 +2037,7 @@ update_cloudreve()
 {
     if ! wget -O cloudreve.tar.gz "https://github.com/cloudreve/Cloudreve/releases/download/${cloudreve_version}/cloudreve_${cloudreve_version}_linux_${machine}.tar.gz"; then
         red "获取Cloudreve失败！！"
-        yellow "按回车键继续或者按ctrl+c终止"
+        yellow "按回车键继续或者按Ctrl+c终止"
         read -s
     fi
     tar -zxf cloudreve.tar.gz
