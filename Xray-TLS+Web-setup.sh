@@ -2446,7 +2446,6 @@ update_script()
         yellow "按回车键继续或Ctrl+c中止"
         read -s
     fi
-    chmod +x "${BASH_SOURCE[0]}"
 }
 full_install_php()
 {
@@ -2797,10 +2796,6 @@ change_xray_protocol()
 }
 simplify_system()
 {
-    if [ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        yellow "该功能仅对Debian基系统(Ubuntu Debian deepin等)开放"
-        return 1
-    fi
     if systemctl -q is-active xray || systemctl -q is-active nginx || systemctl -q is-active php-fpm; then
         yellow "请先停止Xray-TLS+Web"
         return 1
@@ -2808,8 +2803,12 @@ simplify_system()
     yellow "警告：如果服务器上有运行别的程序，可能会被误删"
     tyblue "建议在纯净系统下使用此功能"
     ! ask_if "是否要继续?(y/n)" && return 0
-    $debian_package_manager -y --autoremove purge openssl snapd kdump-tools fwupd flex open-vm-tools make automake '^cloud-init' libffi-dev pkg-config
-    $debian_package_manager -y -f install
+    if [ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+        $redhat_package_manager -y remove openssl "perl*"
+    else
+        $debian_package_manager -y --autoremove purge openssl snapd kdump-tools fwupd flex open-vm-tools make automake '^cloud-init' libffi-dev pkg-config
+        $debian_package_manager -y -f install
+    fi
     check_important_dependence_installed openssh-server openssh-server
     [ $nginx_is_installed -eq 1 ] && install_nginx_dependence
     [ $php_is_installed -eq 1 ] && install_php_dependence
