@@ -1363,7 +1363,7 @@ install_base_dependence()
 install_nginx_dependence()
 {
     if [ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        install_dependence perl-IPC-Cmd perl-Getopt-Long pcre-devel zlib-devel libxml2-devel libxslt-devel gd-devel geoip-devel perl-ExtUtils-Embed gperftools-devel libatomic_ops-devel perl-devel
+        install_dependence perl-IPC-Cmd perl-Getopt-Long perl-Data-Dumper pcre-devel zlib-devel libxml2-devel libxslt-devel gd-devel geoip-devel perl-ExtUtils-Embed gperftools-devel libatomic_ops-devel perl-devel
     else
         install_dependence libpcre3-dev zlib1g-dev libxml2-dev libxslt1-dev libgd-dev libgeoip-dev libgoogle-perftools-dev libatomic-ops-dev libperl-dev
     fi
