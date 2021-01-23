@@ -1252,15 +1252,21 @@ readPretend()
     do
         echo -e "\\n\\n\\n"
         tyblue "------------------------------请选择要伪装的网站页面------------------------------"
-        tyblue " 1. Cloudreve(个人网盘) \\033[32m(推荐)"
-        tyblue " 2. Nextcloud(个人网盘，需安装php) \\033[32m(推荐)"
-        tyblue " 3. 403页面 (模拟网站后台)"
-        tyblue " 4. 自定义静态网站 (默认是Nextcloud登陆界面，如果选择，建议自行更换)"
-        yellow " 5. 自定义反向代理网页 (不推荐)"
+        tyblue " 1. Cloudreve \\033[32m(推荐)"
+        purple "     个人网盘"
+        tyblue " 2. Nextcloud \\033[32m(推荐)"
+        purple "     个人网盘，需安装php"
+        tyblue " 3. 403页面"
+        purple "     模拟网站后台"
+        tyblue " 4. 自定义静态网站"
+        purple "     不建议小白选择，默认为Nextcloud登陆界面，强烈建议自行更换"
+        tyblue " 5. 自定义反向代理网页 \033[32m(不推荐)"
         echo
-        green  " 内存<128MB建议选择 403页面"
-        green  " 128MB<=内存<1G建议选择 Cloudreve"
-        green  " 内存>=1G建议选择 Nextcloud 或 Cloudreve"
+        green  " 内存<128MB 建议选择 403页面"
+        green  " 128MB<=内存<1G 建议选择 Cloudreve"
+        green  " 内存>=1G 建议选择 Nextcloud 或 Cloudreve"
+        echo
+        yellow " 关于选择伪装网站的详细说明见：https://github.com/kirin10000/Xray-script#伪装网站说明"
         echo
         pretend=""
         while [[ "$pretend" != "1" && "$pretend" != "2" && "$pretend" != "3" && "$pretend" != "4" && "$pretend" != "5" ]]
