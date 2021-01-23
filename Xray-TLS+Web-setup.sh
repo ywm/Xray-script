@@ -1260,7 +1260,7 @@ readPretend()
         purple "     模拟网站后台"
         tyblue " 4. 自定义静态网站"
         purple "     不建议小白选择，默认为Nextcloud登陆界面，强烈建议自行更换"
-        tyblue " 5. 自定义反向代理网页 \033[32m(不推荐)"
+        tyblue " 5. 自定义反向代理网页 \033[31m(不推荐)"
         echo
         green  " 内存<128MB 建议选择 403页面"
         green  " 128MB<=内存<1G 建议选择 Cloudreve"
