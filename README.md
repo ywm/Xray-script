@@ -230,7 +230,6 @@ bash Xray-TLS+Web-setup.sh
 ||autoconf|autoconf|
 ||git|git|
 ||libmagickwand-dev|ImageMagick-devel|
-|Nextcloud初始化|sudo|sudo|
 ## 注
 1.本文链接(官网)：https://github.com/kirin10000/Xray-script
 
