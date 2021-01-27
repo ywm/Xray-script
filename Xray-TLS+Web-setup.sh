@@ -91,7 +91,7 @@ red()                              #姨妈红
 check_base_command()
 {
     local i
-    local temp_command_list=('bash' 'true' 'false' 'exit' 'echo' 'test' 'free' 'sort' 'sed' 'awk' 'grep' 'cut' 'cd' 'rm' 'cp' 'mv' 'head' 'tail' 'uname' 'tr' 'md5sum' 'tar' 'cat' 'find' 'type' 'command' 'kill' 'pkill' 'wc' 'ls')
+    local temp_command_list=('bash' 'true' 'false' 'exit' 'echo' 'test' 'free' 'sort' 'sed' 'awk' 'grep' 'cut' 'cd' 'rm' 'cp' 'mv' 'head' 'tail' 'uname' 'tr' 'md5sum' 'tar' 'cat' 'find' 'type' 'command' 'kill' 'pkill' 'wc' 'ls' 'mktemp')
     for i in ${!temp_command_list[@]}
     do
         if ! command -V "${temp_command_list[$i]}" > /dev/null; then
@@ -104,7 +104,7 @@ check_base_command()
 #版本比较函数
 version_ge()
 {
-    test "$(echo "$@" | tr " " "\\n" | sort -rV | head -n 1)" == "$1"
+    test "$(echo -e "$1\\n$2" | sort -rV | head -n 1)" == "$1"
 }
 #安装单个重要依赖
 check_important_dependence_installed()
@@ -817,91 +817,69 @@ install_bbr()
     get_kernel_info()
     {
         green "正在获取最新版本内核版本号。。。。(60内秒未获取成功自动跳过)"
-        local kernel_list
-        local kernel_list_temp
-        kernel_list_temp=($(timeout 60 wget -qO- https://kernel.ubuntu.com/~kernel-ppa/mainline/ | awk -F'\"v' '/v[0-9]/{print $2}' | cut -d '"' -f1 | cut -d '/' -f1 | sort -rV))
-        if [ ${#kernel_list_temp[@]} -le 1 ]; then
+        your_kernel_version="$(uname -r | cut -d - -f 1)"
+        while [ ${your_kernel_version##*.} -eq 0 ]
+        do
+            your_kernel_version=${your_kernel_version%.*}
+        done
+        if ! timeout 60 wget -O "temp_kernel_version" "https://kernel.ubuntu.com/~kernel-ppa/mainline/"; then
             latest_kernel_version="error"
-            your_kernel_version=$(uname -r | cut -d - -f 1)
             return 1
         fi
-        local i=0
+        local kernel_list=()
+        local kernel_list_temp
+        kernel_list_temp=($(awk -F'\"v' '/v[0-9]/{print $2}' "temp_kernel_version" | cut -d '"' -f1 | cut -d '/' -f1 | sort -rV))
+        if [ ${#kernel_list_temp[@]} -le 1 ]; then
+            latest_kernel_version="error"
+            return 1
+        fi
         local i2=0
-        local i3=0
+        local i3
         local kernel_rc=""
         local kernel_list_temp2
         while ((i2<${#kernel_list_temp[@]}))
         do
-            if [[ "${kernel_list_temp[i2]}" =~ "rc" ]] && [ "$kernel_rc" == "" ]; then
-                kernel_list_temp2[i3]="${kernel_list_temp[i2]}"
-                kernel_rc="${kernel_list_temp[i2]%%-*}"
-                ((i3++))
+            if [[ "${kernel_list_temp[$i2]}" =~ -rc(0|[1-9][0-9]*)$ ]] && [ "$kernel_rc" == "" ]; then
+                kernel_list_temp2=("${kernel_list_temp[$i2]}")
+                kernel_rc="${kernel_list_temp[$i2]%-*}"
                 ((i2++))
-            elif [[ "${kernel_list_temp[i2]}" =~ "rc" ]] && [ "${kernel_list_temp[i2]%%-*}" == "$kernel_rc" ]; then
-                kernel_list_temp2[i3]=${kernel_list_temp[i2]}
-                ((i3++))
+            elif [[ "${kernel_list_temp[$i2]}" =~ -rc(0|[1-9][0-9]*)$ ]] && [ "${kernel_list_temp[$i2]%-*}" == "$kernel_rc" ]; then
+                kernel_list_temp2+=("${kernel_list_temp[$i2]}")
                 ((i2++))
-            elif [[ "${kernel_list_temp[i2]}" =~ "rc" ]] && [ "${kernel_list_temp[i2]%%-*}" != "$kernel_rc" ]; then
+            elif [[ "${kernel_list_temp[$i2]}" =~ -rc(0|[1-9][0-9]*)$ ]] && [ "${kernel_list_temp[$i2]%-*}" != "$kernel_rc" ]; then
                 for((i3=0;i3<${#kernel_list_temp2[@]};i3++))
                 do
-                    kernel_list[i]=${kernel_list_temp2[i3]}
-                    ((i++))
+                    kernel_list+=("${kernel_list_temp2[$i3]}")
                 done
                 kernel_rc=""
-                i3=0
-                unset kernel_list_temp2
-            elif version_ge "$kernel_rc" "${kernel_list_temp[i2]}"; then
-                if [ "$kernel_rc" == "${kernel_list_temp[i2]}" ]; then
-                    kernel_list[i]=${kernel_list_temp[i2]}
-                    ((i++))
-                    ((i2++))
-                fi
-                for((i3=0;i3<${#kernel_list_temp2[@]};i3++))
-                do
-                    kernel_list[i]=${kernel_list_temp2[i3]}
-                    ((i++))
-                done
-                kernel_rc=""
-                i3=0
-                unset kernel_list_temp2
+            elif [ -z "$kernel_rc" ] || version_ge "${kernel_list_temp[$i2]}" "$kernel_rc"; then
+                kernel_list+=("${kernel_list_temp[$i2]}")
+                ((i2++))
             else
-                kernel_list[i]=${kernel_list_temp[i2]}
-                ((i++))
-                ((i2++))
+                for((i3=0;i3<${#kernel_list_temp2[@]};i3++))
+                do
+                    kernel_list+=("${kernel_list_temp2[$i3]}")
+                done
+                kernel_rc=""
             fi
         done
-        if [ "$kernel_rc" != "" ]; then
+        if [ -n "$kernel_rc" ]; then
             for((i3=0;i3<${#kernel_list_temp2[@]};i3++))
             do
-                kernel_list[i]=${kernel_list_temp2[i3]}
-                ((i++))
+                kernel_list+=("${kernel_list_temp2[$i3]}")
             done
         fi
-        latest_kernel_version=${kernel_list[0]}
-        your_kernel_version=$(uname -r | cut -d - -f 1)
-        check_fake_version()
-        {
-            local temp=${1##*.}
-            if [ ${temp} -eq 0 ]; then
-                return 0
-            else
-                return 1
-            fi
-        }
-        while check_fake_version ${your_kernel_version}
-        do
-            your_kernel_version=${your_kernel_version%.*}
-        done
+        latest_kernel_version="${kernel_list[0]}"
         if [ $release == "ubuntu" ] || [ $release == "other-debian" ]; then
             local rc_version
-            rc_version=$(uname -r | cut -d - -f 2)
-            if [[ $rc_version =~ "rc" ]]; then
-                rc_version=${rc_version##*'rc'}
-                your_kernel_version=${your_kernel_version}-rc${rc_version}
+            rc_version="$(uname -r | cut -d - -f 2)"
+            if [[ $rc_version =~ rc ]]; then
+                rc_version="${rc_version##*'rc'}"
+                your_kernel_version="${your_kernel_version}-rc${rc_version}"
             fi
             uname -r | grep -q xanmod && your_kernel_version="${your_kernel_version}-xanmod"
         else
-            latest_kernel_version=${latest_kernel_version%%-*}
+            latest_kernel_version="${latest_kernel_version%%-*}"
         fi
     }
     #卸载多余内核
