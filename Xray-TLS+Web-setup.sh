@@ -154,7 +154,7 @@ install_dependence()
             local temp_redhat_install="$redhat_package_manager -y --enablerepo "
         fi
         if ! $redhat_package_manager -y install "$@"; then
-            if [ "$release" == "centos" ] && version_ge $systemVersion 8 && $temp_redhat_install"epel,PowerTools" install "$@";then
+            if [ "$release" == "centos" ] && version_ge "$systemVersion" 8 && $temp_redhat_install"epel,PowerTools" install "$@";then
                 return 0
             fi
             if $temp_redhat_install'*' install "$@"; then
@@ -470,15 +470,21 @@ fi
 [ -e ${cloudreve_prefix}/cloudreve.db ] && cloudreve_is_installed=1 || cloudreve_is_installed=0
 [ -e /usr/local/bin/xray ] && xray_is_installed=1 || xray_is_installed=0
 ([ $xray_is_installed -eq 1 ] && [ $nginx_is_installed -eq 1 ]) && is_installed=1 || is_installed=0
-if [[ "$(uname -m)" =~ ^(amd64|x86_64)$ ]]; then
-    machine="amd64"
-elif [[ "$(uname -m)" =~ ^(armv8|aarch64)$ ]]; then
-    machine="arm64"
-elif [[ "$(uname -m)" =~ ^(armv5tel|armv6l|armv7|armv7l)$ ]] ;then
-    machine="arm"
-else
-    machine=""
-fi
+case "$(uname -m)" in
+    'amd64' | 'x86_64')
+        machine='amd64'
+        ;;
+    'armv5tel' | 'armv6l' | 'armv7' | 'armv7l')
+        machine='arm'
+        ;;
+    'armv8' | 'aarch64')
+        machine='arm64'
+        ;;
+    *)
+        machine=''
+        ;;
+esac
+
 mem="$(free -m | sed -n 2p | awk '{print $2}')"
 mem_total="$(($(free -m | sed -n 2p | awk '{print $2}')+$(free -m | tail -n 1 | awk '{print $2}')))"
 [[ "$(free -b | tail -n 1 | awk '{print $2}')" -ne "0" ]] && using_swap=1 || using_swap=0
@@ -491,26 +497,28 @@ fi
 #获取系统版本信息
 get_system_info()
 {
-    if lsb_release -a 2>/dev/null | grep -qi "ubuntu"; then
+    local temp_release
+    temp_release="$(lsb_release -i -s | tr "[:upper:]" "[:lower:]")"
+    if [[ "$temp_release" =~ ubuntu ]]; then
         release="ubuntu"
-    elif lsb_release -a 2>/dev/null | grep -qi "centos"; then
+    elif [[ "$temp_release" =~ centos ]]; then
         release="centos"
-    elif lsb_release -a 2>/dev/null | grep -qi "fedora"; then
+    elif [[ "$temp_release" =~ fedora ]]; then
         release="fedora"
     fi
-    systemVersion=$(lsb_release -r -s)
+    systemVersion="$(lsb_release -r -s)"
     if [ $release == "fedora" ]; then
-        if version_ge $systemVersion 30; then
+        if version_ge "$systemVersion" 30; then
             redhat_version=8
-        elif version_ge $systemVersion 19; then
+        elif version_ge "$systemVersion" 19; then
             redhat_version=7
-        elif version_ge $systemVersion 12; then
+        elif version_ge "$systemVersion" 12; then
             redhat_version=6
         else
             redhat_version=5
         fi
     else
-        redhat_version=$systemVersion
+        redhat_version="$systemVersion"
     fi
 }
 
@@ -715,7 +723,7 @@ doupdate()
         yellow " 5.升级系统后以下配置可能会恢复系统默认配置："
         yellow "     ssh端口   ssh超时时间    bbr加速(恢复到关闭状态)"
         tyblue "----------------------------------------------------------"
-        green  " 您现在的系统版本是$systemVersion"
+        green  " 您现在的系统版本是"$systemVersion""
         tyblue "----------------------------------------------------------"
         echo
         choice=""
@@ -758,7 +766,7 @@ doupdate()
                     do-release-upgrade
                     ;;
             esac
-            if ! version_ge $systemVersion 20.04; then
+            if ! version_ge "$systemVersion" 20.04; then
                 sed -i 's/Prompt=lts/Prompt=normal/' /etc/update-manager/release-upgrades
                 do-release-upgrade
                 do-release-upgrade
@@ -891,7 +899,7 @@ install_bbr()
             local kernel_list_modules
             kernel_list_modules=($(dpkg --list | awk '{print $2}' | grep '^linux-modules'))
             local kernel_now
-            kernel_now=$(uname -r)
+            kernel_now="$(uname -r)"
             local ok_install=0
             for ((i=${#kernel_list_image[@]}-1;i>=0;i--))
             do
@@ -923,14 +931,14 @@ install_bbr()
             kernel_list=($(rpm -qa |grep '^kernel-[0-9]\|^kernel-ml-[0-9]'))
             local kernel_list_devel
             kernel_list_devel=($(rpm -qa | grep '^kernel-devel\|^kernel-ml-devel'))
-            if version_ge $redhat_version 8; then
+            if version_ge "$redhat_version" 8; then
                 local kernel_list_modules
                 kernel_list_modules=($(rpm -qa |grep '^kernel-modules\|^kernel-ml-modules'))
                 local kernel_list_core
                 kernel_list_core=($(rpm -qa | grep '^kernel-core\|^kernel-ml-core'))
             fi
             local kernel_now
-            kernel_now=$(uname -r)
+            kernel_now="$(uname -r)"
             local ok_install=0
             for ((i=${#kernel_list[@]}-1;i>=0;i--))
             do
@@ -951,7 +959,7 @@ install_bbr()
                     unset 'kernel_list_devel[$i]'
                 fi
             done
-            if version_ge $redhat_version 8; then
+            if version_ge "$redhat_version" 8; then
                 ok_install=0
                 for ((i=${#kernel_list_modules[@]}-1;i>=0;i--))
                 do
@@ -981,11 +989,11 @@ install_bbr()
                     return 1
                 fi
             fi
-            if ([ ${#kernel_list[@]} -eq 0 ] && [ ${#kernel_list_devel[@]} -eq 0 ]) && (! version_ge $redhat_version 8 || ([ ${#kernel_list_modules[@]} -eq 0 ] && [ ${#kernel_list_core[@]} -eq 0 ])); then
+            if ([ ${#kernel_list[@]} -eq 0 ] && [ ${#kernel_list_devel[@]} -eq 0 ]) && (! version_ge "$redhat_version" 8 || ([ ${#kernel_list_modules[@]} -eq 0 ] && [ ${#kernel_list_core[@]} -eq 0 ])); then
                 yellow "没有内核可卸载"
                 return 0
             fi
-            if version_ge $redhat_version 8; then
+            if version_ge "$redhat_version" 8; then
                 $redhat_package_manager -y remove "${kernel_list[@]}" "${kernel_list_modules[@]}" "${kernel_list_core[@]}" "${kernel_list_devel[@]}"
             else
                 $redhat_package_manager -y remove "${kernel_list[@]}" "${kernel_list_devel[@]}"
@@ -1006,7 +1014,9 @@ install_bbr()
         do
             read -p "您的选择是：" choice
         done
-        local qdisc=${list[((choice-1))]}
+        local qdisc="${list[$((choice-1))]}"
+        local default_qdisc
+        default_qdisc="$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')"
         sed -i '/^[ \t]*net.core.default_qdisc[ \t]*=/d' /etc/sysctl.conf
         echo "net.core.default_qdisc = $qdisc" >> /etc/sysctl.conf
         sysctl -p
@@ -1070,21 +1080,21 @@ install_bbr()
             tyblue "       ${tcp_congestion_control} \\033[31m(bbr未启用)"
         fi
         tyblue "   当前队列算法："
-        local default_qdisc
-        default_qdisc=$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')
-        green "       $default_qdisc"
+        green "       $(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')"
         echo
-        choice=""
+        local choice=""
         while [[ ! "$choice" =~ ^(0|[1-9][0-9]*)$ ]] || ((choice>7))
         do
             read -p "您的选择是：" choice
         done
         if [ $choice -eq 1 ]; then
-            sed -i '/^[ \t]*net.core.default_qdisc[ \t]*=/d' /etc/sysctl.conf
-            sed -i '/^[ \t]*net.ipv4.tcp_congestion_control[ \t]*=/d' /etc/sysctl.conf
-            echo 'net.core.default_qdisc = fq' >> /etc/sysctl.conf
-            echo 'net.ipv4.tcp_congestion_control = bbr' >> /etc/sysctl.conf
-            sysctl -p
+            if ! ([ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(grep '^[ '$'\t]*net.ipv4.tcp_congestion_control[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]); then
+                sed -i '/^[ \t]*net.core.default_qdisc[ \t]*=/d' /etc/sysctl.conf
+                sed -i '/^[ \t]*net.ipv4.tcp_congestion_control[ \t]*=/d' /etc/sysctl.conf
+                echo 'net.core.default_qdisc = fq' >> /etc/sysctl.conf
+                echo 'net.ipv4.tcp_congestion_control = bbr' >> /etc/sysctl.conf
+                sysctl -p
+            fi
             if ! wget -O update-kernel.sh https://github.com/kirin10000/update-kernel/raw/master/update-kernel.sh; then
                 red    "获取内核升级脚本失败"
                 yellow "按回车键继续或者按Ctrl+c终止"
@@ -1092,19 +1102,21 @@ install_bbr()
             fi
             chmod +x update-kernel.sh
             ./update-kernel.sh
-            if ! sysctl net.ipv4.tcp_congestion_control | grep -q "bbr"; then
+            if [ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]; then
+                green "--------------------bbr已安装--------------------"
+            else
                 red "开启bbr失败"
                 red "如果刚安装完内核，请先重启"
-                red "如果重启仍然无效，请尝试选择2选项"
-            else
-                green "--------------------bbr已安装--------------------"
+                red "如果重启仍然无效，请尝试选项3"
             fi
         elif [ $choice -eq 2 ]; then
-            sed -i '/^[ \t]*net.core.default_qdisc[ \t]*=/d' /etc/sysctl.conf
-            sed -i '/^[ \t]*net.ipv4.tcp_congestion_control[ \t]*=/d' /etc/sysctl.conf
-            echo 'net.core.default_qdisc = fq' >> /etc/sysctl.conf
-            echo 'net.ipv4.tcp_congestion_control = bbr' >> /etc/sysctl.conf
-            sysctl -p
+            if ! ([ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(grep '^[ '$'\t]*net.ipv4.tcp_congestion_control[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]); then
+                sed -i '/^[ \t]*net.core.default_qdisc[ \t]*=/d' /etc/sysctl.conf
+                sed -i '/^[ \t]*net.ipv4.tcp_congestion_control[ \t]*=/d' /etc/sysctl.conf
+                echo 'net.core.default_qdisc = fq' >> /etc/sysctl.conf
+                echo 'net.ipv4.tcp_congestion_control = bbr' >> /etc/sysctl.conf
+                sysctl -p
+            fi
             if ! wget -O xanmod-install.sh https://github.com/kirin10000/xanmod-install/raw/main/xanmod-install.sh; then
                 red    "获取xanmod内核安装脚本失败"
                 yellow "按回车键继续或者按Ctrl+c终止"
@@ -1112,30 +1124,34 @@ install_bbr()
             fi
             chmod +x xanmod-install.sh
             ./xanmod-install.sh
-            if ! sysctl net.ipv4.tcp_congestion_control | grep -q "bbr"; then
+            if [ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]; then
+                green "--------------------bbr已安装--------------------"
+            else
                 red "开启bbr失败"
                 red "如果刚安装完内核，请先重启"
-                red "如果重启仍然无效，请尝试选择2选项"
-            else
-                green "--------------------bbr已安装--------------------"
+                red "如果重启仍然无效，请尝试选项3"
             fi
         elif [ $choice -eq 3 ]; then
-            sed -i '/^[ \t]*net.core.default_qdisc[ \t]*=/d' /etc/sysctl.conf
-            sed -i '/^[ \t]*net.ipv4.tcp_congestion_control[ \t]*=/d' /etc/sysctl.conf
-            echo 'net.core.default_qdisc = fq' >> /etc/sysctl.conf
-            echo 'net.ipv4.tcp_congestion_control = bbr' >> /etc/sysctl.conf
-            sysctl -p
-            sleep 1s
-            if ! sysctl net.ipv4.tcp_congestion_control | grep -wq "bbr"; then
-                if ! wget -O bbr.sh https://github.com/teddysun/across/raw/master/bbr.sh; then
-                    red    "获取bbr脚本失败"
-                    yellow "按回车键继续或者按Ctrl+c终止"
-                    read -s
-                fi
-                chmod +x bbr.sh
-                ./bbr.sh
-            else
+            if [ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(grep '^[ '$'\t]*net.ipv4.tcp_congestion_control[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]; then
                 green "--------------------bbr已安装--------------------"
+            else
+                sed -i '/^[ \t]*net.core.default_qdisc[ \t]*=/d' /etc/sysctl.conf
+                sed -i '/^[ \t]*net.ipv4.tcp_congestion_control[ \t]*=/d' /etc/sysctl.conf
+                echo 'net.core.default_qdisc = fq' >> /etc/sysctl.conf
+                echo 'net.ipv4.tcp_congestion_control = bbr' >> /etc/sysctl.conf
+                sysctl -p
+                sleep 1s
+                if [ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "fq" ]; then
+                    green "--------------------bbr已安装--------------------"
+                else
+                    if ! wget -O bbr.sh https://github.com/teddysun/across/raw/master/bbr.sh; then
+                        red    "获取bbr脚本失败"
+                        yellow "按回车键继续或者按Ctrl+c终止"
+                        read -s
+                    fi
+                    chmod +x bbr.sh
+                    ./bbr.sh
+                fi
             fi
         elif [ $choice -eq 4 ]; then
             tyblue "--------------------即将安装bbr2加速，安装完成后服务器将会重启--------------------"
@@ -1259,7 +1275,7 @@ readPretend()
                 queren=0
             fi
         elif [ $pretend -eq 2 ]; then
-            if ([ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]) && ! version_ge $redhat_version 8; then
+            if ([ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]) && ! version_ge "$redhat_version" 8; then
                 red "不支持在 Red Hat版本<8 的 Red Hat基 系统上安装php"
                 yellow "如：CentOS<8 Fedora<30 的版本"
                 sleep 3s
