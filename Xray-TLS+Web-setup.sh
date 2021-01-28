@@ -2412,12 +2412,12 @@ install_update_xray_tls_web()
             systemctl --now disable cloudreve
         fi
         green "-------------------安装完成-------------------"
+        print_config_info
     else
         [ $cloudreve_is_installed -eq 1 ] && update_cloudreve
         turn_on_off_cloudreve
         green "-------------------更新完成-------------------"
     fi
-    print_config_info
     cd /
     rm -rf "$temp_dir"
 }
