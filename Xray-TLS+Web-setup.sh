@@ -675,6 +675,7 @@ uninstall_firewall()
     pkill -9 YDService
     pkill -9 YDLive
     pkill -9 sgagent
+    pkill -9 tat_agent
     pkill -9 /usr/local/qcloud
     pkill -9 barad_agent
     rm -rf /usr/local/qcloud
@@ -2802,8 +2803,16 @@ simplify_system()
     if [ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         $redhat_package_manager -y remove openssl "perl*"
     else
-        $debian_package_manager -y --autoremove purge openssl snapd kdump-tools fwupd flex open-vm-tools make automake '^cloud-init' libffi-dev pkg-config
-        $debian_package_manager -y -f install
+        local temp_remove_list=('openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' 'libffi-dev' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^libpython' 'dbus' 'cron' 'at' 'open-iscsi' 'rsyslog' 'anacron' 'acpid')
+        if ! $debian_package_manager -y --autoremove purge "${temp_remove_list[@]}"; then
+            $debian_package_manager -y -f install
+            for i in ${!temp_remove_list[@]}
+            do
+                $debian_package_manager -y --autoremove purge "${temp_remove_list[$i]}"
+            done
+            $debian_package_manager -y -f install
+        fi
+        [ $release == "ubuntu" ] && check_important_dependence_installed netplan.io
     fi
     check_important_dependence_installed openssh-server openssh-server
     [ $nginx_is_installed -eq 1 ] && install_nginx_dependence
@@ -2936,7 +2945,7 @@ start_menu()
         red "请先启动Xray-TLS+Web！！"
         return 1
     fi
-    (( 4<=choice&&choice<=6 )) && check_important_dependence_installed lsb-release redhat-lsb-core
+    (( 4<=choice&&choice<=6 || choice==24 )) && check_important_dependence_installed lsb-release redhat-lsb-core
     if (( choice==3 || choice==5 || choice==6 || choice==10 )); then
         check_important_dependence_installed ca-certificates ca-certificates
         if [ $choice -eq 10 ]; then
