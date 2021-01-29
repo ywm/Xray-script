@@ -71,7 +71,7 @@
 |配置文件|<100毫秒|
 |配置伪装网站|Nextcloud:1-3分钟|
 ||Cloudreve:1-2分钟|
-#### 为什么脚本安装时间那么长？
+### 为什么脚本安装时间那么长？
 之所以时间相比别的脚本长，有三个原因：
 ```
 1.集成了安装bbr的功能
@@ -169,7 +169,7 @@ bash Xray-TLS+Web-setup.sh
 |unzip|unzip|unzip|
 |curl|curl|curl|
 |acme.sh依赖|openssl|openssl|
-|acme.sh依赖|crontabs|crontabs|
+|acme.sh依赖|cron|crontabs|
 |编译基础：|||
 |gcc|gcc|gcc|
 |g++|g++|gcc-c++|
