@@ -1596,6 +1596,7 @@ cat > ${nginx_prefix}/conf.d/nextcloud.conf <<EOF
         try_files \$fastcgi_script_name =404;
         include fastcgi.conf;
         fastcgi_param REMOTE_ADDR 127.0.0.1;
+        fastcgi_param SERVER_PORT 443;
         fastcgi_split_path_info ^(.+?\\.php)(/.*)$;
         fastcgi_param PATH_INFO \$fastcgi_path_info;
         fastcgi_param HTTPS on;
