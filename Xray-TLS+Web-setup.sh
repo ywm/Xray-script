@@ -1574,7 +1574,6 @@ cat > ${nginx_prefix}/conf.d/nextcloud.conf <<EOF
     add_header X-XSS-Protection                     "1; mode=block" always;
     fastcgi_hide_header X-Powered-By;
     index index.php index.html /index.php\$request_uri;
-    expires 1m;
     location = / {
         if ( \$http_user_agent ~ ^DavClnt ) {
             return 302 /remote.php/webdav/\$is_args\$args;
@@ -1594,12 +1593,11 @@ cat > ${nginx_prefix}/conf.d/nextcloud.conf <<EOF
     location ~ ^/(?:build|tests|config|lib|3rdparty|templates|data)(?:$|/)  { return 404; }
     location ~ ^/(?:\\.|autotest|occ|issue|indie|db_|console)              { return 404; }
     location ~ \\.php(?:$|/) {
+        try_files \$fastcgi_script_name =404;
         include fastcgi.conf;
         fastcgi_param REMOTE_ADDR 127.0.0.1;
         fastcgi_split_path_info ^(.+?\\.php)(/.*)$;
-        set \$path_info \$fastcgi_path_info;
-        try_files \$fastcgi_script_name =404;
-        fastcgi_param PATH_INFO \$path_info;
+        fastcgi_param PATH_INFO \$fastcgi_path_info;
         fastcgi_param HTTPS on;
         fastcgi_param modHeadersAvailable true;
         fastcgi_param front_controller_active true;
