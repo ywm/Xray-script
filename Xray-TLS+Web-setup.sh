@@ -1585,6 +1585,12 @@ cat > ${nginx_prefix}/conf.d/nextcloud.conf <<EOF
         log_not_found off;
         access_log off;
     }
+    location ^~ /.well-known {
+        location = /.well-known/carddav     { return 301 /remote.php/dav/; }
+        location = /.well-known/caldav      { return 301 /remote.php/dav/; }
+        location ^~ /.well-known            { return 301 /index.php\$uri; }
+        try_files \$uri \$uri/ =404;
+    }
     location ~ ^/(?:build|tests|config|lib|3rdparty|templates|data)(?:$|/)  { return 404; }
     location ~ ^/(?:\\.|autotest|occ|issue|indie|db_|console)              { return 404; }
     location ~ \\.php(?:$|/) {
