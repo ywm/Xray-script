@@ -1856,7 +1856,7 @@ EOF
 cat >> $nginx_config<<EOF
     location / {
         proxy_set_header X-Forwarded-For 127.0.0.1;
-        proxy_set_header Host 127.0.0.1:443;
+        proxy_set_header Host \$http_host;
         proxy_redirect off;
         proxy_pass http://unix:/dev/shm/cloudreve_unixsocket/cloudreve.sock;
         client_max_body_size 0;
