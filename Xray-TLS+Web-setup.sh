@@ -49,7 +49,7 @@ is_installed=""
 update=""
 
 #配置信息
-#域名列表 两个列表用来区别 www.一级域名
+#域名列表 两个列表用来区别 www.主域名
 unset domain_list
 unset true_domain_list
 unset domain_config_list
@@ -1315,10 +1315,10 @@ readDomain()
     local pretend
     echo -e "\\n\\n\\n"
     tyblue "--------------------请选择域名解析情况--------------------"
-    tyblue " 1. 一级域名 和 www.一级域名 都解析到此服务器上 \\033[32m(推荐)"
+    tyblue " 1. 主域名 和 www.主域名 都解析到此服务器上 \\033[32m(推荐)"
     green  "    如：123.com 和 www.123.com 都解析到此服务器上"
-    tyblue " 2. 仅某个域名解析到此服务器上"
-    green  "    如：123.com 或 www.123.com 或 xxx.123.com 中的某一个解析到此服务器上"
+    tyblue " 2. 仅某个特定域名解析到此服务器上"
+    green  "    如：123.com 或 www.123.com 或 xxx.123.com 中的一个解析到此服务器上"
     echo
     while [ "$domain_config" != "1" ] && [ "$domain_config" != "2" ]
     do
@@ -1330,7 +1330,7 @@ readDomain()
         domain=""
         echo
         if [ $domain_config -eq 1 ]; then
-            tyblue '---------请输入一级域名(前面不带"www."、"http://"或"https://")---------'
+            tyblue '---------请输入主域名(前面不带"www."、"http://"或"https://")---------'
             while ! check_domain "$domain"
             do
                 read -p "请输入域名：" domain
@@ -1576,7 +1576,7 @@ cat > ${nginx_prefix}/conf.d/nextcloud.conf <<EOF
     index index.php index.html /index.php\$request_uri;
     location = / {
         if ( \$http_user_agent ~ ^DavClnt ) {
-            return 302 /remote.php/webdav/\$is_args\$args;
+            return 302 https://\$host/remote.php/webdav/\$is_args\$args;
         }
     }
     location = /robots.txt {
@@ -1585,9 +1585,12 @@ cat > ${nginx_prefix}/conf.d/nextcloud.conf <<EOF
         access_log off;
     }
     location ^~ /.well-known {
-        location = /.well-known/carddav     { return 301 /remote.php/dav/; }
-        location = /.well-known/caldav      { return 301 /remote.php/dav/; }
-        location ^~ /.well-known            { return 301 /index.php\$uri; }
+        rewrite ^/\\.well-known/host-meta\\.json  https://\$host/public.php?service=host-meta-json  last;
+        rewrite ^/\\.well-known/host-meta        https://\$host/public.php?service=host-meta       last;
+        rewrite ^/\\.well-known/webfinger        https://\$host/public.php?service=webfinger       last;
+        rewrite ^/\\.well-known/nodeinfo         https://\$host/public.php?service=nodeinfo        last;
+        location = /.well-known/carddav     { return 301 https://\$host/remote.php/dav/; }
+        location = /.well-known/caldav      { return 301 https://\$host/remote.php/dav/; }
         try_files \$uri \$uri/ =404;
     }
     location ~ ^/(?:build|tests|config|lib|3rdparty|templates|data)(?:$|/)  { return 404; }
@@ -1608,13 +1611,13 @@ cat > ${nginx_prefix}/conf.d/nextcloud.conf <<EOF
     }
     location ~ \\.(?:css|js|svg|gif)$ {
         try_files \$uri /index.php\$request_uri;
-        expires 6M;         # Cache-Control policy borrowed from \`.htaccess\`
-        access_log off;     # Optional: Don't log access to assets
+        expires 6M;
+        access_log off;
     }
     location ~ \\.woff2?$ {
         try_files \$uri /index.php\$request_uri;
-        expires 7d;         # Cache-Control policy borrowed from \`.htaccess\`
-        access_log off;     # Optional: Don't log access to assets
+        expires 7d;
+        access_log off;
     }
     location / {
         try_files \$uri \$uri/ /index.php\$request_uri;
