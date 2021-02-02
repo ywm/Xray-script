@@ -444,12 +444,12 @@ if [ "$EUID" != "0" ]; then
     red "请用root用户运行此脚本！！"
     exit 1
 fi
-if ! check_sudo; then
-    red "--------------------------- 检测到正在使用sudo ---------------------------"
-    yellow "acme.sh不支持sudo，请使用root用户运行此脚本"
-    tyblue "详情请见：https://github.com/acmesh-official/acme.sh/wiki/sudo"
-    exit 1
-fi
+#if ! check_sudo; then
+#    red "--------------------------- 检测到正在使用sudo ---------------------------"
+#    yellow "acme.sh不支持sudo，请使用root用户运行此脚本"
+#    tyblue "详情请见：https://github.com/acmesh-official/acme.sh/wiki/sudo"
+#    exit 1
+#fi
 if [[ ! -f '/etc/os-release' ]]; then
     red "系统版本太老，Xray官方脚本不支持"
     exit 1
