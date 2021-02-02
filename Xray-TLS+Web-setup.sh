@@ -101,23 +101,23 @@ check_base_command()
         fi
     done
 }
-check_sudo()
-{
-    if [ "$SUDO_GID" ] && [ "$SUDO_COMMAND" ] && [ "$SUDO_USER" ] && [ "$SUDO_UID" ]; then
-        if [ "$SUDO_USER" = "root" ] && [ "$SUDO_UID" = "0" ]; then
-            #it's root using sudo, no matter it's using sudo or not, just fine
-            return 0
-        fi
-        if [ -n "$SUDO_COMMAND" ]; then
-            #it's a normal user doing "sudo su", or `sudo -i` or `sudo -s`, or `sudo su acmeuser1`
-            echo "$SUDO_COMMAND" | grep -- "/bin/su\$" >/dev/null 2>&1 || echo "$SUDO_COMMAND" | grep -- "/bin/su " >/dev/null 2>&1 || || grep "^$SUDO_COMMAND\$" /etc/shells >/dev/null 2>&1
-            return $?
-        fi
-        #otherwise
-        return 1
-    fi
-    return 0
-}
+#check_sudo()
+#{
+#    if [ "$SUDO_GID" ] && [ "$SUDO_COMMAND" ] && [ "$SUDO_USER" ] && [ "$SUDO_UID" ]; then
+#        if [ "$SUDO_USER" = "root" ] && [ "$SUDO_UID" = "0" ]; then
+#            #it's root using sudo, no matter it's using sudo or not, just fine
+#            return 0
+#        fi
+#        if [ -n "$SUDO_COMMAND" ]; then
+#            #it's a normal user doing "sudo su", or `sudo -i` or `sudo -s`, or `sudo su acmeuser1`
+#            echo "$SUDO_COMMAND" | grep -- "/bin/su\$" >/dev/null 2>&1 || echo "$SUDO_COMMAND" | grep -- "/bin/su " >/dev/null 2>&1 || || grep "^$SUDO_COMMAND\$" /etc/shells >/dev/null 2>&1
+#            return $?
+#        fi
+#        #otherwise
+#        return 1
+#    fi
+#    return 0
+#}
 #版本比较函数
 version_ge()
 {
