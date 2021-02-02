@@ -101,23 +101,23 @@ check_base_command()
         fi
     done
 }
-#check_sudo()
-#{
-#    if [ "$SUDO_GID" ] && [ "$SUDO_COMMAND" ] && [ "$SUDO_USER" ] && [ "$SUDO_UID" ]; then
-#        if [ "$SUDO_USER" = "root" ] && [ "$SUDO_UID" = "0" ]; then
-#            #it's root using sudo, no matter it's using sudo or not, just fine
-#            return 0
-#        fi
-#        if [ -n "$SUDO_COMMAND" ]; then
-#            #it's a normal user doing "sudo su", or `sudo -i` or `sudo -s`, or `sudo su acmeuser1`
-#            echo "$SUDO_COMMAND" | grep -- "/bin/su\$" >/dev/null 2>&1 || echo "$SUDO_COMMAND" | grep -- "/bin/su " >/dev/null 2>&1 || || grep "^$SUDO_COMMAND\$" /etc/shells >/dev/null 2>&1
-#            return $?
-#        fi
-#        #otherwise
-#        return 1
-#    fi
-#    return 0
-#}
+check_sudo()
+{
+    if [ "$SUDO_GID" ] && [ "$SUDO_COMMAND" ] && [ "$SUDO_USER" ] && [ "$SUDO_UID" ]; then
+        if [ "$SUDO_USER" = "root" ] && [ "$SUDO_UID" = "0" ]; then
+            #it's root using sudo, no matter it's using sudo or not, just fine
+            return 0
+        fi
+        if [ -n "$SUDO_COMMAND" ]; then
+            #it's a normal user doing "sudo su", or `sudo -i` or `sudo -s`, or `sudo su acmeuser1`
+            echo "$SUDO_COMMAND" | grep -- "/bin/su\$" >/dev/null 2>&1 || echo "$SUDO_COMMAND" | grep -- "/bin/su " >/dev/null 2>&1 || grep "^$SUDO_COMMAND\$" /etc/shells >/dev/null 2>&1
+            return $?
+        fi
+        #otherwise
+        return 1
+    fi
+    return 0
+}
 #版本比较函数
 version_ge()
 {
@@ -444,12 +444,12 @@ if [ "$EUID" != "0" ]; then
     red "请用root用户运行此脚本！！"
     exit 1
 fi
-#if ! check_sudo; then
-#    red "--------------------------- 检测到正在使用sudo ---------------------------"
-#    yellow "acme.sh不支持sudo，请使用root用户运行此脚本"
-#    tyblue "详情请见：https://github.com/acmesh-official/acme.sh/wiki/sudo"
-#    exit 1
-#fi
+if ! check_sudo; then
+    red "--------------------------- 检测到正在使用sudo ---------------------------"
+    yellow "acme.sh不支持sudo，请使用root用户运行此脚本"
+    tyblue "详情请见：https://github.com/acmesh-official/acme.sh/wiki/sudo"
+    exit 1
+fi
 if [[ ! -f '/etc/os-release' ]]; then
     red "系统版本太老，Xray官方脚本不支持"
     exit 1
