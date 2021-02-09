@@ -27,7 +27,7 @@ nginx_config="${nginx_prefix}/conf.d/xray.conf"
 nginx_service="/etc/systemd/system/nginx.service"
 nginx_is_installed=""
 
-php_version="php-8.0.1"
+php_version="php-8.0.2"
 php_prefix="/usr/local/php"
 php_service="/etc/systemd/system/php-fpm.service"
 php_is_installed=""
@@ -37,7 +37,7 @@ cloudreve_prefix="/usr/local/cloudreve"
 cloudreve_service="/etc/systemd/system/cloudreve.service"
 cloudreve_is_installed=""
 
-nextcloud_url="https://download.nextcloud.com/server/prereleases/nextcloud-21.0.0beta8.zip"
+nextcloud_url="https://download.nextcloud.com/server/prereleases/nextcloud-21.0.0RC1.zip"
 
 xray_config="/usr/local/etc/xray/config.json"
 xray_is_installed=""
@@ -445,7 +445,7 @@ if [ "$EUID" != "0" ]; then
     exit 1
 fi
 if ! check_sudo; then
-    red "--------------------------- 检测到正在使用sudo ---------------------------"
+    yellow "检测到正在使用sudo！"
     yellow "acme.sh不支持sudo，请使用root用户运行此脚本"
     tyblue "详情请见：https://github.com/acmesh-official/acme.sh/wiki/sudo"
     exit 1
