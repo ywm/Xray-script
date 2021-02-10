@@ -1608,12 +1608,9 @@ cat > ${nginx_prefix}/conf.d/nextcloud.conf <<EOF
         access_log off;
     }
     location ^~ /.well-known {
-        rewrite ^/\\.well-known/host-meta\\.json  /public.php?service=host-meta-json  last;
-        rewrite ^/\\.well-known/host-meta        /public.php?service=host-meta       last;
-        rewrite ^/\\.well-known/webfinger        /public.php?service=webfinger       last;
-        rewrite ^/\\.well-known/nodeinfo         /public.php?service=nodeinfo        last;
         location = /.well-known/carddav     { return 301 https://\$host/remote.php/dav/; }
         location = /.well-known/caldav      { return 301 https://\$host/remote.php/dav/; }
+        location ^~ /.well-known            { return 301 https://\$host/index.php\$uri; }
         try_files \$uri \$uri/ =404;
     }
     location ~ ^/(?:build|tests|config|lib|3rdparty|templates|data)(?:$|/)  { return 404; }
