@@ -12,9 +12,11 @@
 
 [6. 伪装网站说明](#伪装网站说明)
 
-[7. 依赖列表](#依赖列表)
+[7. 安装位置](#安装位置)
 
-[8. 注](#注)
+[8. 依赖列表](#依赖列表)
+
+[9. 注](#注)
 ## 脚本特性
 1. 支持 (Xray-TCP+XTLS) + (Xray-WebSocket+TLS) + Web
 
@@ -237,10 +239,18 @@ bash Xray-TLS+Web-setup.sh
 ||autoconf|autoconf|
 ||git|git|
 ||libmagickwand-dev|ImageMagick-devel|
+## 安装位置
+**Nginx：**`/usr/local/nginx`
+
+**php：**`/usr/local/php`
+
+**Cloudreve：**`/usr/local/cloudreve`
+
+**Xray：** 见 **[Xray-install](https://github.com/XTLS/Xray-install)**
 ## 注
 1.本文链接(官网)：https://github.com/kirin10000/Xray-script
 
-2.参考教程：https://www.v2fly.org/config/overview.html https://guide.v2fly.org/ https://docs.nextcloud.com/server/20/admin_manual/installation/source_installation.html https://docs.cloudreve.org/
+2.参考教程：https://www.v2fly.org/config/overview.html https://guide.v2fly.org/ https://docs.nextcloud.com/server/21/admin_manual/installation/source_installation.html https://docs.cloudreve.org/
 
 3.域名证书申请：https://github.com/acmesh-official/acme.sh
 
