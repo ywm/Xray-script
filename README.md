@@ -160,6 +160,14 @@ bash Xray-TLS+Web-setup.sh
 4. **自定义反向代理网站**
 
 不建议选择，因为反向代理往往只是反向代理几个html和js文件，网站里面的大部分内容依然是网站后台提供的。不符合大流量特点。
+## 安装位置
+**Nginx：**`/usr/local/nginx`
+
+**php：**`/usr/local/php`
+
+**Cloudreve：**`/usr/local/cloudreve`
+
+**Xray：** 见 **[Xray-install](https://github.com/XTLS/Xray-install)**
 ## 依赖列表
 脚本可能自动安装以下依赖：
 |用途|Debian基系统|Red Hat基系统|
@@ -239,14 +247,6 @@ bash Xray-TLS+Web-setup.sh
 ||autoconf|autoconf|
 ||git|git|
 ||libmagickwand-dev|ImageMagick-devel|
-## 安装位置
-**Nginx：**`/usr/local/nginx`
-
-**php：**`/usr/local/php`
-
-**Cloudreve：**`/usr/local/cloudreve`
-
-**Xray：** 见 **[Xray-install](https://github.com/XTLS/Xray-install)**
 ## 注
 1.本文链接(官网)：https://github.com/kirin10000/Xray-script
 
