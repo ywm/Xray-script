@@ -20,7 +20,7 @@ using_swap=""
 using_swap_now=0
 
 #安装信息
-nginx_version="nginx-1.19.6"
+nginx_version="nginx-1.19.7"
 openssl_version="openssl-openssl-3.0.0-alpha11"
 nginx_prefix="/usr/local/nginx"
 nginx_config="${nginx_prefix}/conf.d/xray.conf"
