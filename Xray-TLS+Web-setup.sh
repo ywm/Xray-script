@@ -75,7 +75,7 @@ tyblue()                           #天依蓝
 {
     echo -e "\\033[36;1m${*}\\033[0m"
 }
-green()                            #水鸭青
+green()                            #原谅绿
 {
     echo -e "\\033[32;1m${*}\\033[0m"
 }
@@ -86,6 +86,10 @@ yellow()                           #鸭屎黄
 red()                              #姨妈红
 {
     echo -e "\\033[31;1m${*}\\033[0m"
+}
+blue()                             #蓝色
+{
+    echo -e "\\033[34;1m${*}\\033[0m"
 }
 #检查基本命令
 check_base_command()
@@ -2204,8 +2208,9 @@ print_config_info()
         purple "   (Qv2ray:允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
         tyblue " ------------------------其他-----------------------"
         tyblue "  Mux(多路复用)                 ：使用XTLS必须关闭;不使用XTLS也建议关闭"
+        purple "   (V2RayN:设置页面-开启Mux多路复用)"
         tyblue "  socks入站的Sniffing(流量探测) ：建议开启"
-        purple "   (V2rayN:设置-参数设置-Core:基础设置-开启流量探测;Qv2ray:首选项-入站设置-SOCKS设置-嗅探)"
+        purple "   (V2rayN(G):设置页面-开启流量探测;Qv2ray:首选项-入站设置-SOCKS设置-嗅探)"
         tyblue "------------------------------------------------------------------------"
     fi
     if [ $protocol_2 -ne 0 ]; then
@@ -2246,8 +2251,9 @@ print_config_info()
         purple "   (Qv2ray:允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
         tyblue " ------------------------其他-----------------------"
         tyblue "  Mux(多路复用)                 ：建议关闭"
+        purple "   (V2RayN:设置页面-开启Mux多路复用)"
         tyblue "  socks入站的Sniffing(流量探测) ：建议开启"
-        purple "   (V2rayN:设置-参数设置-Core:基础设置-开启流量探测;Qv2ray:首选项-入站设置-SOCKS设置-嗅探)"
+        purple "   (V2rayN(G):设置页面-开启流量探测;Qv2ray:首选项-入站设置-SOCKS设置-嗅探)"
         tyblue "------------------------------------------------------------------------"
     fi
     echo
@@ -2263,7 +2269,11 @@ print_config_info()
     yellow " 若使用VLESS，请确保客户端为 Xray 或 V2Ray v4.30.0+"
     yellow " 若使用XTLS，请确保客户端为 Xray 或 V2Ray v4.31.0至v4.32.1"
     yellow " 若使用xtls-rprx-splice，请确保客户端为 Xray v1.1.0+"
-    yellow " 若想达成fullcone，请确保客户端为 Xray v1.3.0+，并且如果测试系统为Windows，请确保当前网络设置为专用网络"
+    echo
+    blue   " 若想实现Fullcone(NAT类型开放)，需要达成以下条件："
+    blue   "   1. 确保客户端为 Xray v1.3.0+"
+    blue   "   2. 若您正在使用Netch作为客户端，请不要使用[模式1]连接 (可使用[模式3 TUN/TAP])"
+    blue   "   3. 如果测试系统为Windows，并且正在使用透明代理或TUN/TAP，请确保当前网络设置为专用网络"
     echo
     tyblue " 脚本最后更新时间：2020.02.19"
     echo
