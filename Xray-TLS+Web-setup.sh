@@ -1435,15 +1435,6 @@ compile_php()
     swap_off
     cd ..
 }
-install_php_part1()
-{
-    green "正在安装php。。。。"
-    cd "${php_version}"
-    make install
-    cp sapi/fpm/php-fpm.service ${php_prefix}/php-fpm.service.default
-    cd ..
-    php_is_installed=1
-}
 instal_php_imagick()
 {
     if ! git clone https://github.com/Imagick/imagick; then
@@ -1468,6 +1459,16 @@ instal_php_imagick()
     mv modules/imagick.so "$(${php_prefix}/bin/php -i | grep "^extension_dir" | awk '{print $3}')"
     cd ..
 }
+install_php_part1()
+{
+    green "正在安装php。。。。"
+    cd "${php_version}"
+    make install
+    cp sapi/fpm/php-fpm.service ${php_prefix}/php-fpm.service.default
+    cd ..
+    instal_php_imagick
+    php_is_installed=1
+}
 install_php_part2()
 {
     useradd -r -s /bin/bash www-data
@@ -1477,7 +1478,6 @@ install_php_part2()
     echo "listen = /dev/shm/php-fpm_unixsocket/php.sock" >> ${php_prefix}/etc/php-fpm.d/www.conf
     sed -i '/^[ \t]*env\[PATH\][ \t]*=/d' ${php_prefix}/etc/php-fpm.d/www.conf
     echo "env[PATH] = $PATH" >> ${php_prefix}/etc/php-fpm.d/www.conf
-    instal_php_imagick
 cat > ${php_prefix}/etc/php.ini << EOF
 [PHP]
 memory_limit=-1
