@@ -2433,12 +2433,7 @@ install_update_xray_tls_web()
     sleep 2s
     systemctl restart xray nginx
     if [ $update -eq 0 ]; then
-        if [ "${pretend_list[0]}" == "2" ]; then
-            systemctl --now enable php-fpm
-            let_init_nextcloud "0"
-        else
-            systemctl --now disable php-fpm
-        fi
+        turn_on_off_php
         if [ "${pretend_list[0]}" == "1" ]; then
             if [ $temp_remove_cloudreve -eq 1 ]; then
                 install_init_cloudreve "0"
@@ -2449,6 +2444,7 @@ install_update_xray_tls_web()
             fi
         else
             systemctl --now disable cloudreve
+            [ "${pretend_list[0]}" == "2" ] && let_init_nextcloud "0"
         fi
         green "-------------------安装完成-------------------"
         print_config_info
@@ -2629,7 +2625,6 @@ add_domain()
     sleep 2s
     systemctl restart xray nginx
     turn_on_off_php
-    [ "${pretend_list[-1]}" == "2" ] && let_init_nextcloud "-1"
     if [ "${pretend_list[-1]}" == "1" ]; then
         if [ $cloudreve_is_installed -eq 0 ]; then
             full_install_init_cloudreve "-1"
@@ -2637,6 +2632,9 @@ add_domain()
             systemctl --now enable cloudreve
             let_change_cloudreve_domain "-1"
         fi
+    else
+        turn_on_off_cloudreve
+        [ "${pretend_list[-1]}" == "2" ] && let_init_nextcloud "-1"
     fi
     green "域名添加完成！！"
     print_config_info
@@ -2747,7 +2745,6 @@ change_pretend()
     config_nginx
     systemctl restart nginx
     turn_on_off_php
-    [ "$pretend" == "2" ] && let_init_nextcloud "$change"
     if [ "$pretend" == "1" ]; then
         if [ $cloudreve_is_installed -eq 0 ]; then
             full_install_init_cloudreve "$change"
@@ -2757,6 +2754,7 @@ change_pretend()
         fi
     else
         turn_on_off_cloudreve
+        [ "$pretend" == "2" ] && let_init_nextcloud "$change"
     fi
     green "修改完成！"
 }
