@@ -2203,7 +2203,7 @@ print_config_info()
         else
             tyblue "  serverName                    ：${domain_list[*]} \\033[35m(任选其一)"
         fi
-        purple "   (V2RayN:SNI;V2RayNG:伪装域名;Qv2ray:TLS设置-服务器地址;Shadowrocket:Peer 名称)"
+        purple "   (V2RayN(G):SNI;Qv2ray:TLS设置-服务器地址;Shadowrocket:Peer 名称)"
         tyblue "  allowInsecure                 ：false"
         purple "   (Qv2ray:允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
         tyblue " ------------------------其他-----------------------"
