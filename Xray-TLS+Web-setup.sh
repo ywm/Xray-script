@@ -7,7 +7,6 @@ machine=""
 release=""
 #系统版本号
 systemVersion=""
-redhat_version=""
 debian_package_manager=""
 redhat_package_manager=""
 #物理内存大小
@@ -130,7 +129,7 @@ version_ge()
 #安装单个重要依赖
 check_important_dependence_installed()
 {
-    if [ $release == "ubuntu" ] || [ $release == "other-debian" ]; then
+    if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
         if dpkg -s "$1" > /dev/null 2>&1; then
             apt-mark manual "$1"
         elif ! $debian_package_manager -y --no-install-recommends install "$1"; then
@@ -158,7 +157,7 @@ check_important_dependence_installed()
 #安装依赖
 install_dependence()
 {
-    if [ $release == "ubuntu" ] || [ $release == "other-debian" ]; then
+    if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
         if ! $debian_package_manager -y --no-install-recommends install "$@"; then
             $debian_package_manager update
             if ! $debian_package_manager -y --no-install-recommends install "$@"; then
@@ -528,25 +527,18 @@ get_system_info()
     temp_release="$(lsb_release -i -s | tr "[:upper:]" "[:lower:]")"
     if [[ "$temp_release" =~ ubuntu ]]; then
         release="ubuntu"
+    elif [[ "$temp_release" =~ debian ]]; then
+        release="debian"
+    elif [[ "$temp_release" =~ deepin ]]; then
+        release="deepin"
     elif [[ "$temp_release" =~ centos ]]; then
         release="centos"
+    elif [[ "$temp_release" =~ (redhatenterprise|rhel) ]]; then
+        release="rhel"
     elif [[ "$temp_release" =~ fedora ]]; then
         release="fedora"
     fi
     systemVersion="$(lsb_release -r -s)"
-    if [ $release == "fedora" ]; then
-        if version_ge "$systemVersion" 30; then
-            redhat_version=8
-        elif version_ge "$systemVersion" 19; then
-            redhat_version=7
-        elif version_ge "$systemVersion" 12; then
-            redhat_version=6
-        else
-            redhat_version=5
-        fi
-    else
-        redhat_version="$systemVersion"
-    fi
 }
 
 #检查80端口和443端口是否被占用
@@ -653,31 +645,28 @@ uninstall_firewall()
     systemctl disable firewalld
     $redhat_package_manager -y remove firewalld
     green "正在删除阿里云盾和腾讯云盾 (仅对阿里云和腾讯云服务器有效)。。。"
-#阿里云盾
-    if [ $release == "ubuntu" ] || [ $release == "other-debian" ]; then
-        systemctl stop CmsGoAgent
-        systemctl disable CmsGoAgent
-        rm -rf /usr/local/cloudmonitor
-        rm -rf /etc/systemd/system/CmsGoAgent.service
-        systemctl daemon-reload
-    else
-        systemctl stop cloudmonitor
-        /etc/rc.d/init.d/cloudmonitor remove
-        rm -rf /usr/local/cloudmonitor
-        systemctl daemon-reload
-    fi
-
+    #阿里云盾
     systemctl stop aliyun
     systemctl disable aliyun
+    systemctl stop CmsGoAgent
+    systemctl disable CmsGoAgent
+    systemctl stop cloudmonitor
+    /etc/rc.d/init.d/cloudmonitor remove
+    rm -rf /usr/local/cloudmonitor
+    rm -rf /etc/systemd/system/CmsGoAgent.service
     rm -rf /etc/systemd/system/aliyun.service
     systemctl daemon-reload
+    #aliyun-assist
+    systemctl stop AssistDaemon
+    systemctl disable AssistDaemon
     $debian_package_manager -y purge aliyun-assist
     $redhat_package_manager -y remove aliyun_assist
     rm -rf /usr/local/share/aliyun-assist
     rm -rf /usr/sbin/aliyun_installer
     rm -rf /usr/sbin/aliyun-service
     rm -rf /usr/sbin/aliyun-service.backup
-
+    #AliYunDun aegis
+    pkill -9 AliYunDunUpdate
     pkill -9 AliYunDun
     pkill -9 AliHids
     /etc/init.d/aegis uninstall
@@ -687,7 +676,8 @@ uninstall_firewall()
     rm -rf /etc/rc3.d/S80aegis
     rm -rf /etc/rc4.d/S80aegis
     rm -rf /etc/rc5.d/S80aegis
-#腾讯云盾
+
+    #腾讯云盾
     /usr/local/qcloud/stargate/admin/uninstall.sh
     /usr/local/qcloud/YunJing/uninst.sh
     /usr/local/qcloud/monitor/barad/admin/uninstall.sh
@@ -906,7 +896,7 @@ install_bbr()
             done
         fi
         latest_kernel_version="${kernel_list[0]}"
-        if [ $release == "ubuntu" ] || [ $release == "other-debian" ]; then
+        if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
             local rc_version
             rc_version="$(uname -r | cut -d - -f 2)"
             if [[ $rc_version =~ rc ]]; then
@@ -921,7 +911,7 @@ install_bbr()
     #卸载多余内核
     remove_other_kernel()
     {
-        if [ $release == "ubuntu" ] || [ $release == "other-debian" ]; then
+        if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
             local kernel_list_image
             kernel_list_image=($(dpkg --list | awk '{print $2}' | grep '^linux-image'))
             local kernel_list_modules
@@ -959,12 +949,10 @@ install_bbr()
             kernel_list=($(rpm -qa |grep '^kernel-[0-9]\|^kernel-ml-[0-9]'))
             local kernel_list_devel
             kernel_list_devel=($(rpm -qa | grep '^kernel-devel\|^kernel-ml-devel'))
-            if version_ge "$redhat_version" 8; then
-                local kernel_list_modules
-                kernel_list_modules=($(rpm -qa |grep '^kernel-modules\|^kernel-ml-modules'))
-                local kernel_list_core
-                kernel_list_core=($(rpm -qa | grep '^kernel-core\|^kernel-ml-core'))
-            fi
+            local kernel_list_modules
+            kernel_list_modules=($(rpm -qa |grep '^kernel-modules\|^kernel-ml-modules'))
+            local kernel_list_core
+            kernel_list_core=($(rpm -qa | grep '^kernel-core\|^kernel-ml-core'))
             local kernel_now
             kernel_now="$(uname -r)"
             local ok_install=0
@@ -987,45 +975,23 @@ install_bbr()
                     unset 'kernel_list_devel[$i]'
                 fi
             done
-            if version_ge "$redhat_version" 8; then
-                ok_install=0
-                for ((i=${#kernel_list_modules[@]}-1;i>=0;i--))
-                do
-                    if [[ "${kernel_list_modules[$i]}" =~ "$kernel_now" ]]; then
-                        unset 'kernel_list_modules[$i]'
-                        ((ok_install++))
-                    fi
-                done
-                if [ $ok_install -lt 1 ]; then
-                    red "未发现正在使用的内核，可能已经被卸载，请先重新启动"
-                    yellow "按回车键继续。。。"
-                    read -s
-                    return 1
+            for ((i=${#kernel_list_modules[@]}-1;i>=0;i--))
+            do
+                if [[ "${kernel_list_modules[$i]}" =~ "$kernel_now" ]]; then
+                    unset 'kernel_list_modules[$i]'
                 fi
-                ok_install=0
-                for ((i=${#kernel_list_core[@]}-1;i>=0;i--))
-                do
-                    if [[ "${kernel_list_core[$i]}" =~ "$kernel_now" ]]; then
-                        unset 'kernel_list_core[$i]'
-                        ((ok_install++))
-                    fi
-                done
-                if [ $ok_install -lt 1 ]; then
-                    red "未发现正在使用的内核，可能已经被卸载，请先重新启动"
-                    yellow "按回车键继续。。。"
-                    read -s
-                    return 1
+            done
+            for ((i=${#kernel_list_core[@]}-1;i>=0;i--))
+            do
+                if [[ "${kernel_list_core[$i]}" =~ "$kernel_now" ]]; then
+                    unset 'kernel_list_core[$i]'
                 fi
-            fi
-            if ([ ${#kernel_list[@]} -eq 0 ] && [ ${#kernel_list_devel[@]} -eq 0 ]) && (! version_ge "$redhat_version" 8 || ([ ${#kernel_list_modules[@]} -eq 0 ] && [ ${#kernel_list_core[@]} -eq 0 ])); then
+            done
+            if [ ${#kernel_list[@]} -eq 0 ] && [ ${#kernel_list_devel[@]} -eq 0 ] && [ ${#kernel_list_modules[@]} -eq 0 ] && [ ${#kernel_list_core[@]} -eq 0 ]; then
                 yellow "没有内核可卸载"
                 return 0
             fi
-            if version_ge "$redhat_version" 8; then
-                $redhat_package_manager -y remove "${kernel_list[@]}" "${kernel_list_modules[@]}" "${kernel_list_core[@]}" "${kernel_list_devel[@]}"
-            else
-                $redhat_package_manager -y remove "${kernel_list[@]}" "${kernel_list_devel[@]}"
-            fi
+            $redhat_package_manager -y remove "${kernel_list[@]}" "${kernel_list_modules[@]}" "${kernel_list_core[@]}" "${kernel_list_devel[@]}"
         fi
         green "-------------------卸载完成-------------------"
     }
@@ -1187,7 +1153,7 @@ install_bbr()
             yellow " 按回车键以继续。。。。"
             read -s
             local temp_bbr2
-            if [ $release == "ubuntu" ] || [ $release == "other-debian" ]; then
+            if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
                 local temp_bbr2="https://github.com/yeyingorg/bbr2.sh/raw/master/bbr2.sh"
             else
                 local temp_bbr2="https://github.com/jackjieYYY/bbr2/raw/master/bbr2.sh"
@@ -1299,16 +1265,41 @@ readPretend()
         if [ $pretend -eq 1 ]; then
             if [ -z "$machine" ]; then
                 red "您的VPS指令集不支持Cloudreve！"
+                yellow "Cloudreve仅支持x86_64、arm64和arm指令集"
                 sleep 3s
                 queren=0
             fi
         elif [ $pretend -eq 2 ]; then
-            if ([ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]) && ! version_ge "$redhat_version" 8; then
-                red "不支持在 Red Hat版本<8 的 Red Hat基 系统上安装php"
-                yellow "如：CentOS<8 Fedora<30 的版本"
+            if ([ $release == "centos" ] && ! version_ge "$systemVersion" "8" ) || ([ $release == "rhel" ] && ! version_ge "$systemVersion" "8") || ([ $release == "fedora" ] && ! version_ge "$systemVersion" "30") || ([ $release == "ubuntu" ] && ! version_ge "$systemVersion" "20.04") || ([ $release == "debian" ] && ! version_ge "$systemVersion" "10") || ([ $release == "deepin" ] && ! version_ge "$systemVersion" "20"); then
+                red "系统版本过低！"
+                tyblue "安装Nextcloud需要安装php"
+                yellow "仅支持在以下版本系统下安装php："
+                yellow " 1. Ubuntu 20.04+"
+                yellow " 2. Debian 10+"
+                yellow " 3. Deepin 20+"
+                yellow " 4. 其他以 Debian 10+ 为基的系统"
+                yellow " 5. Red Hat Enterprise Linux 8+"
+                yellow " 6. CentOS 8+"
+                yellow " 7. Fedora 30+"
+                yellow " 8. 其他以 Red Hat 8+ 为基的系统"
                 sleep 3s
                 queren=0
-            elif [ $php_is_installed -eq 0 ]; then
+                continue
+            elif [ $release == "other-debian" ] || [ $release == "other-redhat" ]; then
+                yellow "未知的系统！"
+                tyblue "安装Nextcloud需要安装php"
+                yellow "仅支持在以下版本系统下安装php："
+                yellow " 1. Ubuntu 20.04+"
+                yellow " 2. Debian 10+"
+                yellow " 3. Deepin 20+"
+                yellow " 4. 其他以 Debian 10+ 为基的系统"
+                yellow " 5. Red Hat Enterprise Linux 8+"
+                yellow " 6. CentOS 8+"
+                yellow " 7. Fedora 30+"
+                yellow " 8. 其他以 Red Hat 8+ 为基的系统"
+                ! ask_if "确定选择吗？(y/n)" && queren=0 && continue
+            fi
+            if [ $php_is_installed -eq 0 ]; then
                 tyblue "安装Nextcloud需要安装php"
                 yellow "编译&&安装php可能需要额外消耗15-60分钟"
                 yellow "php将占用一定系统资源，不建议内存<512M的机器使用"
@@ -1382,7 +1373,7 @@ readDomain()
 #安装依赖
 install_base_dependence()
 {
-    if [ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+    if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         install_dependence net-tools redhat-lsb-core ca-certificates wget unzip curl openssl crontabs gcc gcc-c++ make
     else
         install_dependence net-tools lsb-release ca-certificates wget unzip curl openssl cron gcc g++ make
@@ -1390,7 +1381,7 @@ install_base_dependence()
 }
 install_nginx_dependence()
 {
-    if [ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+    if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         install_dependence perl-IPC-Cmd perl-Getopt-Long perl-Data-Dumper pcre-devel zlib-devel libxml2-devel libxslt-devel gd-devel geoip-devel perl-ExtUtils-Embed gperftools-devel libatomic_ops-devel perl-devel
     else
         install_dependence libpcre3-dev zlib1g-dev libxml2-dev libxslt1-dev libgd-dev libgeoip-dev libgoogle-perftools-dev libatomic-ops-dev libperl-dev
@@ -1398,7 +1389,7 @@ install_nginx_dependence()
 }
 install_php_dependence()
 {
-    if [ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+    if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         install_dependence pkgconf-pkg-config libxml2-devel sqlite-devel systemd-devel libacl-devel openssl-devel krb5-devel pcre2-devel zlib-devel bzip2-devel libcurl-devel gdbm-devel libdb-devel tokyocabinet-devel lmdb-devel enchant-devel libffi-devel libpng-devel gd-devel libwebp-devel libjpeg-turbo-devel libXpm-devel freetype-devel gmp-devel libc-client-devel libicu-devel openldap-devel oniguruma-devel unixODBC-devel freetds-devel libpq-devel aspell-devel libedit-devel net-snmp-devel libsodium-devel libargon2-devel libtidy-devel libxslt-devel libzip-devel autoconf git ImageMagick-devel
     else
         install_dependence pkg-config libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-dev libffi-dev libpng-dev libgd-dev libwebp-dev libjpeg-dev libxpm-dev libfreetype6-dev libgmp-dev libc-client2007e-dev libicu-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt1-dev libzip-dev autoconf git libmagickwand-dev
@@ -1417,7 +1408,7 @@ compile_php()
     tar -xJf "${php_version}.tar.xz"
     cd "${php_version}"
     sed -i 's#db$THIS_VERSION/db_185.h include/db$THIS_VERSION/db_185.h include/db/db_185.h#& include/db_185.h#' configure
-    if [ $release == "ubuntu" ] || [ $release == "other-debian" ]; then
+    if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
         sed -i 's#if test -f $THIS_PREFIX/$PHP_LIBDIR/lib$LIB\.a || test -f $THIS_PREFIX/$PHP_LIBDIR/lib$LIB\.$SHLIB_SUFFIX_NAME#& || true#' configure
         sed -i 's#if test ! -r "$PDO_FREETDS_INSTALLATION_DIR/$PHP_LIBDIR/libsybdb\.a" && test ! -r "$PDO_FREETDS_INSTALLATION_DIR/$PHP_LIBDIR/libsybdb\.so"#& \&\& false#' configure
         ./configure --prefix=${php_prefix} --enable-embed=shared --enable-fpm --with-fpm-user=www-data --with-fpm-group=www-data --with-fpm-systemd --with-fpm-acl --with-fpm-apparmor --disable-phpdbg --with-layout=GNU --with-openssl --with-kerberos --with-external-pcre --with-pcre-jit --with-zlib --enable-bcmath --with-bz2 --enable-calendar --with-curl --enable-dba --with-qdbm --with-db4 --with-db1 --with-tcadb --with-lmdb --with-enchant --enable-exif --with-ffi --enable-ftp --enable-gd --with-external-gd --with-webp --with-jpeg --with-xpm --with-freetype --enable-gd-jis-conv --with-gettext --with-gmp --with-mhash --with-imap --with-imap-ssl --enable-intl --with-ldap --with-ldap-sasl --enable-mbstring --with-mysqli --with-mysql-sock --with-unixODBC --enable-pcntl --with-pdo-dblib --with-pdo-mysql --with-zlib-dir --with-pdo-odbc=unixODBC,/usr --with-pdo-pgsql --with-pgsql --with-pspell --with-libedit --with-mm --enable-shmop --with-snmp --enable-soap --enable-sockets --with-sodium --with-password-argon2 --enable-sysvmsg --enable-sysvsem --enable-sysvshm --with-tidy --with-xsl --with-zip --enable-mysqlnd --with-pear CPPFLAGS="-g0 -O3" CFLAGS="-g0 -O3" CXXFLAGS="-g0 -O3"
@@ -2284,6 +2275,7 @@ print_config_info()
 install_update_xray_tls_web()
 {
     check_nginx_installed_system
+    [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
     check_SELinux
     check_important_dependence_installed net-tools net-tools
     check_port
@@ -2837,7 +2829,7 @@ simplify_system()
     yellow "警告：如果服务器上有运行别的程序，可能会被误删"
     tyblue "建议在纯净系统下使用此功能"
     ! ask_if "是否要继续?(y/n)" && return 0
-    if [ $release == "centos" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+    if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         $redhat_package_manager -y remove openssl "perl*"
     else
         local temp_remove_list=('openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' 'libffi-dev' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^libpython' 'dbus' 'cron' 'at' 'open-iscsi' 'rsyslog' 'anacron' 'acpid')
@@ -2983,6 +2975,7 @@ start_menu()
         red "请先启动Xray-TLS+Web！！"
         return 1
     fi
+    (( 3<=choice&&choice<=6 || choice==10 || choice==24 )) && [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
     (( 4<=choice&&choice<=6 || choice==24 )) && check_important_dependence_installed lsb-release redhat-lsb-core
     if (( choice==3 || choice==5 || choice==6 || choice==10 )); then
         check_important_dependence_installed ca-certificates ca-certificates
