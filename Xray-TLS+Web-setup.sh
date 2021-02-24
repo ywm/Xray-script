@@ -646,25 +646,29 @@ uninstall_firewall()
     $redhat_package_manager -y remove firewalld
     green "正在删除阿里云盾和腾讯云盾 (仅对阿里云和腾讯云服务器有效)。。。"
     #阿里云盾
-    systemctl stop aliyun
-    systemctl disable aliyun
+    pkill -9 assist_daemon
+    rm -rf /usr/local/share/assist-daemon
     systemctl stop CmsGoAgent
     systemctl disable CmsGoAgent
     systemctl stop cloudmonitor
     /etc/rc.d/init.d/cloudmonitor remove
     rm -rf /usr/local/cloudmonitor
     rm -rf /etc/systemd/system/CmsGoAgent.service
-    rm -rf /etc/systemd/system/aliyun.service
     systemctl daemon-reload
     #aliyun-assist
     systemctl stop AssistDaemon
     systemctl disable AssistDaemon
+    systemctl stop aliyun
+    systemctl disable aliyun
     $debian_package_manager -y purge aliyun-assist
     $redhat_package_manager -y remove aliyun_assist
     rm -rf /usr/local/share/aliyun-assist
     rm -rf /usr/sbin/aliyun_installer
     rm -rf /usr/sbin/aliyun-service
     rm -rf /usr/sbin/aliyun-service.backup
+    rm -rf /etc/systemd/system/aliyun.service
+    rm -rf /etc/systemd/system/AssistDaemon.service
+    systemctl daemon-reload
     #AliYunDun aegis
     pkill -9 AliYunDunUpdate
     pkill -9 AliYunDun
@@ -695,6 +699,7 @@ uninstall_firewall()
     pkill -9 tat_agent
     pkill -9 /usr/local/qcloud
     pkill -9 barad_agent
+    kill -s 9 "$(ps -aux | grep '/usr/local/qcloud/nv//nv_driver_install_helper\.sh' | awk '{print $2}')"
     rm -rf /usr/local/qcloud
     rm -rf /usr/local/yd.socket.client
     rm -rf /usr/local/yd.socket.server
@@ -911,11 +916,13 @@ install_bbr()
     #卸载多余内核
     remove_other_kernel()
     {
+        local exit_code=1
         if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
+            dpkg --list > "temp_installed_list"
             local kernel_list_image
-            kernel_list_image=($(dpkg --list | awk '{print $2}' | grep '^linux-image'))
+            kernel_list_image=($(awk '{print $2}' "temp_installed_list" | grep '^linux-image'))
             local kernel_list_modules
-            kernel_list_modules=($(dpkg --list | awk '{print $2}' | grep '^linux-modules'))
+            kernel_list_modules=($(awk '{print $2}' "temp_installed_list" | grep '^linux-modules'))
             local kernel_now
             kernel_now="$(uname -r)"
             local ok_install=0
@@ -942,17 +949,21 @@ install_bbr()
                 yellow "没有内核可卸载"
                 return 0
             fi
-            $debian_package_manager -y purge "${kernel_list_image[@]}" "${kernel_list_modules[@]}"
+            $debian_package_manager -y purge "${kernel_list_image[@]}" "${kernel_list_modules[@]}" && exit_code=0
+            [ $exit_code -eq 1 ] && $debian_package_manager -y -f install
             apt-mark manual "^grub"
         else
+            rpm -qa > "temp_installed_list"
             local kernel_list
-            kernel_list=($(rpm -qa |grep '^kernel-[0-9]\|^kernel-ml-[0-9]'))
+            kernel_list=($(grep -E '^kernel(|-ml|-lt)-[0-9]' "temp_installed_list"))
+            #local kernel_list_headers
+            #kernel_list_headers=($(grep -E '^kernel(|-ml|-lt)-headers' "temp_installed_list"))
             local kernel_list_devel
-            kernel_list_devel=($(rpm -qa | grep '^kernel-devel\|^kernel-ml-devel'))
+            kernel_list_devel=($(grep -E '^kernel(|-ml|-lt)-devel' "temp_installed_list"))
             local kernel_list_modules
-            kernel_list_modules=($(rpm -qa |grep '^kernel-modules\|^kernel-ml-modules'))
+            kernel_list_modules=($(grep -E '^kernel(|-ml|-lt)-modules' "temp_installed_list"))
             local kernel_list_core
-            kernel_list_core=($(rpm -qa | grep '^kernel-core\|^kernel-ml-core'))
+            kernel_list_core=($(grep -E '^kernel(|-ml|-lt)-core' "temp_installed_list"))
             local kernel_now
             kernel_now="$(uname -r)"
             local ok_install=0
@@ -969,6 +980,12 @@ install_bbr()
                 read -s
                 return 1
             fi
+            #for ((i=${#kernel_list_headers[@]}-1;i>=0;i--))
+            #do
+            #    if [[ "${kernel_list_headers[$i]}" =~ "$kernel_now" ]]; then
+            #        unset 'kernel_list_headers[$i]'
+            #    fi
+            #done
             for ((i=${#kernel_list_devel[@]}-1;i>=0;i--))
             do
                 if [[ "${kernel_list_devel[$i]}" =~ "$kernel_now" ]]; then
@@ -987,13 +1004,22 @@ install_bbr()
                     unset 'kernel_list_core[$i]'
                 fi
             done
+            #if [ ${#kernel_list[@]} -eq 0 ] && [ ${#kernel_list_headers[@]} -eq 0 ] && [ ${#kernel_list_devel[@]} -eq 0 ] && [ ${#kernel_list_modules[@]} -eq 0 ] && [ ${#kernel_list_core[@]} -eq 0 ]; then
             if [ ${#kernel_list[@]} -eq 0 ] && [ ${#kernel_list_devel[@]} -eq 0 ] && [ ${#kernel_list_modules[@]} -eq 0 ] && [ ${#kernel_list_core[@]} -eq 0 ]; then
                 yellow "没有内核可卸载"
                 return 0
             fi
-            $redhat_package_manager -y remove "${kernel_list[@]}" "${kernel_list_modules[@]}" "${kernel_list_core[@]}" "${kernel_list_devel[@]}"
+            #$redhat_package_manager -y remove "${kernel_list[@]}" "${kernel_list_headers[@]}" "${kernel_list_modules[@]}" "${kernel_list_core[@]}" "${kernel_list_devel[@]}" && exit_code=0
+            $redhat_package_manager -y remove "${kernel_list[@]}" "${kernel_list_modules[@]}" "${kernel_list_core[@]}" "${kernel_list_devel[@]}" && exit_code=0
         fi
-        green "-------------------卸载完成-------------------"
+        if [ $exit_code -eq 0 ]; then
+            green "卸载成功"
+        else
+            red "卸载失败！"
+            yellow "按回车键继续或Ctrl+c退出"
+            read -s
+            return 1
+        fi
     }
     change_qdisc()
     {
