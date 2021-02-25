@@ -1673,7 +1673,7 @@ EOF
 install_update_xray()
 {
     green "正在安装/更新Xray。。。。"
-    if ! bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u root --without-geodata && ! bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u root --without-geodata; then
+    if ! bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u root --without-geodata --without-logfiles && ! bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u root --without-geodata --without-logfiles; then
         red    "安装/更新Xray失败"
         yellow "按回车键继续或者按Ctrl+c终止"
         read -s
@@ -2513,6 +2513,33 @@ full_install_php()
 install_check_update_update_php()
 {
     check_script_update && red "脚本可升级，请先更新脚本" && return 1
+    if ([ $release == "centos" ] && ! version_ge "$systemVersion" "8" ) || ([ $release == "rhel" ] && ! version_ge "$systemVersion" "8") || ([ $release == "fedora" ] && ! version_ge "$systemVersion" "30") || ([ $release == "ubuntu" ] && ! version_ge "$systemVersion" "20.04") || ([ $release == "debian" ] && ! version_ge "$systemVersion" "10") || ([ $release == "deepin" ] && ! version_ge "$systemVersion" "20"); then
+        red "系统版本过低！"
+        tyblue "安装Nextcloud需要安装php"
+        yellow "仅支持在以下版本系统下安装php："
+        yellow " 1. Ubuntu 20.04+"
+        yellow " 2. Debian 10+"
+        yellow " 3. Deepin 20+"
+        yellow " 4. 其他以 Debian 10+ 为基的系统"
+        yellow " 5. Red Hat Enterprise Linux 8+"
+        yellow " 6. CentOS 8+"
+        yellow " 7. Fedora 30+"
+        yellow " 8. 其他以 Red Hat 8+ 为基的系统"
+        return 1
+    elif [ $release == "other-debian" ] || [ $release == "other-redhat" ]; then
+        yellow "未知的系统！"
+        tyblue "安装Nextcloud需要安装php"
+        yellow "仅支持在以下版本系统下安装php："
+        yellow " 1. Ubuntu 20.04+"
+        yellow " 2. Debian 10+"
+        yellow " 3. Deepin 20+"
+        yellow " 4. 其他以 Debian 10+ 为基的系统"
+        yellow " 5. Red Hat Enterprise Linux 8+"
+        yellow " 6. CentOS 8+"
+        yellow " 7. Fedora 30+"
+        yellow " 8. 其他以 Red Hat 8+ 为基的系统"
+        ! ask_if "确定选择吗？(y/n)" && return 0
+    fi
     if [ $php_is_installed -eq 1 ]; then
         if check_php_update; then
             green "php有新版本"
