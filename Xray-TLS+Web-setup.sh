@@ -1996,7 +1996,8 @@ cat >> $xray_config <<EOF
                         {
                             "certificateFile": "${nginx_prefix}/certs/${true_domain_list[$i]}.cer",
                             "keyFile": "${nginx_prefix}/certs/${true_domain_list[$i]}.key",
-                            "ocspStapling": 3600
+                            "ocspStapling": 3600,
+                            "oneTimeLoading": true
 EOF
         ((i==${#true_domain_list[@]}-1)) && echo "                        }" >> $xray_config || echo "                        }," >> $xray_config
     done
