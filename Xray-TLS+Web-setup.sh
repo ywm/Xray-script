@@ -451,16 +451,6 @@ remove_all_domains()
 }
 
 check_base_command
-if [ "$EUID" != "0" ]; then
-    red "请用root用户运行此脚本！！"
-    exit 1
-fi
-if ! check_sudo; then
-    yellow "检测到正在使用sudo！"
-    yellow "acme.sh不支持sudo，请使用root用户运行此脚本"
-    tyblue "详情请见：https://github.com/acmesh-official/acme.sh/wiki/sudo"
-    exit 1
-fi
 if [[ ! -f '/etc/os-release' ]]; then
     red "系统版本太老，Xray官方脚本不支持"
     exit 1
@@ -497,6 +487,16 @@ elif [[ "$(type -P yum)" ]]; then
 else
     red "apt yum dnf命令均不存在"
     red "不支持的系统"
+    exit 1
+fi
+if [ "$EUID" != "0" ]; then
+    red "请用root用户运行此脚本！！"
+    exit 1
+fi
+if ! check_sudo; then
+    yellow "检测到正在使用sudo！"
+    yellow "acme.sh不支持sudo，请使用root用户运行此脚本"
+    tyblue "详情请见：https://github.com/acmesh-official/acme.sh/wiki/sudo"
     exit 1
 fi
 [ -e $nginx_config ] && nginx_is_installed=1 || nginx_is_installed=0
@@ -2899,9 +2899,8 @@ simplify_system()
             $debian_package_manager -y -f install
             for i in ${!temp_remove_list[@]}
             do
-                $debian_package_manager -y --autoremove purge "${temp_remove_list[$i]}"
+                $debian_package_manager -y --autoremove purge "${temp_remove_list[$i]}" || $debian_package_manager -y -f install
             done
-            $debian_package_manager -y -f install
         fi
         [ $release == "ubuntu" ] && version_ge "$systemVersion" "18.04" && check_important_dependence_installed netplan.io
     fi
