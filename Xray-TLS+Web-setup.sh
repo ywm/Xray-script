@@ -129,29 +129,36 @@ version_ge()
 #安装单个重要依赖
 check_important_dependence_installed()
 {
+    local temp_exit_code=1
     if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
         if dpkg -s "$1" > /dev/null 2>&1; then
-            apt-mark manual "$1"
-        elif ! $debian_package_manager -y --no-install-recommends install "$1"; then
+            apt-mark manual "$1" && temp_exit_code=0
+        elif $debian_package_manager -y --no-install-recommends install "$1"; then
+            temp_exit_code=0
+        else
             $debian_package_manager update
-            if ! $debian_package_manager -y --no-install-recommends install "$1"; then
-                red "重要组件\"$1\"安装失败！！"
-                yellow "按回车键继续或者Ctrl+c退出"
-                read -s
-            fi
+            $debian_package_manager -y -f install
+            $debian_package_manager -y --no-install-recommends install "$1" && temp_exit_code=0
         fi
     else
         if rpm -q "$2" > /dev/null 2>&1; then
             if [ "$redhat_package_manager" == "dnf" ]; then
-                dnf mark install "$2"
+                dnf mark install "$2" && temp_exit_code=0
             else
-                yumdb set reason user "$2"
+                yumdb set reason user "$2" && temp_exit_code=0
             fi
-        elif ! $redhat_package_manager -y install "$2"; then
-            red "重要组件\"$2\"安装失败！！"
-            yellow "按回车键继续或者Ctrl+c退出"
-            read -s
+        elif $redhat_package_manager -y install "$2"; then
+            temp_exit_code=0
         fi
+    fi
+    if [ $temp_exit_code -ne 0 ]; then
+        if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
+            red "重要组件\"$1\"安装失败！！"
+        else
+            red "重要组件\"$2\"安装失败！！"
+        fi
+        yellow "按回车键继续或者Ctrl+c退出"
+        read -s
     fi
 }
 #安装依赖
@@ -160,6 +167,7 @@ install_dependence()
     if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
         if ! $debian_package_manager -y --no-install-recommends install "$@"; then
             $debian_package_manager update
+            $debian_package_manager -y -f install
             if ! $debian_package_manager -y --no-install-recommends install "$@"; then
                 yellow "依赖安装失败！！"
                 green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
@@ -2880,13 +2888,13 @@ simplify_system()
         yellow "请先停止Xray-TLS+Web"
         return 1
     fi
-    yellow "警告：如果服务器上有运行别的程序，可能会被误删"
+    yellow "警告：此功能可能导致某些VPS无法开机，请谨慎使用"
     tyblue "建议在纯净系统下使用此功能"
     ! ask_if "是否要继续?(y/n)" && return 0
     if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         $redhat_package_manager -y remove openssl "perl*"
     else
-        local temp_remove_list=('openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' 'libffi-dev' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^libpython' 'dbus' 'cron' 'at' 'open-iscsi' 'rsyslog' 'anacron' 'acpid')
+        local temp_remove_list=('openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' 'libffi-dev' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^python.*:i386' '^libpython' '^libpython.*:i386' 'dbus' 'cron' 'at' 'open-iscsi' 'rsyslog' 'anacron' 'acpid' 'libnetplan0' 'glib-networking-common')
         if ! $debian_package_manager -y --autoremove purge "${temp_remove_list[@]}"; then
             $debian_package_manager -y -f install
             for i in ${!temp_remove_list[@]}
@@ -2895,7 +2903,7 @@ simplify_system()
             done
             $debian_package_manager -y -f install
         fi
-        [ $release == "ubuntu" ] && check_important_dependence_installed netplan.io
+        [ $release == "ubuntu" ] && version_ge "$systemVersion" "18.04" && check_important_dependence_installed netplan.io
     fi
     check_important_dependence_installed openssh-server openssh-server
     [ $nginx_is_installed -eq 1 ] && install_nginx_dependence
