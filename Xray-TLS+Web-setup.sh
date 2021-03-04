@@ -861,7 +861,7 @@ install_bbr()
         do
             your_kernel_version=${your_kernel_version%.*}
         done
-        if ! timeout 60 wget -O "temp_kernel_version" "https://kernel.ubuntu.com/~kernel-ppa/mainline/"; then
+        if ! timeout 60 wget -q -O "temp_kernel_version" "https://kernel.ubuntu.com/~kernel-ppa/mainline/"; then
             latest_kernel_version="error"
             return 1
         fi
