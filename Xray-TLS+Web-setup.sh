@@ -198,9 +198,16 @@ install_dependence()
 #进入工作目录
 enter_temp_dir()
 {
-    rm -rf "$temp_dir"
-    mkdir "$temp_dir"
-    cd "$temp_dir"
+    local temp_exit_code=0
+    cd / || temp_exit_code=1
+    rm -rf "$temp_dir" || temp_exit_code=1
+    mkdir "$temp_dir" || temp_exit_code=1
+    cd "$temp_dir" || temp_exit_code=1
+    if [ $temp_exit_code -eq 1 ]; then
+        yellow "进入临时目录失败"
+        tyblue "可能是之前运行脚本中断导致，建议先重启系统，再运行脚本"
+        exit 1
+    fi
 }
 #检查是否需要php
 check_need_php()
@@ -1069,17 +1076,18 @@ install_bbr()
     do
         echo -e "\\n\\n\\n"
         tyblue "------------------请选择要使用的bbr版本------------------"
-        green  " 1. 升级最新版内核并启用bbr(推荐)"
+        green  " 1. 升级最新稳定版内核并启用bbr(推荐)"
         green  " 2. 安装xanmod内核并启用bbr(推荐)"
+        tyblue " 3. 升级最新测试版内核并启用bbr"
         if version_ge $your_kernel_version 4.9; then
-            tyblue " 3. 启用bbr"
+            tyblue " 4. 启用bbr"
         else
-            tyblue " 3. 升级内核启用bbr"
+            tyblue " 4. 升级内核启用bbr"
         fi
-        tyblue " 4. 安装第三方内核并启用bbr2"
-        tyblue " 5. 安装第三方内核并启用bbrplus/bbr魔改版/暴力bbr魔改版/锐速"
-        tyblue " 6. 卸载多余内核"
-        tyblue " 7. 更换队列算法"
+        tyblue " 5. 安装第三方内核并启用bbr2"
+        tyblue " 6. 安装第三方内核并启用bbrplus/bbr魔改版/暴力bbr魔改版/锐速"
+        tyblue " 7. 卸载多余内核"
+        tyblue " 8. 更换队列算法"
         tyblue " 0. 退出bbr安装"
         tyblue "------------------关于安装bbr加速的说明------------------"
         green  " bbr拥塞算法可以大幅提升网络速度，建议启用"
@@ -1111,11 +1119,11 @@ install_bbr()
         green "       $(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')"
         echo
         local choice=""
-        while [[ ! "$choice" =~ ^(0|[1-9][0-9]*)$ ]] || ((choice>7))
+        while [[ ! "$choice" =~ ^(0|[1-9][0-9]*)$ ]] || ((choice>8))
         do
             read -p "您的选择是：" choice
         done
-        if [ $choice -eq 1 ]; then
+        if (( 1<=choice&&choice<=3 )); then
             if ! ([ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(grep '^[ '$'\t]*net.ipv4.tcp_congestion_control[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]); then
                 sed -i '/^[ \t]*net.core.default_qdisc[ \t]*=/d' /etc/sysctl.conf
                 sed -i '/^[ \t]*net.ipv4.tcp_congestion_control[ \t]*=/d' /etc/sysctl.conf
@@ -1123,13 +1131,21 @@ install_bbr()
                 echo 'net.ipv4.tcp_congestion_control = bbr' >> /etc/sysctl.conf
                 sysctl -p
             fi
-            if ! wget -O update-kernel.sh https://github.com/kirin10000/update-kernel/raw/master/update-kernel.sh; then
-                red    "获取内核升级脚本失败"
+            local temp_kernel_sh_url
+            if [ $choice -eq 1 ]; then
+                temp_kernel_sh_url="https://github.com/kirin10000/update-kernel/raw/master/update-kernel-stable.sh"
+            elif [ $choice -eq 2 ]; then
+                temp_kernel_sh_url="https://github.com/kirin10000/xanmod-install/raw/main/xanmod-install.sh"
+            else
+                temp_kernel_sh_url="https://github.com/kirin10000/update-kernel/raw/master/update-kernel.sh"
+            fi
+            if ! wget -O kernel.sh "$temp_kernel_sh_url"; then
+                red    "获取内核安装脚本失败"
                 yellow "按回车键继续或者按Ctrl+c终止"
                 read -s
             fi
-            chmod +x update-kernel.sh
-            ./update-kernel.sh
+            chmod +x kernel.sh
+            ./kernel.sh
             if [ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]; then
                 green "--------------------bbr已安装--------------------"
             else
@@ -1137,29 +1153,7 @@ install_bbr()
                 red "如果刚安装完内核，请先重启"
                 red "如果重启仍然无效，请尝试选项3"
             fi
-        elif [ $choice -eq 2 ]; then
-            if ! ([ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(grep '^[ '$'\t]*net.ipv4.tcp_congestion_control[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]); then
-                sed -i '/^[ \t]*net.core.default_qdisc[ \t]*=/d' /etc/sysctl.conf
-                sed -i '/^[ \t]*net.ipv4.tcp_congestion_control[ \t]*=/d' /etc/sysctl.conf
-                echo 'net.core.default_qdisc = fq' >> /etc/sysctl.conf
-                echo 'net.ipv4.tcp_congestion_control = bbr' >> /etc/sysctl.conf
-                sysctl -p
-            fi
-            if ! wget -O xanmod-install.sh https://github.com/kirin10000/xanmod-install/raw/main/xanmod-install.sh; then
-                red    "获取xanmod内核安装脚本失败"
-                yellow "按回车键继续或者按Ctrl+c终止"
-                read -s
-            fi
-            chmod +x xanmod-install.sh
-            ./xanmod-install.sh
-            if [ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]; then
-                green "--------------------bbr已安装--------------------"
-            else
-                red "开启bbr失败"
-                red "如果刚安装完内核，请先重启"
-                red "如果重启仍然无效，请尝试选项3"
-            fi
-        elif [ $choice -eq 3 ]; then
+        elif [ $choice -eq 4 ]; then
             if [ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(grep '^[ '$'\t]*net.ipv4.tcp_congestion_control[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]; then
                 green "--------------------bbr已安装--------------------"
             else
@@ -1181,7 +1175,7 @@ install_bbr()
                     ./bbr.sh
                 fi
             fi
-        elif [ $choice -eq 4 ]; then
+        elif [ $choice -eq 5 ]; then
             tyblue "--------------------即将安装bbr2加速，安装完成后服务器将会重启--------------------"
             tyblue " 重启后，请再次选择这个选项完成bbr2剩余部分安装(开启bbr和ECN)"
             yellow " 按回车键以继续。。。。"
@@ -1199,7 +1193,7 @@ install_bbr()
             fi
             chmod +x bbr2.sh
             ./bbr2.sh
-        elif [ $choice -eq 5 ]; then
+        elif [ $choice -eq 6 ]; then
             if ! wget -O tcp.sh "https://raw.githubusercontent.com/chiakge/Linux-NetSpeed/master/tcp.sh"; then
                 red    "获取脚本失败"
                 yellow "按回车键继续或者按Ctrl+c终止"
@@ -1207,11 +1201,11 @@ install_bbr()
             fi
             chmod +x tcp.sh
             ./tcp.sh
-        elif [ $choice -eq 6 ]; then
+        elif [ $choice -eq 7 ]; then
             tyblue " 该操作将会卸载除现在正在使用的内核外的其余内核"
             tyblue "    您正在使用的内核是：$(uname -r)"
             ask_if "是否继续？(y/n)" && remove_other_kernel
-        elif [ $choice -eq 7 ]; then
+        elif [ $choice -eq 8 ]; then
             change_qdisc
         else
             break
@@ -3032,7 +3026,7 @@ start_menu()
         red "请先安装Xray-TLS+Web！！"
         return 1
     fi
-    if (( 16<=choice&&choice<=20 )) && ! (systemctl -q is-active nginx && systemctl -q is-active xray); then
+    if (( 17<=choice&&choice<=20 )) && ! (systemctl -q is-active nginx && systemctl -q is-active xray); then
         red "请先启动Xray-TLS+Web！！"
         return 1
     fi
