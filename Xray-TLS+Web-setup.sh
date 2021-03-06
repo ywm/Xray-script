@@ -1078,7 +1078,7 @@ install_bbr()
         tyblue "------------------请选择要使用的bbr版本------------------"
         green  " 1. 升级最新稳定版内核并启用bbr(推荐)"
         green  " 2. 安装xanmod内核并启用bbr(推荐)"
-        tyblue " 3. 升级最新测试版内核并启用bbr"
+        tyblue " 3. 升级最新版内核并启用bbr"
         if version_ge $your_kernel_version 4.9; then
             tyblue " 4. 启用bbr"
         else
