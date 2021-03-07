@@ -1124,34 +1124,38 @@ install_bbr()
             read -p "您的选择是：" choice
         done
         if (( 1<=choice&&choice<=3 )); then
-            if ! ([ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(grep '^[ '$'\t]*net.ipv4.tcp_congestion_control[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]); then
-                sed -i '/^[ \t]*net.core.default_qdisc[ \t]*=/d' /etc/sysctl.conf
-                sed -i '/^[ \t]*net.ipv4.tcp_congestion_control[ \t]*=/d' /etc/sysctl.conf
-                echo 'net.core.default_qdisc = fq' >> /etc/sysctl.conf
-                echo 'net.ipv4.tcp_congestion_control = bbr' >> /etc/sysctl.conf
-                sysctl -p
-            fi
-            local temp_kernel_sh_url
-            if [ $choice -eq 1 ]; then
-                temp_kernel_sh_url="https://github.com/kirin10000/update-kernel/raw/master/update-kernel-stable.sh"
-            elif [ $choice -eq 2 ]; then
-                temp_kernel_sh_url="https://github.com/kirin10000/xanmod-install/raw/main/xanmod-install.sh"
+            if ([ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]) && [ $choice -eq 2 ]; then
+                red "xanmod内核仅支持Debian系的系统，如Ubuntu、Debian、deepin、UOS"
             else
-                temp_kernel_sh_url="https://github.com/kirin10000/update-kernel/raw/master/update-kernel.sh"
-            fi
-            if ! wget -O kernel.sh "$temp_kernel_sh_url"; then
-                red    "获取内核安装脚本失败"
-                yellow "按回车键继续或者按Ctrl+c终止"
-                read -s
-            fi
-            chmod +x kernel.sh
-            ./kernel.sh
-            if [ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]; then
-                green "--------------------bbr已安装--------------------"
-            else
-                red "开启bbr失败"
-                red "如果刚安装完内核，请先重启"
-                red "如果重启仍然无效，请尝试选项3"
+                if ! ([ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(grep '^[ '$'\t]*net.ipv4.tcp_congestion_control[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]); then
+                    sed -i '/^[ \t]*net.core.default_qdisc[ \t]*=/d' /etc/sysctl.conf
+                    sed -i '/^[ \t]*net.ipv4.tcp_congestion_control[ \t]*=/d' /etc/sysctl.conf
+                    echo 'net.core.default_qdisc = fq' >> /etc/sysctl.conf
+                    echo 'net.ipv4.tcp_congestion_control = bbr' >> /etc/sysctl.conf
+                    sysctl -p
+                fi
+                local temp_kernel_sh_url
+                if [ $choice -eq 1 ]; then
+                    temp_kernel_sh_url="https://github.com/kirin10000/update-kernel/raw/master/update-kernel-stable.sh"
+                elif [ $choice -eq 2 ]; then
+                    temp_kernel_sh_url="https://github.com/kirin10000/xanmod-install/raw/main/xanmod-install.sh"
+                else
+                    temp_kernel_sh_url="https://github.com/kirin10000/update-kernel/raw/master/update-kernel.sh"
+                fi
+                if ! wget -O kernel.sh "$temp_kernel_sh_url"; then
+                    red    "获取内核安装脚本失败"
+                    yellow "按回车键继续或者按Ctrl+c终止"
+                    read -s
+                fi
+                chmod +x kernel.sh
+                ./kernel.sh
+                if [ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]; then
+                    green "--------------------bbr已安装--------------------"
+                else
+                    red "开启bbr失败"
+                    red "如果刚安装完内核，请先重启"
+                    red "如果重启仍然无效，请尝试选项3"
+                fi
             fi
         elif [ $choice -eq 4 ]; then
             if [ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(grep '^[ '$'\t]*net.ipv4.tcp_congestion_control[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]; then
