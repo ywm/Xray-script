@@ -1079,16 +1079,6 @@ install_bbr()
             return 1
         fi
     }
-    if [ $in_install_update_xray_tls_web -eq 1 ]; then
-        echo
-        tyblue "提示：即将开始安装bbr，安装bbr可能需要更换内核"
-        yellow " 更换内核后服务器将重启，重启后，请再次运行脚本完成剩余安装"
-        yellow " 再次运行脚本时，重复之前选过的选项即可"
-        echo
-        sleep 3s
-        yellow "按回车键以继续。。。"
-        read -s
-    fi
     local your_kernel_version
     local latest_kernel_version
     get_kernel_info
@@ -1146,6 +1136,16 @@ install_bbr()
         do
             read -p "您的选择是：" choice
         done
+        if [ $in_install_update_xray_tls_web -eq 1 ] && (( (1<=choice&&choice<=3) || choice==5 || choice==6 )); then
+            echo
+            tyblue "提示："
+            yellow " 更换内核后服务器将重启，重启后，请再次运行脚本完成剩余安装"
+            yellow " 再次运行脚本时，重复之前选过的选项即可"
+            echo
+            sleep 3s
+            yellow "按回车键以继续。。。"
+            read -s
+        fi
         if (( 1<=choice&&choice<=3 )); then
             if ([ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]) && [ $choice -eq 2 ]; then
                 red "xanmod内核仅支持Debian系的系统，如Ubuntu、Debian、deepin、UOS"
@@ -1193,6 +1193,16 @@ install_bbr()
                 if [ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "fq" ]; then
                     green "--------------------bbr已安装--------------------"
                 else
+                    if [ $in_install_update_xray_tls_web -eq 1 ]; then
+                        echo
+                        tyblue "提示：开启bbr需要更换内核"
+                        yellow " 更换内核后服务器将重启，重启后，请再次运行脚本完成剩余安装"
+                        yellow " 再次运行脚本时，重复之前选过的选项即可"
+                        echo
+                        sleep 3s
+                        yellow "按回车键以继续。。。"
+                        read -s
+                    fi
                     if ! wget -O bbr.sh https://github.com/teddysun/across/raw/master/bbr.sh; then
                         red    "获取bbr脚本失败"
                         yellow "按回车键继续或者按Ctrl+c终止"
