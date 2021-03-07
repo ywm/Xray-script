@@ -46,6 +46,7 @@ temp_dir="/temp_install_update_xray_tls_web"
 is_installed=""
 
 update=""
+in_install_update_xray_tls_web=0
 
 #配置信息
 #域名列表 两个列表用来区别 www.主域名
@@ -643,9 +644,13 @@ check_ssh_timeout()
     echo "#This file has been edited by Xray-TLS-Web-setup-script" >> /etc/ssh/sshd_config
     systemctl restart sshd
     green  "----------------------配置完成----------------------"
-    tyblue " 请重新进行ssh连接(即重新登陆服务器)，并再次运行此脚本"
-    yellow " 按回车键退出。。。。"
-    read -s
+    tyblue " 请重新连接服务器以让配置生效"
+    if [ $in_install_update_xray_tls_web -eq 1 ]; then
+        yellow " 重新连接服务器后，请再次运行脚本完成剩余安装"
+        yellow " 再次运行脚本时，重复之前选过的选项即可"
+        yellow " 按回车键退出。。。。"
+        read -s
+    fi
     exit 0
 }
 
@@ -744,6 +749,16 @@ doupdate()
                 fi
             fi
         fi
+        if [ $in_install_update_xray_tls_web -eq 1 ]; then
+            echo
+            tyblue "提示：即将开始升级系统"
+            yellow " 升级完系统后服务器将重启，重启后，请再次运行脚本完成剩余安装"
+            yellow " 再次运行脚本时，重复之前选过的选项即可"
+            echo
+            sleep 3s
+            yellow "按回车键以继续。。。"
+            read -s
+        fi
         echo -e "\\n\\n\\n"
         tyblue "------------------请选择升级系统版本--------------------"
         tyblue " 1.最新beta版(现在是21.04)(2020.11)"
@@ -755,10 +770,9 @@ doupdate()
         tyblue " LTS版：长期支持版本，可以理解为超级稳定版"
         tyblue "-------------------------注意事项-------------------------"
         yellow " 1.升级过程中遇到问话/对话框，如果不明白，选择yes/y/第一个选项"
-        yellow " 2.升级系统完成后将会重启，重启后，请再次运行此脚本完成剩余安装"
-        yellow " 3.升级系统可能需要15分钟或更久"
-        yellow " 4.有的时候不能一次性更新到所选择的版本，可能要更新多次"
-        yellow " 5.升级系统后以下配置可能会恢复系统默认配置："
+        yellow " 2.升级系统可能需要15分钟或更久"
+        yellow " 3.有的时候不能一次性更新到所选择的版本，可能要更新多次"
+        yellow " 4.升级系统后以下配置可能会恢复系统默认配置："
         yellow "     ssh端口   ssh超时时间    bbr加速(恢复到关闭状态)"
         tyblue "----------------------------------------------------------"
         green  " 您现在的系统版本是"$systemVersion""
@@ -1065,6 +1079,16 @@ install_bbr()
             return 1
         fi
     }
+    if [ $in_install_update_xray_tls_web -eq 1 ]; then
+        echo
+        tyblue "提示：即将开始安装bbr，安装bbr可能需要更换内核"
+        yellow " 更换内核后服务器将重启，重启后，请再次运行脚本完成剩余安装"
+        yellow " 再次运行脚本时，重复之前选过的选项即可"
+        echo
+        sleep 3s
+        yellow "按回车键以继续。。。"
+        read -s
+    fi
     local your_kernel_version
     local latest_kernel_version
     get_kernel_info
@@ -1092,7 +1116,6 @@ install_bbr()
         tyblue "------------------关于安装bbr加速的说明------------------"
         green  " bbr拥塞算法可以大幅提升网络速度，建议启用"
         yellow " 更换第三方内核可能造成系统不稳定，甚至无法开机"
-        yellow " 更换/升级内核需重启，重启后，请再次运行此脚本完成剩余安装"
         tyblue "---------------------------------------------------------"
         tyblue " 当前内核版本：${your_kernel_version}"
         tyblue " 最新内核版本：${latest_kernel_version}"
@@ -2307,6 +2330,7 @@ print_config_info()
 
 install_update_xray_tls_web()
 {
+    in_install_update_xray_tls_web=1
     check_nginx_installed_system
     [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
     check_SELinux
@@ -2480,6 +2504,7 @@ install_update_xray_tls_web()
     fi
     cd /
     rm -rf "$temp_dir"
+    in_install_update_xray_tls_web=0
 }
 
 #功能型函数
