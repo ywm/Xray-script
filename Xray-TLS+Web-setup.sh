@@ -749,16 +749,6 @@ doupdate()
                 fi
             fi
         fi
-        if [ $in_install_update_xray_tls_web -eq 1 ]; then
-            echo
-            tyblue "提示：即将开始升级系统"
-            yellow " 升级完系统后服务器将重启，重启后，请再次运行脚本完成剩余安装"
-            yellow " 再次运行脚本时，重复之前选过的选项即可"
-            echo
-            sleep 3s
-            yellow "按回车键以继续。。。"
-            read -s
-        fi
         echo -e "\\n\\n\\n"
         tyblue "------------------请选择升级系统版本--------------------"
         tyblue " 1.最新beta版(现在是21.04)(2020.11)"
@@ -783,10 +773,20 @@ doupdate()
         do
             read -p "您的选择是：" choice
         done
-        if ! [[ "$(grep -i '^[ '$'\t]*port ' /etc/ssh/sshd_config | awk '{print $2}')" =~ ^("22"|)$ ]]; then
+        if ! [[ "$(grep -i '^[ '$'\t]*port[ '$'\t]' /etc/ssh/sshd_config | awk '{print $2}')" =~ ^("22"|)$ ]]; then
             red "检测到ssh端口号被修改"
             red "升级系统后ssh端口号可能恢复默认值(22)"
             yellow "按回车键继续。。。"
+            read -s
+        fi
+        if [ $in_install_update_xray_tls_web -eq 1 ]; then
+            echo
+            tyblue "提示：即将开始升级系统"
+            yellow " 升级完系统后服务器将重启，重启后，请再次运行脚本完成剩余安装"
+            yellow " 再次运行脚本时，重复之前选过的选项即可"
+            echo
+            sleep 3s
+            yellow "按回车键以继续。。。"
             read -s
         fi
         local i
