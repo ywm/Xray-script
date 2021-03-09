@@ -646,7 +646,7 @@ check_ssh_timeout()
     green  "----------------------配置完成----------------------"
     tyblue " 请重新连接服务器以让配置生效"
     if [ $in_install_update_xray_tls_web -eq 1 ]; then
-        yellow " 重新连接服务器后，请再次运行脚本完成剩余安装"
+        yellow " 重新连接服务器后，请再次运行脚本完成 Xray-TLS+Web 剩余部分的安装/升级"
         yellow " 再次运行脚本时，重复之前选过的选项即可"
         yellow " 按回车键退出。。。。"
         read -s
@@ -782,7 +782,7 @@ doupdate()
         if [ $in_install_update_xray_tls_web -eq 1 ]; then
             echo
             tyblue "提示：即将开始升级系统"
-            yellow " 升级完系统后服务器将重启，重启后，请再次运行脚本完成剩余安装"
+            yellow " 升级完系统后服务器将重启，重启后，请再次运行脚本完成 Xray-TLS+Web 剩余部分的安装/升级"
             yellow " 再次运行脚本时，重复之前选过的选项即可"
             echo
             sleep 3s
@@ -1136,16 +1136,6 @@ install_bbr()
         do
             read -p "您的选择是：" choice
         done
-        if [ $in_install_update_xray_tls_web -eq 1 ] && (( (1<=choice&&choice<=3) || choice==5 || choice==6 )); then
-            echo
-            tyblue "提示："
-            yellow " 更换内核后服务器将重启，重启后，请再次运行脚本完成剩余安装"
-            yellow " 再次运行脚本时，重复之前选过的选项即可"
-            echo
-            sleep 3s
-            yellow "按回车键以继续。。。"
-            read -s
-        fi
         if (( 1<=choice&&choice<=3 )); then
             if ([ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]) && [ $choice -eq 2 ]; then
                 red "xanmod内核仅支持Debian系的系统，如Ubuntu、Debian、deepin、UOS"
@@ -1156,6 +1146,16 @@ install_bbr()
                     echo 'net.core.default_qdisc = fq' >> /etc/sysctl.conf
                     echo 'net.ipv4.tcp_congestion_control = bbr' >> /etc/sysctl.conf
                     sysctl -p
+                fi
+                if [ $in_install_update_xray_tls_web -eq 1 ]; then
+                    echo
+                    tyblue "提示："
+                    yellow " 更换内核后服务器将重启，重启后，请再次运行脚本完成 Xray-TLS+Web 剩余部分的安装/升级"
+                    yellow " 再次运行脚本时，重复之前选过的选项即可"
+                    echo
+                    sleep 3s
+                    yellow "按回车键以继续。。。"
+                    read -s
                 fi
                 local temp_kernel_sh_url
                 if [ $choice -eq 1 ]; then
@@ -1196,7 +1196,7 @@ install_bbr()
                     if [ $in_install_update_xray_tls_web -eq 1 ]; then
                         echo
                         tyblue "提示：开启bbr需要更换内核"
-                        yellow " 更换内核后服务器将重启，重启后，请再次运行脚本完成剩余安装"
+                        yellow " 更换内核后服务器将重启，重启后，请再次运行脚本完成 Xray-TLS+Web 剩余部分的安装/升级"
                         yellow " 再次运行脚本时，重复之前选过的选项即可"
                         echo
                         sleep 3s
@@ -1213,8 +1213,16 @@ install_bbr()
                 fi
             fi
         elif [ $choice -eq 5 ]; then
-            tyblue "--------------------即将安装bbr2加速，安装完成后服务器将会重启--------------------"
-            tyblue " 重启后，请再次选择这个选项完成bbr2剩余部分安装(开启bbr和ECN)"
+            tyblue "提示：安装bbr2内核需要重启"
+            if [ $in_install_update_xray_tls_web -eq 1 ]; then
+                yellow " 重启后，请："
+                yellow "    1. 再次运行脚本，重复之前选过的选项"
+                yellow "    2. 到这一步时，再次选择这个选项完成bbr2剩余部分的安装(开启bbr2和ECN)"
+                yellow "    3. 选择 \"退出bbr安装\" 选项完成 Xray-TLS+Web 剩余部分的安装/升级"
+            else
+                yellow " 重启后，请再次运行脚本并选择这个选项完成bbr2剩余部分安装(开启bbr2和ECN)"
+            fi
+            sleep 3s
             yellow " 按回车键以继续。。。。"
             read -s
             local temp_bbr2
@@ -1231,6 +1239,18 @@ install_bbr()
             chmod +x bbr2.sh
             ./bbr2.sh
         elif [ $choice -eq 6 ]; then
+            tyblue "提示：安装bbrplus/bbr魔改版/暴力bbr魔改版/锐速内核需要重启"
+            if [ $in_install_update_xray_tls_web -eq 1 ]; then
+                yellow " 重启后，请："
+                yellow "    1. 再次运行脚本，重复之前选过的选项"
+                yellow "    2. 到这一步时，再次选择这个选项完成 bbrplus/bbr魔改版/暴力bbr魔改版/锐速 剩余部分的安装"
+                yellow "    3. 选择 \"退出bbr安装\" 选项完成 Xray-TLS+Web 剩余部分的安装/升级"
+            else
+                yellow " 重启后，请再次运行脚本并选择这个选项完成 bbrplus/bbr魔改版/暴力bbr魔改版/锐速 剩余部分的安装"
+            fi
+            sleep 3s
+            yellow " 按回车键以继续。。。。"
+            read -s
             if ! wget -O tcp.sh "https://raw.githubusercontent.com/chiakge/Linux-NetSpeed/master/tcp.sh"; then
                 red    "获取脚本失败"
                 yellow "按回车键继续或者按Ctrl+c终止"
