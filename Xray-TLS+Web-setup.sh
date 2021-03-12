@@ -19,8 +19,8 @@ using_swap=""
 using_swap_now=0
 
 #安装信息
-nginx_version="nginx-1.19.7"
-openssl_version="openssl-openssl-3.0.0-alpha12"
+nginx_version="nginx-1.19.8"
+openssl_version="openssl-openssl-3.0.0-alpha13"
 nginx_prefix="/usr/local/nginx"
 nginx_config="${nginx_prefix}/conf.d/xray.conf"
 nginx_service="/etc/systemd/system/nginx.service"
