@@ -555,7 +555,7 @@ if [ $is_installed -eq 1 ] && ! grep -q "domain_list=" $nginx_config; then
     yellow "请选择 \"重新安装\"选项 来升级"
     sleep 3s
 fi
-if [ $is_installed -eq 1 ] && ! grep -q "# This file has been edited by Xray-TLS-Web setup script" /etc/systemd/system/xray.service; then
+if [ $is_installed -eq 1 ] && ! grep -q "# This file has been edited by Xray-TLS-Web setup script" /etc/systemd/system/xray.service && ! [ "$1" == "--update" ]; then
     red "脚本进行了一次不向下兼容的更新"
     yellow "请选择 \"更新Xray\"选项 来升级"
     sleep 3s
@@ -3290,8 +3290,8 @@ start_menu()
             check_important_dependence_installed wget wget
         fi
     fi
-    (( (4<=choice&&choice<=7) || choice==16 || choice==17 || choice==19 || choice==24 )) && get_system_info
-    (( choice==6 || choice==7 || (11<=choice&&choice<=13) || (15<=choice&&choice<=23) )) && get_config_info
+    (( (4<=choice&&choice<=7) || choice==16 || choice==17 || choice==19 || choice==25 )) && get_system_info
+    (( choice==6 || choice==7 || (11<=choice&&choice<=13) || (15<=choice&&choice<=24) )) && get_config_info
     if [ $choice -eq 1 ]; then
         install_update_xray_tls_web
     elif [ $choice -eq 2 ]; then
