@@ -366,6 +366,7 @@ remove_xray()
         systemctl daemon-reload
     fi
     xray_is_installed=0
+    is_installed=0
 }
 remove_nginx()
 {
@@ -374,6 +375,7 @@ remove_nginx()
     systemctl daemon-reload
     rm -rf ${nginx_prefix}
     nginx_is_installed=0
+    is_installed=0
 }
 remove_php()
 {
@@ -1774,6 +1776,7 @@ EOF
     config_service_nginx
     systemctl enable nginx
     nginx_is_installed=1
+    ([ $xray_is_installed -eq 1 ] && [ $nginx_is_installed -eq 1 ]) && is_installed=1 || is_installed=0
 }
 
 #安装/更新Xray
@@ -1800,6 +1803,7 @@ EOF
         systemctl -q is-active xray && systemctl restart xray
     fi
     xray_is_installed=1
+    ([ $xray_is_installed -eq 1 ] && [ $nginx_is_installed -eq 1 ]) && is_installed=1 || is_installed=0
 }
 
 #获取证书 参数: 域名位置
@@ -2640,8 +2644,6 @@ install_update_xray_tls_web()
     #安装Xray
     remove_xray
     install_update_xray
-
-    is_installed=1
 
     green "正在获取证书。。。。"
     if [ $update -eq 0 ]; then
