@@ -793,7 +793,7 @@ doupdate()
         yellow " 4.升级系统后以下配置可能会恢复系统默认配置："
         yellow "     ssh端口   ssh超时时间    bbr加速(恢复到关闭状态)"
         tyblue "----------------------------------------------------------"
-        green  " 您现在的系统版本是"$systemVersion""
+        green  " 您现在的系统版本是：$systemVersion"
         tyblue "----------------------------------------------------------"
         echo
         choice=""
@@ -1383,7 +1383,7 @@ readPretend()
         purple "     模拟网站后台"
         tyblue " 4. 自定义静态网站"
         purple "     不建议小白选择，默认为Nextcloud登陆界面，强烈建议自行更换"
-        tyblue " 5. 自定义反向代理网页 \033[31m(不推荐)"
+        tyblue " 5. 自定义反向代理网页 \\033[31m(不推荐)"
         echo
         green  " 内存<128MB 建议选择 403页面"
         green  " 128MB<=内存<1G 建议选择 Cloudreve"
@@ -1776,7 +1776,7 @@ EOF
     config_service_nginx
     systemctl enable nginx
     nginx_is_installed=1
-    ([ $xray_is_installed -eq 1 ] && [ $nginx_is_installed -eq 1 ]) && is_installed=1 || is_installed=0
+    [ $xray_is_installed -eq 1 ] && is_installed=1 || is_installed=0
 }
 
 #安装/更新Xray
@@ -1803,7 +1803,7 @@ EOF
         systemctl -q is-active xray && systemctl restart xray
     fi
     xray_is_installed=1
-    ([ $xray_is_installed -eq 1 ] && [ $nginx_is_installed -eq 1 ]) && is_installed=1 || is_installed=0
+    [ $nginx_is_installed -eq 1 ] && is_installed=1 || is_installed=0
 }
 
 #获取证书 参数: 域名位置
