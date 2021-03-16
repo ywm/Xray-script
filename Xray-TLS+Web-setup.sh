@@ -56,14 +56,19 @@ unset domain_config_list
 #域名伪装列表，对应域名列表
 unset pretend_list
 
-#Xray-TCP-TLS使用的协议，0代表禁用，1代表VLESS
+# TCP使用的会话层协议，0代表禁用，1代表VLESS
 protocol_1=""
-#Xray-WS-TLS使用的协议，0代表禁用，1代表VLESS，2代表VMess
+# grpc使用的会话层协议，0代表禁用，1代表VLESS，2代表VMess
 protocol_2=""
+# WebSocket使用的会话层协议，0代表禁用，1代表VLESS，2代表VMess
+protocol_3=""
+
+serviceName=""
 path=""
+
 xid_1=""
 xid_2=""
-
+xid_3=""
 
 #功能性函数：
 #定义几个颜色
@@ -403,27 +408,42 @@ backup_domains_web()
 get_config_info()
 {
     [ $is_installed -eq 0 ] && return
-    if [ $(grep -c '"clients"' $xray_config) -eq 2 ] || [ $(grep -Ec '"(vmess|vless)"' $xray_config) -eq 1 ]; then
-        protocol_1=1
-        xid_1=$(grep '"id"' $xray_config | head -n 1 | cut -d : -f 2)
-        xid_1=${xid_1#*'"'}
-        xid_1=${xid_1%'"'*}
+    local temp
+    if grep -q '"network"[ '$'\t]*:[ '$'\t]*"ws"' $xray_config; then
+        if [[ "$(grep -E '"protocol"[ '$'\t]*:[ '$'\t]*"(vmess|vless)"' $xray_config | tail -n 1)" =~ \"vmess\" ]]; then
+            protocol_3=2
+        else
+            protocol_3=1
+        fi
+        path="$(grep '"path"' $xray_config | tail -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
+        xid_3="$(grep '"id"' $xray_config | tail -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
     else
-        protocol_1=0
-        xid_1=""
+        protocol_3=0
     fi
-    if [ $(grep -Ec '"(vmess|vless)"' $xray_config) -eq 2 ]; then
-        grep -q '"vmess"' $xray_config && protocol_2=2 || protocol_2=1
-        path=$(grep '"path"' $xray_config | head -n 1 | cut -d : -f 2)
-        path=${path#*'"'}
-        path=${path%'"'*}
-        xid_2=$(grep '"id"' $xray_config | tail -n 1 | cut -d : -f 2)
-        xid_2=${xid_2#*'"'}
-        xid_2=${xid_2%'"'*}
+    if grep -q '"network"[ '$'\t]*:[ '$'\t]*"grpc"' $xray_config; then
+        if [ $protocol_3 -ne 0 ]; then
+            temp=2
+        else
+            temp=1
+        fi
+        if [[ "$(grep -E '"protocol"[ '$'\t]*:[ '$'\t]*"(vmess|vless)"' $xray_config | tail -n $temp | head -n 1)" =~ \"vmess\" ]]; then
+            protocol_2=2
+        else
+            protocol_2=1
+        fi
+        serviceName="$(grep '"serviceName"' $xray_config | cut -d : -f 2 | cut -d \" -f 2)"
+        xid_2="$(grep '"id"' $xray_config | tail -n $temp | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
     else
         protocol_2=0
-        path=""
-        xid_2=""
+    fi
+    temp=1
+    [ $protocol_2 -ne 0 ] && ((temp++))
+    [ $protocol_3 -ne 0 ] && ((temp++))
+    if [ $(grep -c '"clients"' $xray_config) -eq $temp ]; then
+        protocol_1=1
+        xid_1="$(grep '"id"' $xray_config | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
+    else
+        protocol_1=0
     fi
     unset domain_list
     unset true_domain_list
@@ -532,7 +552,12 @@ mem_total="$(($(free -m | sed -n 2p | awk '{print $2}')+$(free -m | tail -n 1 | 
 [[ "$(free -b | tail -n 1 | awk '{print $2}')" -ne "0" ]] && using_swap=1 || using_swap=0
 if [ $is_installed -eq 1 ] && ! grep -q "domain_list=" $nginx_config; then
     red "脚本进行了一次不向下兼容的更新"
-    yellow "请选择 \"重新安装\" 来升级"
+    yellow "请选择 \"重新安装\"选项 来升级"
+    sleep 3s
+fi
+if [ $is_installed -eq 1 ] && ! grep -q "# This file has been edited by Xray-TLS-Web setup script" /etc/systemd/system/xray.service; then
+    red "脚本进行了一次不向下兼容的更新"
+    yellow "请选择 \"更新Xray\"选项 来升级"
     sleep 3s
 fi
 
@@ -1275,45 +1300,67 @@ install_bbr()
 readProtocolConfig()
 {
     echo -e "\\n\\n\\n"
-    tyblue "---------------------请选择Xray要使用协议---------------------"
-    tyblue " 1. (VLESS-TCP+XTLS) + (VMess-WebSocket+TLS) + Web"
-    green  "    适合有时使用CDN，且CDN不可信任(如国内CDN)"
-    tyblue " 2. (VLESS-TCP+XTLS) + (VLESS-WebSocket+TLS) + Web"
-    green  "    适合有时使用CDN，且CDN可信任"
-    tyblue " 3. VLESS-TCP+XTLS+Web"
-    green  "    适合完全不用CDN"
-    tyblue " 4. VMess-WebSocket+TLS+Web"
-    green  "    适合一直使用CDN，且CDN不可信任(如国内CDN)"
-    tyblue " 5. VLESS-WebSocket+TLS+Web"
-    green  "    适合一直使用CDN，且CDN可信任"
+    tyblue "---------------------请选择传输层协议---------------------"
+    tyblue " 1. TCP"
+    tyblue " 2. gRPC"
+    tyblue " 3. WebSocket"
+    tyblue " 4. TCP + gRPC"
+    tyblue " 5. TCP + WebSocket"
+    tyblue " 6. gRPC + WebSocket"
+    tyblue " 7. TCP + gRPC + WebSocket"
+    yellow " 0. 无 (仅提供Web服务)"
     echo
-    yellow " 注："
-    yellow "   1.各协议理论速度对比：github.com/badO1a5A90/v2ray-doc/blob/main/Xray_test_v1.1.1.md"
-    yellow "   2.XTLS完全兼容TLS"
-    yellow "   3.WebSocket协议支持CDN，TCP不支持"
-    yellow "   4.VLESS协议用于CDN，CDN可以看见传输的明文"
-    yellow "   5.若不知CDN为何物，请选3"
+    blue   " 注："
+    blue   "   1. 不知道什么是CDN或不使用CDN，请选择1"
+    blue   "   2. gRPC和WebSocket支持通过CDN，关于两者的区别，详见：施工中。。。"
     echo
-    local mode=""
-    while [[ "$mode" != "1" && "$mode" != "2" && "$mode" != "3" && "$mode" != "4" && "$mode" != "5" ]]
+    local choice=""
+    while [[ ! "$choice" =~ ^(0|[1-9][0-9]*)$ ]] || ((choice>7))
     do
-        read -p "您的选择是：" mode
+        read -p "您的选择是：" choice
     done
-    if [ $mode -eq 1 ]; then
+    if [ $choice -eq 1 ] || [ $choice -eq 4 ] || [ $choice -eq 5 ] || [ $choice -eq 7 ]; then
         protocol_1=1
-        protocol_2=2
-    elif [ $mode -eq 2 ]; then
-        protocol_1=1
+    else
+        protocol_1=0
+    fi
+    if [ $choice -eq 2 ] || [ $choice -eq 4 ] || [ $choice -eq 6 ] || [ $choice -eq 7 ]; then
         protocol_2=1
-    elif [ $mode -eq 3 ]; then
-        protocol_1=1
+    else
         protocol_2=0
-    elif [ $mode -eq 4 ]; then
-        protocol_1=0
-        protocol_2=2
-    elif [ $mode -eq 5 ]; then
-        protocol_1=0
-        protocol_2=1
+    fi
+    if [ $choice -eq 3 ] || [ $choice -eq 5 ] || [ $choice -eq 6 ] || [ $choice -eq 7 ]; then
+        protocol_3=1
+    else
+        protocol_3=0
+    fi
+    if [ $protocol_2 -eq 1 ]; then
+        tyblue "-------------- 请选择gRPC使用的会话层协议 --------------"
+        tyblue " 1. VMess"
+        tyblue " 2. VLESS"
+        echo
+        yellow " 注：使用VMess的好处是可以对CDN加密，若使用VLESS，CDN提供商可获取传输明文"
+        echo
+        choice=""
+        while [[ ! "$choice" =~ ^([1-9][0-9]*)$ ]] || ((choice>2))
+        do
+            read -p "您的选择是：" choice
+        done
+        [ $choice -eq 1 ] && protocol_2=2
+    fi
+    if [ $protocol_3 -eq 1 ]; then
+        tyblue "-------------- 请选择WebSocket使用的会话层协议 --------------"
+        tyblue " 1. VMess"
+        tyblue " 2. VLESS"
+        echo
+        yellow " 注：使用VMess的好处是可以对CDN加密，若使用VLESS，CDN提供商可获取传输明文"
+        echo
+        choice=""
+        while [[ ! "$choice" =~ ^([1-9][0-9]*)$ ]] || ((choice>2))
+        do
+            read -p "您的选择是：" choice
+        done
+        [ $choice -eq 1 ] && protocol_3=2
     fi
 }
 
@@ -1738,6 +1785,19 @@ install_update_xray()
         read -s
         return 1
     fi
+    if ! grep -q "# This file has been edited by Xray-TLS-Web setup script" /etc/systemd/system/xray.service; then
+cat >> /etc/systemd/system/xray.service <<EOF
+
+# This file has been edited by Xray-TLS-Web setup script
+[Service]
+ExecStartPre=/bin/rm -rf /dev/shm/xray_unixsocket
+ExecStartPre=/bin/mkdir /dev/shm/xray_unixsocket
+ExecStartPre=/bin/chmod 711 /dev/shm/xray_unixsocket
+ExecStopPost=/bin/rm -rf /dev/shm/xray_unixsocket
+EOF
+        systemctl daemon-reload
+        systemctl -q is-active xray && systemctl restart xray
+    fi
 }
 
 #获取证书 参数: 域名位置
@@ -1955,6 +2015,13 @@ server {
     server_name ${domain_list[$i]};
     add_header Strict-Transport-Security "max-age=63072000; includeSubdomains; preload" always;
 EOF
+        if [ $protocol_2 -ne 0 ]; then
+cat >> $nginx_config<<EOF
+    location = /$serviceName/TunMulti {
+        grpc_pass grpc://unix:/dev/shm/xray_unixsocket/grpc.sock;
+    }
+EOF
+        fi
         if [ "${pretend_list[$i]}" == "1" ]; then
 cat >> $nginx_config<<EOF
     location / {
@@ -1969,7 +2036,13 @@ EOF
             echo "    root ${nginx_prefix}/html/${true_domain_list[$i]};" >> $nginx_config
             echo "    include ${nginx_prefix}/conf.d/nextcloud.conf;" >> $nginx_config
         elif [ "${pretend_list[$i]}" == "3" ]; then
-            echo "    return 403;" >> $nginx_config
+            if [ $protocol_2 -ne 0 ]; then
+                echo "    location / {" >> $nginx_config
+                echo "        return 403;" >> $nginx_config
+                echo "    }" >> $nginx_config
+            else
+                echo "    return 403;" >> $nginx_config
+            fi
         elif [ "${pretend_list[$i]}" == "4" ]; then
             echo "    root ${nginx_prefix}/html/${true_domain_list[$i]};" >> $nginx_config
         else
@@ -2019,7 +2092,7 @@ EOF
     fi
     echo '                "decryption": "none",' >> $xray_config
     echo '                "fallbacks": [' >> $xray_config
-    if [ $protocol_2 -ne 0 ]; then
+    if [ $protocol_3 -ne 0 ]; then
 cat >> $xray_config <<EOF
                     {
                         "path": "$path",
@@ -2068,7 +2141,7 @@ EOF
     if [ $protocol_2 -ne 0 ]; then
         echo '        },' >> $xray_config
         echo '        {' >> $xray_config
-        echo '            "listen": "@/dev/shm/xray/ws.sock",' >> $xray_config
+        echo '            "listen": "/dev/shm/xray_unixsocket/grpc.sock",' >> $xray_config
         if [ $protocol_2 -eq 2 ]; then
             echo '            "protocol": "vmess",' >> $xray_config
         else
@@ -2080,6 +2153,37 @@ EOF
         echo "                        \"id\": \"$xid_2\"" >> $xray_config
         echo '                    }' >> $xray_config
         if [ $protocol_2 -eq 2 ]; then
+            echo '                ]' >> $xray_config
+        else
+            echo '                ],' >> $xray_config
+            echo '                "decryption": "none"' >> $xray_config
+        fi
+cat >> $xray_config <<EOF
+            },
+            "streamSettings": {
+                "network": "grpc",
+                "grpcSettings": {
+                    "serviceName": "$serviceName",
+                    "multiMode": true
+                }
+            }
+EOF
+    fi
+    if [ $protocol_3 -ne 0 ]; then
+        echo '        },' >> $xray_config
+        echo '        {' >> $xray_config
+        echo '            "listen": "@/dev/shm/xray/ws.sock",' >> $xray_config
+        if [ $protocol_3 -eq 2 ]; then
+            echo '            "protocol": "vmess",' >> $xray_config
+        else
+            echo '            "protocol": "vless",' >> $xray_config
+        fi
+        echo '            "settings": {' >> $xray_config
+        echo '                "clients": [' >> $xray_config
+        echo '                    {' >> $xray_config
+        echo "                        \"id\": \"$xid_3\"" >> $xray_config
+        echo '                    }' >> $xray_config
+        if [ $protocol_3 -eq 2 ]; then
             echo '                ]' >> $xray_config
         else
             echo '                ],' >> $xray_config
@@ -2240,17 +2344,17 @@ print_share_link()
             tyblue " vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&flow=xtls-rprx-direct"
         done
     fi
-    if [ $protocol_2 -eq 1 ]; then
+    if [ $protocol_3 -eq 1 ]; then
         green  "VLESS-WebSocket+TLS\\033[35m(有CDN则走CDN，否则直连)\\033[32m："
         for i in ${!domain_list[@]}
         do
-            tyblue "vless://${xid_2}@${domain_list[$i]}:443?type=ws&security=tls&path=%2F${path#/}%3Fed=2048"
+            tyblue "vless://${xid_3}@${domain_list[$i]}:443?type=ws&security=tls&path=%2F${path#/}%3Fed=2048"
         done
-    elif [ $protocol_2 -eq 2 ]; then
+    elif [ $protocol_3 -eq 2 ]; then
         green  "VMess-WebSocket+TLS\\033[35m(有CDN则走CDN，否则直连)\\033[32m："
         for i in ${!domain_list[@]}
         do
-            tyblue "vmess://${xid_2}@${domain_list[$i]}:443?type=ws&security=tls&path=%2F${path#/}%3Fed=2048"
+            tyblue "vmess://${xid_3}@${domain_list[$i]}:443?type=ws&security=tls&path=%2F${path#/}%3Fed=2048"
         done
     fi
 }
@@ -2292,7 +2396,7 @@ print_config_info()
     fi
     if [ $protocol_2 -ne 0 ]; then
         echo
-        tyblue "------------ Xray-WebSocket+TLS+Web (有CDN则走CDN，否则直连) -----------"
+        tyblue "------------ Xray-gRPC+TLS+Web (有CDN则走CDN，否则直连) -----------"
         if [ $protocol_2 -eq 1 ]; then
             tyblue " 服务器类型            ：VLESS"
         else
@@ -2307,6 +2411,47 @@ print_config_info()
         tyblue " port(端口)            ：443"
         tyblue " id(用户ID/UUID)       ：${xid_2}"
         if [ $protocol_2 -eq 1 ]; then
+            tyblue " flow(流控)            ：空"
+            tyblue " encryption(加密)      ：none"
+        else
+            tyblue " alterId(额外ID)       ：0"
+            tyblue " security(加密方式)    ：使用CDN，推荐auto;不使用CDN，推荐none"
+            purple "  (Qv2ray:安全选项;Shadowrocket:算法)"
+        fi
+        tyblue " ---Transport/StreamSettings(底层传输方式/流设置)---"
+        tyblue "  network(传输协议)             ：grpc"
+        tyblue "  serviceName                   ：${serviceName}"
+        tyblue "  multiMode                     ：true"
+        tyblue "  security(传输层加密)          ：tls"
+        purple "   (V2RayN(G):底层传输安全;Qv2ray:TLS设置-安全类型)"
+        tyblue "  serverName                    ：空"
+        purple "   (V2RayN(G):SNI和伪装域名;Qv2ray:TLS设置-服务器地址;Shadowrocket:Peer 名称)"
+        tyblue "  allowInsecure                 ：false"
+        purple "   (Qv2ray:允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
+        tyblue " ------------------------其他-----------------------"
+        tyblue "  Mux(多路复用)                 ：强烈建议关闭"
+        purple "   (V2RayN:设置页面-开启Mux多路复用)"
+        tyblue "  socks入站的Sniffing(流量探测) ：建议开启"
+        purple "   (V2rayN(G):设置页面-开启流量探测;Qv2ray:首选项-入站设置-SOCKS设置-嗅探)"
+        tyblue "------------------------------------------------------------------------"
+    fi
+    if [ $protocol_3 -ne 0 ]; then
+        echo
+        tyblue "------------ Xray-WebSocket+TLS+Web (有CDN则走CDN，否则直连) -----------"
+        if [ $protocol_3 -eq 1 ]; then
+            tyblue " 服务器类型            ：VLESS"
+        else
+            tyblue " 服务器类型            ：VMess"
+        fi
+        if [ ${#domain_list[@]} -eq 1 ]; then
+            tyblue " address(地址)         ：${domain_list[*]}"
+        else
+            tyblue " address(地址)         ：${domain_list[*]} \\033[35m(任选其一)"
+        fi
+        purple "  (Qv2ray:主机)"
+        tyblue " port(端口)            ：443"
+        tyblue " id(用户ID/UUID)       ：${xid_3}"
+        if [ $protocol_3 -eq 1 ]; then
             tyblue " flow(流控)            ：空"
             tyblue " encryption(加密)      ：none"
         else
@@ -2379,8 +2524,10 @@ install_update_xray_tls_web()
         readProtocolConfig
         readDomain
         path="/$(head -c 8 /dev/urandom | md5sum | head -c 7)"
+        serviceName="$(head -c 8 /dev/urandom | md5sum | head -c 7)"
         xid_1="$(cat /proc/sys/kernel/random/uuid)"
         xid_2="$(cat /proc/sys/kernel/random/uuid)"
+        xid_3="$(cat /proc/sys/kernel/random/uuid)"
     else
         get_config_info
     fi
@@ -2862,33 +3009,94 @@ change_pretend()
     fi
     green "修改完成！"
 }
+change_xray_protocol()
+{
+    local protocol_1_old=$protocol_1
+    local protocol_2_old=$protocol_2
+    local protocol_3_old=$protocol_3
+    readProtocolConfig
+    if [ $protocol_1_old -eq $protocol_1 ] && [ $protocol_2_old -eq $protocol_2 ] && [ $protocol_3_old -eq $protocol_3 ]; then
+        red "传输协议未更换"
+        return 1
+    fi
+    [ $protocol_1_old -eq 0 ] && [ $protocol_1 -ne 0 ] && xid_1=$(cat /proc/sys/kernel/random/uuid)
+    if [ $protocol_2_old -eq 0 ] && [ $protocol_2 -ne 0 ]; then
+        serviceName="$(head -c 8 /dev/urandom | md5sum | head -c 7)"
+        xid_2=$(cat /proc/sys/kernel/random/uuid)
+    fi
+    if [ $protocol_3_old -eq 0 ] && [ $protocol_3 -ne 0 ]; then
+        path="/$(head -c 8 /dev/urandom | md5sum | head -c 7)"
+        xid_3=$(cat /proc/sys/kernel/random/uuid)
+    fi
+    config_xray
+    config_nginx
+    systemctl -q is-active xray && systemctl restart xray
+    systemctl -q is-active nginx && systemctl restart nginx
+    green "更换成功！！"
+    print_config_info
+}
 change_xray_id()
 {
     local flag=""
-    if [ $protocol_1 -ne 0 ] && [ $protocol_2 -ne 0 ]; then
-        tyblue "-------------请输入你要修改的id-------------"
-        tyblue " 1. Xray-TCP+XTLS 的id"
-        tyblue " 2. Xray-WebSocket+TLS 的id"
-        echo
-        while [ "$flag" != "1" ] && [ "$flag" != "2" ]
-        do
-            read -p "您的选择是：" flag
-        done
-    elif [ $protocol_1 -ne 0 ]; then
-        flag=1
-    else
-        flag=2
+    tyblue "-------------请输入你要修改的id-------------"
+    tyblue " 1. TCP的id"
+    tyblue " 2. gRPC的id"
+    tyblue " 3. WebSocket的id"
+    echo
+    while [ "$flag" != "1" ] && [ "$flag" != "2" ]
+    do
+        read -p "您的选择是：" flag
+    done
+    local temp_protocol="protocol_$flag"
+    if [ ${!temp_protocol} -eq 0 ]; then
+        red "没有使用该协议！"
+        return 1
     fi
     local xid="xid_$flag"
     tyblue "您现在的id是：${!xid}"
     ! ask_if "是否要继续?(y/n)" && return 0
-    xid=""
-    while [ -z "$xid" ]
+    while true
     do
-        tyblue "-------------请输入新的id-------------"
-        read xid
+        xid=""
+        while [ -z "$xid" ]
+        do
+            tyblue "-------------请输入新的id-------------"
+            read xid
+        done
+        tyblue "您输入的id是：$xid"
+        ask_if "是否确定?(y/n)" && break
     done
-    [ $flag -eq 1 ] && xid_1="$xid" || xid_2="$xid"
+    if [ $flag -eq 1 ]; then
+        xid_1="$xid"
+    elif [ $flag -eq 2 ]; then
+        xid_2="$xid"
+    else
+        xid_3="$xid"
+    fi
+    config_xray
+    systemctl -q is-active xray && systemctl restart xray
+    green "更换成功！！"
+    print_config_info
+}
+change_xray_serviceName()
+{
+    if [ $protocol_2 -eq 0 ]; then
+        red "没有使用gRPC协议！"
+        return 1
+    fi
+    tyblue "您现在的serviceName是：$serviceName"
+    ! ask_if "是否要继续?(y/n)" && return 0
+    while true
+    do
+        serviceName=""
+        while [ -z "$serviceName" ]
+        do
+            tyblue "---------------请输入新的serviceName(字母数字组合)---------------"
+            read serviceName
+        done
+        tyblue "您输入的serviceName是：$serviceName"
+        ask_if "是否确定?(y/n)" && break
+    done
     config_xray
     systemctl -q is-active xray && systemctl restart xray
     green "更换成功！！"
@@ -2896,37 +3104,23 @@ change_xray_id()
 }
 change_xray_path()
 {
-    if [ $protocol_2 -eq 0 ]; then
-        red "Xray-TCP+XTLS+Web模式没有path!!"
+    if [ $protocol_3 -eq 0 ]; then
+        red "没有使用WebSocket协议！"
         return 1
     fi
     tyblue "您现在的path是：$path"
     ! ask_if "是否要继续?(y/n)" && return 0
-    path=""
-    while [ -z "$path" ]
+    while true
     do
-        tyblue "---------------请输入新的path(带\"/\")---------------"
-        read path
+        path=""
+        while [ -z "$path" ]
+        do
+            tyblue "---------------请输入新的path(/+字母数字组合)---------------"
+            read path
+        done
+        tyblue "您输入的path是：$path"
+        ask_if "是否确定?(y/n)" && break
     done
-    config_xray
-    systemctl -q is-active xray && systemctl restart xray
-    green "更换成功！！"
-    print_config_info
-}
-change_xray_protocol()
-{
-    local protocol_1_old=$protocol_1
-    local protocol_2_old=$protocol_2
-    readProtocolConfig
-    if [ $protocol_1_old -eq $protocol_1 ] && [ $protocol_2_old -eq $protocol_2 ]; then
-        red "传输协议未更换"
-        return 1
-    fi
-    [ $protocol_1_old -eq 0 ] && [ $protocol_1 -ne 0 ] && xid_1=$(cat /proc/sys/kernel/random/uuid)
-    if [ $protocol_2_old -eq 0 ] && [ $protocol_2 -ne 0 ]; then
-        path="/$(head -c 8 /dev/urandom | md5sum | head -c 7)"
-        xid_2=$(cat /proc/sys/kernel/random/uuid)
-    fi
     config_xray
     systemctl -q is-active xray && systemctl restart xray
     green "更换成功！！"
@@ -3005,7 +3199,7 @@ start_menu()
     local cloudreve_status
     [ $cloudreve_is_installed -eq 1 ] && cloudreve_status="\\033[32m已安装" || cloudreve_status="\\033[31m未安装"
     systemctl -q is-active cloudreve && cloudreve_status+="                \\033[32m运行中" || cloudreve_status+="                \\033[31m未运行"
-    tyblue "---------------------- Xray-TLS(1.3)+Web 搭建/管理脚本 ---------------------"
+    tyblue "------------------------ Xray-TLS+Web 搭建/管理脚本 ------------------------"
     echo
     tyblue "           Xray   ：           ${xray_status}"
     echo
@@ -3059,25 +3253,26 @@ start_menu()
     tyblue "  19. 修改伪装网站类型"
     tyblue "  20. 重新初始化Cloudreve"
     purple "         将删除所有Cloudreve网盘的文件和帐户信息，管理员密码忘记可用此选项恢复"
-    tyblue "  21. 修改id(用户ID/UUID)"
-    tyblue "  22. 修改path(路径)"
-    tyblue "  23. 修改Xray传输协议(TCP/WebSocket)"
+    tyblue "  21. 修改传输协议"
+    tyblue "  22. 修改id(用户ID/UUID)"
+    tyblue "  23. 修改gRPC的serviceName"
+    tyblue "  24. 修改WebSocket的path(路径)"
     echo
     tyblue " ----------------其它----------------"
-    tyblue "  24. 精简系统"
+    tyblue "  25. 精简系统"
     purple "         删除不必要的系统组件"
-    tyblue "  25. 尝试修复退格键无法使用的问题"
+    tyblue "  26. 尝试修复退格键无法使用的问题"
     purple "         部分ssh工具(如Xshell)可能有这类问题"
-    tyblue "  26. 修改dns"
+    tyblue "  27. 修改dns"
     yellow "  0. 退出脚本"
     echo
     echo
     local choice=""
-    while [[ ! "$choice" =~ ^(0|[1-9][0-9]*)$ ]] || ((choice>26))
+    while [[ ! "$choice" =~ ^(0|[1-9][0-9]*)$ ]] || ((choice>27))
     do
         read -p "您的选择是：" choice
     done
-    if (( choice==2 || (7<=choice&&choice<=9) || choice==13 || (15<=choice&&choice<=23) )) && [ $is_installed -eq 0 ]; then
+    if (( choice==2 || (7<=choice&&choice<=9) || choice==13 || (15<=choice&&choice<=24) )) && [ $is_installed -eq 0 ]; then
         red "请先安装Xray-TLS+Web！！"
         return 1
     fi
@@ -3085,8 +3280,8 @@ start_menu()
         red "请先启动Xray-TLS+Web！！"
         return 1
     fi
-    (( 3<=choice&&choice<=6 || choice==10 || choice==24 )) && [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
-    (( 4<=choice&&choice<=6 || choice==24 )) && check_important_dependence_installed lsb-release redhat-lsb-core
+    (( 3<=choice&&choice<=6 || choice==10 || choice==25 )) && [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
+    (( 4<=choice&&choice<=6 || choice==25 )) && check_important_dependence_installed lsb-release redhat-lsb-core
     if (( choice==3 || choice==5 || choice==6 || choice==10 )); then
         check_important_dependence_installed ca-certificates ca-certificates
         if [ $choice -eq 10 ]; then
@@ -3181,16 +3376,18 @@ start_menu()
     elif [ $choice -eq 20 ]; then
         reinit_cloudreve
     elif [ $choice -eq 21 ]; then
-        change_xray_id
-    elif [ $choice -eq 22 ]; then
-        change_xray_path
-    elif [ $choice -eq 23 ]; then
         change_xray_protocol
+    elif [ $choice -eq 22 ]; then
+        change_xray_id
+    elif [ $choice -eq 23 ]; then
+        change_xray_serviceName
     elif [ $choice -eq 24 ]; then
-        simplify_system
+        change_xray_path
     elif [ $choice -eq 25 ]; then
-        repair_tuige
+        simplify_system
     elif [ $choice -eq 26 ]; then
+        repair_tuige
+    elif [ $choice -eq 27 ]; then
         change_dns
     fi
 }
