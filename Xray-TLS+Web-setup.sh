@@ -365,6 +365,7 @@ remove_xray()
         rm -rf /var/log/xray
         systemctl daemon-reload
     fi
+    xray_is_installed=0
 }
 remove_nginx()
 {
@@ -1798,6 +1799,7 @@ EOF
         systemctl daemon-reload
         systemctl -q is-active xray && systemctl restart xray
     fi
+    xray_is_installed=1
 }
 
 #获取证书 参数: 域名位置
@@ -2163,8 +2165,7 @@ cat >> $xray_config <<EOF
             "streamSettings": {
                 "network": "grpc",
                 "grpcSettings": {
-                    "serviceName": "$serviceName",
-                    "multiMode": true
+                    "serviceName": "$serviceName"
                 }
             }
 EOF
@@ -2639,6 +2640,8 @@ install_update_xray_tls_web()
     #安装Xray
     remove_xray
     install_update_xray
+
+    is_installed=1
 
     green "正在获取证书。。。。"
     if [ $update -eq 0 ]; then
