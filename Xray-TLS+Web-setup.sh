@@ -2244,13 +2244,13 @@ print_share_link()
         green  "VLESS-WebSocket+TLS\\033[35m(有CDN则走CDN，否则直连)\\033[32m："
         for i in ${!domain_list[@]}
         do
-            tyblue "vless://${xid_2}@${domain_list[$i]}:443?type=ws&security=tls&path=%2F${path#/}"
+            tyblue "vless://${xid_2}@${domain_list[$i]}:443?type=ws&security=tls&path=%2F${path#/}%3Fed=2048"
         done
     elif [ $protocol_2 -eq 2 ]; then
         green  "VMess-WebSocket+TLS\\033[35m(有CDN则走CDN，否则直连)\\033[32m："
         for i in ${!domain_list[@]}
         do
-            tyblue "vmess://${xid_2}@${domain_list[$i]}:443?type=ws&security=tls&path=%2F${path#/}"
+            tyblue "vmess://${xid_2}@${domain_list[$i]}:443?type=ws&security=tls&path=%2F${path#/}%3Fed=2048"
         done
     fi
 }
@@ -2317,7 +2317,7 @@ print_config_info()
         tyblue " ---Transport/StreamSettings(底层传输方式/流设置)---"
         tyblue "  network(传输协议)             ：ws"
         purple "   (Shadowrocket:传输方式:websocket)"
-        tyblue "  path(路径)                    ：${path}"
+        tyblue "  path(路径)                    ：${path}?ed=2048"
         tyblue "  Host                          ：空"
         purple "   (V2RayN(G):伪装域名;Qv2ray:协议设置-请求头)"
         tyblue "  security(传输层加密)          ：tls"
@@ -2342,15 +2342,12 @@ print_config_info()
     green  "   Linux/MacOS：Qv2ray       v2.7.0-pre1+"
     green  "   IOS        ：Shadowrocket v2.1.67+"
     echo
-    yellow " 若使用VMess，请尽快将客户端更新至 Xray 或 V2Ray v4.28.0+ 以启用VMessAEAD"
-    yellow " 若使用VLESS，请确保客户端为 Xray 或 V2Ray v4.30.0+"
-    yellow " 若使用XTLS，请确保客户端为 Xray 或 V2Ray v4.31.0至v4.32.1"
-    yellow " 若使用xtls-rprx-splice，请确保客户端为 Xray v1.1.0+"
-    echo
     blue   " 若想实现Fullcone(NAT类型开放)，需要达成以下条件："
-    blue   "   1. 确保客户端为 Xray v1.3.0+"
+    blue   "   1. 确保客户端核心为 Xray v1.3.0+"
     blue   "   2. 若您正在使用Netch作为客户端，请不要使用[模式1]连接 (可使用[模式3 TUN/TAP])"
     blue   "   3. 如果测试系统为Windows，并且正在使用透明代理或TUN/TAP，请确保当前网络设置为专用网络"
+    echo
+    blue   " 若想实现WebSocket 0-rtt，请将客户端核心升级至 Xray v1.4.0+"
     echo
     tyblue " 脚本最后更新时间：2020.02.19"
     echo
