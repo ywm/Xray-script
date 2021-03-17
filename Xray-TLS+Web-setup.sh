@@ -289,6 +289,7 @@ swap_off()
     if [ $using_swap_now -eq 1 ]; then
         tyblue "正在恢复swap。。。"
         swapoff -a
+        rm -rf ${temp_dir}/swap
         [ $using_swap -ne 0 ] && swapon -a
         using_swap_now=0
     fi
@@ -1557,6 +1558,7 @@ compile_php()
         read -s
     fi
     tar -xJf "${php_version}.tar.xz"
+    rm "${php_version}.tar.xz"
     cd "${php_version}"
     sed -i 's#db$THIS_VERSION/db_185.h include/db$THIS_VERSION/db_185.h include/db/db_185.h#& include/db_185.h#' configure
     if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
@@ -1654,12 +1656,14 @@ compile_nginx()
         read -s
     fi
     tar -zxf ${nginx_version}.tar.gz
+    rm "${nginx_version}.tar.gz"
     if ! wget -O ${openssl_version}.tar.gz https://github.com/openssl/openssl/archive/${openssl_version#*-}.tar.gz; then
         red    "获取openssl失败"
         yellow "按回车键继续或者按Ctrl+c终止"
         read -s
     fi
     tar -zxf ${openssl_version}.tar.gz
+    rm "${openssl_version}.tar.gz"
     cd ${nginx_version}
     sed -i "s/OPTIMIZE[ \\t]*=>[ \\t]*'-O'/OPTIMIZE          => '-O3'/g" src/http/modules/perl/Makefile.PL
     ./configure --prefix=/usr/local/nginx --with-openssl=../$openssl_version --with-mail=dynamic --with-mail_ssl_module --with-stream=dynamic --with-stream_ssl_module --with-stream_realip_module --with-stream_geoip_module=dynamic --with-stream_ssl_preread_module --with-http_ssl_module --with-http_v2_module --with-http_realip_module --with-http_addition_module --with-http_xslt_module=dynamic --with-http_image_filter_module=dynamic --with-http_geoip_module=dynamic --with-http_sub_module --with-http_dav_module --with-http_flv_module --with-http_mp4_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_auth_request_module --with-http_random_index_module --with-http_secure_link_module --with-http_degradation_module --with-http_slice_module --with-http_stub_status_module --with-http_perl_module=dynamic --with-pcre --with-libatomic --with-compat --with-cpp_test_module --with-google_perftools_module --with-file-aio --with-threads --with-poll_module --with-select_module --with-cc-opt="-Wno-error -g0 -O3"
@@ -1711,6 +1715,7 @@ install_nginx_part1()
     make install
     cd ..
     rm -rf "${nginx_version}"
+    rm -rf "$openssl_version"
 }
 install_nginx_part2()
 {
@@ -3166,10 +3171,11 @@ simplify_system()
     yellow "警告：此功能可能导致某些VPS无法开机，请谨慎使用"
     tyblue "建议在纯净系统下使用此功能"
     ! ask_if "是否要继续?(y/n)" && return 0
+    uninstall_firewall
     if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         $redhat_package_manager -y remove openssl "perl*"
     else
-        local temp_remove_list=('openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' 'libffi-dev' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^python.*:i386' '^libpython' '^libpython.*:i386' 'dbus' 'cron' 'at' 'open-iscsi' 'rsyslog' 'anacron' 'acpid' 'libnetplan0' 'glib-networking-common')
+        local temp_remove_list=('openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' 'libffi-dev' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^python.*:i386' '^libpython' '^libpython.*:i386' 'dbus' 'cron' 'at' 'open-iscsi' 'rsyslog' 'anacron' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)')
         if ! $debian_package_manager -y --autoremove purge "${temp_remove_list[@]}"; then
             $debian_package_manager -y -f install
             for i in ${!temp_remove_list[@]}
