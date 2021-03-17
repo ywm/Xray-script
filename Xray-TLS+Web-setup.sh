@@ -3134,7 +3134,9 @@ change_xray_serviceName()
         ask_if "是否确定?(y/n)" && break
     done
     config_xray
+    config_nginx
     systemctl -q is-active xray && systemctl restart xray
+    systemctl -q is-active nginx && systemctl restart nginx
     green "更换成功！！"
     print_config_info
 }
