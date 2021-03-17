@@ -556,6 +556,7 @@ mem_total="$(($(free -m | sed -n 2p | awk '{print $2}')+$(free -m | tail -n 1 | 
 if [ $is_installed -eq 1 ] && ! grep -q "domain_list=" $nginx_config; then
     red "脚本进行了一次不向下兼容的更新"
     yellow "请选择 \"重新安装\"选项 来升级"
+    [ "$1" == "--update" ] && exit 1
     sleep 3s
 fi
 if [ $is_installed -eq 1 ] && ! grep -q "# This file has been edited by Xray-TLS-Web setup script" /etc/systemd/system/xray.service && ! [ "$1" == "--update" ]; then
@@ -583,6 +584,21 @@ get_system_info()
         release="fedora"
     fi
     systemVersion="$(lsb_release -r -s)"
+}
+
+#检查CentOS8 epel源是否安装
+check_centos8_epel()
+{
+    if [ $release == "centos" ] && version_ge "$systemVersion" "8"; then
+        if $redhat_package_manager --help | grep -qw "\\-\\-all"; then
+            local temp_command="$redhat_package_manager -q --all repolist"
+        else
+            local temp_command="$redhat_package_manager -q repolist all"
+        fi
+        if ! $temp_command | awk '{print $1}' | grep -q epel; then
+            check_important_dependence_installed "" "epel-release"
+        fi
+    fi
 }
 
 #检查80端口和443端口是否被占用
@@ -813,7 +829,7 @@ doupdate()
             yellow " 升级完系统后服务器将重启，重启后，请再次运行脚本完成 Xray-TLS+Web 剩余部分的安装/升级"
             yellow " 再次运行脚本时，重复之前选过的选项即可"
             echo
-            sleep 3s
+            sleep 2s
             yellow "按回车键以继续。。。"
             read -s
         fi
@@ -1181,7 +1197,7 @@ install_bbr()
                     yellow " 更换内核后服务器将重启，重启后，请再次运行脚本完成 Xray-TLS+Web 剩余部分的安装/升级"
                     yellow " 再次运行脚本时，重复之前选过的选项即可"
                     echo
-                    sleep 3s
+                    sleep 2s
                     yellow "按回车键以继续。。。"
                     read -s
                 fi
@@ -1227,7 +1243,7 @@ install_bbr()
                         yellow " 更换内核后服务器将重启，重启后，请再次运行脚本完成 Xray-TLS+Web 剩余部分的安装/升级"
                         yellow " 再次运行脚本时，重复之前选过的选项即可"
                         echo
-                        sleep 3s
+                        sleep 2s
                         yellow "按回车键以继续。。。"
                         read -s
                     fi
@@ -1250,7 +1266,7 @@ install_bbr()
             else
                 yellow " 重启后，请再次运行脚本并选择这个选项完成bbr2剩余部分安装(开启bbr2和ECN)"
             fi
-            sleep 3s
+            sleep 2s
             yellow " 按回车键以继续。。。。"
             read -s
             local temp_bbr2
@@ -1276,7 +1292,7 @@ install_bbr()
             else
                 yellow " 重启后，请再次运行脚本并选择这个选项完成 bbrplus/bbr魔改版/暴力bbr魔改版/锐速 剩余部分的安装"
             fi
-            sleep 3s
+            sleep 2s
             yellow " 按回车键以继续。。。。"
             read -s
             if ! wget -O tcp.sh "https://raw.githubusercontent.com/chiakge/Linux-NetSpeed/master/tcp.sh"; then
@@ -1584,15 +1600,18 @@ instal_php_imagick()
     fi
     mv modules/imagick.so "$(${php_prefix}/bin/php -i | grep "^extension_dir" | awk '{print $3}')"
     cd ..
+    rm -rf imagick
 }
 install_php_part1()
 {
     green "正在安装php。。。。"
     cd "${php_version}"
     make install
-    cp sapi/fpm/php-fpm.service ${php_prefix}/php-fpm.service.default
+    mv sapi/fpm/php-fpm.service "${php_prefix}/php-fpm.service.default.temp"
     cd ..
+    rm -rf "${php_version}"
     instal_php_imagick
+    mv "${php_prefix}/php-fpm.service.default.temp" "${php_prefix}/php-fpm.service.default"
     php_is_installed=1
 }
 install_php_part2()
@@ -1688,9 +1707,10 @@ EOF
 install_nginx_part1()
 {
     green "正在安装Nginx。。。"
-    cd ${nginx_version}
+    cd "${nginx_version}"
     make install
     cd ..
+    rm -rf "${nginx_version}"
 }
 install_nginx_part2()
 {
@@ -2517,6 +2537,7 @@ install_update_xray_tls_web()
     get_system_info
     check_important_dependence_installed ca-certificates ca-certificates
     check_important_dependence_installed wget wget
+    check_centos8_epel
     check_ssh_timeout
     uninstall_firewall
     doupdate
@@ -2602,6 +2623,11 @@ install_update_xray_tls_web()
             read -p "您的选择是：" choice
         done
         [ $choice -eq 1 ] && temp_remove_cloudreve=0
+    fi
+
+    if [ $update -eq 0 ]; then
+        green "即将开始安装Xray-TLS+Web，可能需要10-20分钟。。。"
+        sleep 3s
     fi
 
     green "正在安装依赖。。。。"
