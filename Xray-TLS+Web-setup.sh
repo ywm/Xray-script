@@ -3079,7 +3079,7 @@ change_xray_id()
     tyblue " 2. gRPC的id"
     tyblue " 3. WebSocket的id"
     echo
-    while [ "$flag" != "1" ] && [ "$flag" != "2" ]
+    while [[ ! "$flag" =~ ^([1-9][0-9]*)$ ]] || ((flag>3))
     do
         read -p "您的选择是：" flag
     done
