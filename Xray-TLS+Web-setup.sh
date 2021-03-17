@@ -591,9 +591,9 @@ check_centos8_epel()
 {
     if [ $release == "centos" ] && version_ge "$systemVersion" "8"; then
         if $redhat_package_manager --help | grep -qw "\\-\\-all"; then
-            local temp_command="$redhat_package_manager -q --all repolist"
+            local temp_command="$redhat_package_manager --all repolist"
         else
-            local temp_command="$redhat_package_manager -q repolist all"
+            local temp_command="$redhat_package_manager repolist all"
         fi
         if ! $temp_command | awk '{print $1}' | grep -q epel; then
             check_important_dependence_installed "" "epel-release"
