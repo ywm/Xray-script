@@ -2543,6 +2543,14 @@ install_update_xray_tls_web()
     check_important_dependence_installed ca-certificates ca-certificates
     check_important_dependence_installed wget wget
     check_centos8_epel
+    if [ $update -eq 0 ] && check_script_update; then
+        green "脚本可升级"
+        if ask_if "是否升级脚本？(y/n)"; then
+            update_script
+            tyblue "升级完成，请重新运行脚本"
+            exit 0
+        fi
+    fi
     check_ssh_timeout
     uninstall_firewall
     doupdate
@@ -2950,6 +2958,10 @@ delete_domain()
     done
     [ $delete -eq 0 ] && return 0
     ((delete--))
+    if [ "${pretend_list[$delete]}" == "2" ]; then
+        red "警告：此操作可能导致该域名下的Nextcloud网盘数据被删除"
+        ! ask_if "是否要继续？(y/n)" && return 0
+    fi
     $HOME/.acme.sh/acme.sh --remove --domain ${true_domain_list[$delete]} --ecc
     rm -rf $HOME/.acme.sh/${true_domain_list[$delete]}_ecc
     rm -rf "${nginx_prefix}/certs/${true_domain_list[$delete]}.key" "${nginx_prefix}/certs/${true_domain_list[$delete]}.cer"
@@ -3018,6 +3030,10 @@ change_pretend()
     if [ "${pretend_list[$change]}" == "$pretend" ]; then
         yellow "伪装类型没有变化"
         return 1
+    fi
+    if [ "${pretend_list[$change]}" == "2" ]; then
+        red "警告：此操作可能导致该域名下的Nextcloud网盘数据被删除"
+        ! ask_if "是否要继续？(y/n)" && return 0
     fi
     local need_cloudreve=0
     check_need_cloudreve && need_cloudreve=1
