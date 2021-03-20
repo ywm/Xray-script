@@ -1331,8 +1331,10 @@ readProtocolConfig()
     yellow " 0. 无 (仅提供Web服务)"
     echo
     blue   " 注："
-    blue   "   1. 不知道什么是CDN或不使用CDN，请选择1"
+    blue   "   1. 不知道什么是CDN或不使用CDN，请选择TCP"
     blue   "   2. gRPC和WebSocket支持通过CDN，关于两者的区别，详见：施工中。。。"
+    blue   "   3. 只有TCP能使用XTLS，且XTLS完全兼容TLS"
+    blue   "   4. 能使用TCP传输的只有VLESS"
     echo
     local choice=""
     while [[ ! "$choice" =~ ^(0|[1-9][0-9]*)$ ]] || ((choice>7))
@@ -1355,7 +1357,7 @@ readProtocolConfig()
         protocol_3=0
     fi
     if [ $protocol_2 -eq 1 ]; then
-        tyblue "-------------- 请选择gRPC使用的会话层协议 --------------"
+        tyblue "-------------- 请选择使用gRPC传输的会话层协议 --------------"
         tyblue " 1. VMess"
         tyblue " 2. VLESS"
         echo
@@ -1369,7 +1371,7 @@ readProtocolConfig()
         [ $choice -eq 1 ] && protocol_2=2
     fi
     if [ $protocol_3 -eq 1 ]; then
-        tyblue "-------------- 请选择WebSocket使用的会话层协议 --------------"
+        tyblue "-------------- 请选择使用WebSocket传输的会话层协议 --------------"
         tyblue " 1. VMess"
         tyblue " 2. VLESS"
         echo
