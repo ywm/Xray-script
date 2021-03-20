@@ -18,7 +18,7 @@
 
 [9. 注](#注)
 ## 脚本特性
-1. 支持 (VLESS/VMess)-(TCP/gRPC/WebSocket)-(XTLS/TLS) + Web
+1. 支持 (VLESS/VMess)-(TCP/gRPC/WebSocket)-(XTLS/TLS) + Web 的搭建/管理，支持多种协议并存
 
 2. 集成 多版本bbr/锐速 安装选项
  
