@@ -18,7 +18,7 @@
 
 [9. 注](#注)
 ## 脚本特性
-1. 支持 (Xray-TCP+XTLS) + (Xray-WebSocket+TLS) + Web
+1. 支持 (VLESS/VMess)-(TCP/gRPC/WebSocket)-(XTLS/TLS) + Web
 
 2. 集成 多版本bbr/锐速 安装选项
  
