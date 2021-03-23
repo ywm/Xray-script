@@ -2368,7 +2368,11 @@ print_share_link()
         yellow " Linux/安卓/路由器："
         for i in ${!domain_list[@]}
         do
-            tyblue " vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&flow=xtls-rprx-splice"
+            if [ "${pretend_list[$i]}" == "1" ] || [ "${pretend_list[$i]}" == "2" ]; then
+                tyblue " vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&alpn=http%2F1.1&flow=xtls-rprx-splice"
+            else
+                tyblue " vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&flow=xtls-rprx-splice"
+            fi
         done
         yellow " 其他："
         for i in ${!domain_list[@]}
@@ -2418,7 +2422,9 @@ print_config_info()
         fi
         purple "   (V2RayN(G):SNI;Qv2ray:TLS设置-服务器地址;Shadowrocket:Peer 名称)"
         tyblue "  allowInsecure                 ：false"
-        purple "   (Qv2ray:允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
+        purple "   (Qv2ray:TLS设置-允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
+        tyblue "  alpn                          ：若serverName填的域名对应的伪装网站为网盘则设置为http/1.1，否则保持默认/缺省"
+        purple "   (Qv2ray:TLS设置-ALPN)"
         tyblue " ------------------------其他-----------------------"
         tyblue "  Mux(多路复用)                 ：使用XTLS必须关闭;不使用XTLS也建议关闭"
         purple "   (V2RayN:设置页面-开启Mux多路复用)"
@@ -2459,7 +2465,7 @@ print_config_info()
         tyblue "  serverName                    ：空"
         purple "   (V2RayN(G):SNI和伪装域名;Qv2ray:TLS设置-服务器地址;Shadowrocket:Peer 名称)"
         tyblue "  allowInsecure                 ：false"
-        purple "   (Qv2ray:允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
+        purple "   (Qv2ray:TLS设置-允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
         tyblue " ------------------------其他-----------------------"
         tyblue "  Mux(多路复用)                 ：强烈建议关闭"
         purple "   (V2RayN:设置页面-开启Mux多路复用)"
@@ -2502,7 +2508,7 @@ print_config_info()
         tyblue "  serverName                    ：空"
         purple "   (V2RayN(G):SNI和伪装域名;Qv2ray:TLS设置-服务器地址;Shadowrocket:Peer 名称)"
         tyblue "  allowInsecure                 ：false"
-        purple "   (Qv2ray:允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
+        purple "   (Qv2ray:TLS设置-允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
         tyblue " ------------------------其他-----------------------"
         tyblue "  Mux(多路复用)                 ：建议关闭"
         purple "   (V2RayN:设置页面-开启Mux多路复用)"
@@ -2513,12 +2519,6 @@ print_config_info()
     echo
     ask_if "是否生成分享链接？(y/n)" && print_share_link
     echo
-    green  " 目前支持支持XTLS的图形化客户端："
-    green  "   Windows    ：Qv2ray       v2.7.0-pre1+    V2RayN  v3.26+"
-    green  "   Android    ：V2RayNG      v1.4.8+"
-    green  "   Linux/MacOS：Qv2ray       v2.7.0-pre1+"
-    green  "   IOS        ：Shadowrocket v2.1.67+"
-    echo
     blue   " 若想实现Fullcone(NAT类型开放)，需要达成以下条件："
     blue   "   1. 确保客户端核心为 Xray v1.3.0+"
     blue   "   2. 若您正在使用Netch作为客户端，请不要使用[模式1]连接 (可使用[模式3 TUN/TAP])"
@@ -2526,7 +2526,7 @@ print_config_info()
     echo
     blue   " 若想实现WebSocket 0-rtt，请将客户端核心升级至 Xray v1.4.0+"
     echo
-    tyblue " 脚本最后更新时间：2020.02.19"
+    tyblue " 脚本最后更新时间：2020.03.19"
     echo
     red    " 此脚本仅供交流学习使用，请勿使用此脚本行违法之事。网络非法外之地，行非法之事，必将接受法律制裁!!!!"
     tyblue " 2020.11"
