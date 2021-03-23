@@ -2377,7 +2377,11 @@ print_share_link()
         yellow " 其他："
         for i in ${!domain_list[@]}
         do
-            tyblue " vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&flow=xtls-rprx-direct"
+            if [ "${pretend_list[$i]}" == "1" ] || [ "${pretend_list[$i]}" == "2" ]; then
+                tyblue " vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&alpn=http%2F1.1&flow=xtls-rprx-direct"
+            else
+                tyblue " vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&flow=xtls-rprx-direct"
+            fi
         done
     fi
     if [ $protocol_3 -eq 1 ]; then
