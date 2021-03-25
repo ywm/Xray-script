@@ -2552,7 +2552,7 @@ install_update_xray_tls_web()
     check_important_dependence_installed ca-certificates ca-certificates
     check_important_dependence_installed wget wget
     check_centos8_epel
-    if [ $update -eq 0 ] && check_script_update; then
+    if [ $update -eq 0 ] && [[ -n "${BASH_SOURCE[0]}" ]] && check_script_update; then
         green "脚本可升级"
         if ask_if "是否升级脚本？(y/n)"; then
             update_script
