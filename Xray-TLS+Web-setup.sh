@@ -1182,7 +1182,10 @@ install_bbr()
             read -p "您的选择是：" choice
         done
         if (( 1<=choice&&choice<=3 )); then
-            if ([ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]) && [ $choice -eq 2 ]; then
+            if [ $choice -eq 1 ] && ([ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]) && ! version_ge "$(dpkg --list | grep '^[ '$'\t]*ii[ '$'\t][ '$'\t]*linux-base[ '$'\t]' | awk '{print $3}')" "4.5ubuntu1~16.04.1"; then
+                red    "系统版本太低！"
+                yellow "请更换新系统或使用xanmod内核"
+            elif [ $choice -eq 2 ] && ([ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]); then
                 red "xanmod内核仅支持Debian系的系统，如Ubuntu、Debian、deepin、UOS"
             else
                 if ! ([ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(grep '^[ '$'\t]*net.ipv4.tcp_congestion_control[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]); then
@@ -3199,7 +3202,7 @@ simplify_system()
     if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         $redhat_package_manager -y remove openssl "perl*"
     else
-        local temp_remove_list=('openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' 'libffi-dev' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^python.*:i386' '^libpython' '^libpython.*:i386' 'dbus' 'cron' 'at' 'open-iscsi' 'rsyslog' 'anacron' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)')
+        local temp_remove_list=('openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' 'libffi-dev' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^python.*:i386' '^libpython' '^libpython.*:i386' 'dbus' 'cron' 'anacron' 'cron' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)')
         if ! $debian_package_manager -y --autoremove purge "${temp_remove_list[@]}"; then
             $debian_package_manager -y -f install
             for i in ${!temp_remove_list[@]}
