@@ -298,17 +298,21 @@ swap_off()
 turn_on_off_php()
 {
     if check_need_php; then
-        systemctl --now enable php-fpm
+        systemctl start php-fpm
+        systemctl enable php-fpm
     else
-        systemctl --now disable php-fpm
+        systemctl stop php-fpm
+        systemctl disable php-fpm
     fi
 }
 turn_on_off_cloudreve()
 {
     if check_need_cloudreve; then
-        systemctl --now enable cloudreve
+        systemctl start cloudreve
+        systemctl enable cloudreve
     else
-        systemctl --now disable cloudreve
+        systemctl stop cloudreve
+        systemctl disable cloudreve
     fi
 }
 let_change_cloudreve_domain()
@@ -329,7 +333,8 @@ init_cloudreve()
     local temp
     temp="$(timeout 5s $cloudreve_prefix/cloudreve | grep "初始管理员密码：" | awk '{print $4}')"
     sleep 1s
-    systemctl --now enable cloudreve
+    systemctl start cloudreve
+    systemctl enable cloudreve
     tyblue "-------- 请打开\"https://${domain_list[$1]}\"进行Cloudreve初始化 -------"
     tyblue "  1. 登陆帐号"
     purple "    初始管理员账号：admin@cloudreve.org"
@@ -358,7 +363,8 @@ ask_if()
 remove_xray()
 {
     if ! bash <(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh) remove --purge; then
-        systemctl --now disable xray
+        systemctl stop xray
+        systemctl disable xray
         rm -rf /usr/local/bin/xray
         rm -rf /usr/local/etc/xray
         rm -rf /etc/systemd/system/xray.service
@@ -371,7 +377,8 @@ remove_xray()
 }
 remove_nginx()
 {
-    systemctl --now disable nginx
+    systemctl stop nginx
+    systemctl disable nginx
     rm -rf $nginx_service
     systemctl daemon-reload
     rm -rf ${nginx_prefix}
@@ -380,7 +387,8 @@ remove_nginx()
 }
 remove_php()
 {
-    systemctl --now disable php-fpm
+    systemctl stop php-fpm
+    systemctl disable php-fpm
     rm -rf $php_service
     systemctl daemon-reload
     rm -rf ${php_prefix}
@@ -388,7 +396,8 @@ remove_php()
 }
 remove_cloudreve()
 {
-    systemctl --now disable cloudreve
+    systemctl stop cloudreve
+    systemctl disable cloudreve
     rm -rf $cloudreve_service
     systemctl daemon-reload
     rm -rf ${cloudreve_prefix}
@@ -463,8 +472,10 @@ remove_all_domains()
 {
     systemctl stop xray
     systemctl stop nginx
-    systemctl --now disable php-fpm
-    systemctl --now disable cloudreve
+    systemctl stop php-fpm
+    systemctl disable php-fpm
+    systemctl stop cloudreve
+    systemctl disable cloudreve
     local i
     for i in ${!true_domain_list[@]}
     do
@@ -1182,7 +1193,7 @@ install_bbr()
             read -p "您的选择是：" choice
         done
         if (( 1<=choice&&choice<=3 )); then
-            if [ $choice -eq 1 ] && ([ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]) && ! version_ge "$(dpkg --list | grep '^[ '$'\t]*ii[ '$'\t][ '$'\t]*linux-base[ '$'\t]' | awk '{print $3}')" "4.5ubuntu1~16.04.1"; then
+            if (( choice==1 || choice==3 )) && ([ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]) && ! version_ge "$(dpkg --list | grep '^[ '$'\t]*ii[ '$'\t][ '$'\t]*linux-base[ '$'\t]' | awk '{print $3}')" "4.5ubuntu1~16.04.1"; then
                 red    "系统版本太低！"
                 yellow "请更换新系统或使用xanmod内核"
             elif [ $choice -eq 2 ] && ([ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]); then
@@ -2666,7 +2677,8 @@ install_update_xray_tls_web()
             remove_php
             install_php_part1
         else
-            systemctl --now disable php-fpm
+            systemctl stop php-fpm
+            systemctl disable php-fpm
         fi
         install_php_part2
         [ $update -eq 1 ] && turn_on_off_php
@@ -2679,7 +2691,8 @@ install_update_xray_tls_web()
         remove_nginx
         install_nginx_part1
     else
-        systemctl --now disable nginx
+        systemctl stop nginx
+        systemctl disable nginx
         rm -rf ${nginx_prefix}/conf.d
         rm -rf ${nginx_prefix}/certs
         rm -rf ${nginx_prefix}/html/issue_certs
@@ -2714,12 +2727,14 @@ install_update_xray_tls_web()
             if [ $temp_remove_cloudreve -eq 1 ]; then
                 install_init_cloudreve "0"
             else
-                systemctl --now enable cloudreve
+                systemctl start cloudreve
+                systemctl enable cloudreve
                 update_cloudreve
                 let_change_cloudreve_domain "0"
             fi
         else
-            systemctl --now disable cloudreve
+            systemctl stop cloudreve
+            systemctl disable cloudreve
             [ "${pretend_list[0]}" == "2" ] && let_init_nextcloud "0"
         fi
         green "-------------------安装完成-------------------"
@@ -2892,13 +2907,15 @@ reinit_domain()
     sleep 2s
     systemctl restart xray nginx
     if [ "${pretend_list[0]}" == "2" ]; then
-        systemctl --now enable php-fpm
+        systemctl start php-fpm
+        systemctl enable php-fpm
         let_init_nextcloud "0"
     elif [ "${pretend_list[0]}" == "1" ]; then
         if [ $cloudreve_is_installed -eq 0 ]; then
             full_install_init_cloudreve "0"
         else
-            systemctl --now enable cloudreve
+            systemctl start cloudreve
+            systemctl enable cloudreve
             let_change_cloudreve_domain "0"
         fi
     fi
@@ -2933,7 +2950,8 @@ add_domain()
         if [ $cloudreve_is_installed -eq 0 ]; then
             full_install_init_cloudreve "-1"
         else
-            systemctl --now enable cloudreve
+            systemctl start cloudreve
+            systemctl enable cloudreve
             let_change_cloudreve_domain "-1"
         fi
     else
@@ -3061,7 +3079,8 @@ change_pretend()
         if [ $cloudreve_is_installed -eq 0 ]; then
             full_install_init_cloudreve "$change"
         else
-            systemctl --now enable cloudreve
+            systemctl start cloudreve
+            systemctl enable cloudreve
             let_change_cloudreve_domain "$change"
         fi
     else
