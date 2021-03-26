@@ -2907,15 +2907,13 @@ reinit_domain()
     sleep 2s
     systemctl restart xray nginx
     if [ "${pretend_list[0]}" == "2" ]; then
-        systemctl start php-fpm
-        systemctl enable php-fpm
+        systemctl --now enable php-fpm
         let_init_nextcloud "0"
     elif [ "${pretend_list[0]}" == "1" ]; then
         if [ $cloudreve_is_installed -eq 0 ]; then
             full_install_init_cloudreve "0"
         else
-            systemctl start cloudreve
-            systemctl enable cloudreve
+            systemctl --now enable cloudreve
             let_change_cloudreve_domain "0"
         fi
     fi
