@@ -1135,6 +1135,32 @@ install_bbr()
             return 1
         fi
     }
+    enable_ecn()
+    {
+        if [[ ! -f /sys/module/tcp_bbr2/parameters/ecn_enable ]]; then
+            red "请先开启bbr2！"
+            return 1
+        fi
+        if [ "$(cat /sys/module/tcp_bbr2/parameters/ecn_enable)" == "Y" ] && [ "$(sysctl net.ipv4.tcp_ecn | cut -d = -f 2 | awk '{print $1}')" == "1" ]; then
+            green "bbr2_ECN 已启用！"
+            tyblue "重启系统bbr2_ECN将自动关闭"
+            return 0
+        fi
+        tyblue "提示：bbr2_ECN 会在系统重启后失效"
+        tyblue " 若重启系统了，可以 运行脚本 -> 安装/更新bbr -> 启用bbr2_ECN 来启用bbr2_ECN"
+        yellow "按回车键以继续。。。"
+        read -s
+        echo Y > /sys/module/tcp_bbr2/parameters/ecn_enable
+        sysctl net.ipv4.tcp_ecn=1
+        sleep 1s
+        if [ "$(cat /sys/module/tcp_bbr2/parameters/ecn_enable)" == "Y" ] && [ "$(sysctl net.ipv4.tcp_ecn | cut -d = -f 2 | awk '{print $1}')" == "1" ]; then
+            green "bbr2_ECN 已启用"
+            return 0
+        else
+            red "bbr2_ECN 启用失败"
+            return 1
+        fi
+    }
     local your_kernel_version
     local latest_kernel_version
     get_kernel_info
@@ -1142,23 +1168,25 @@ install_bbr()
         echo >> /etc/sysctl.conf
         echo "#This file has been edited by Xray-TLS-Web-setup-script" >> /etc/sysctl.conf
     fi
-    while ((1))
+    while :
     do
         echo -e "\\n\\n\\n"
         tyblue "------------------请选择要使用的bbr版本------------------"
-        green  " 1. 升级最新稳定版内核并启用bbr(推荐)"
-        green  " 2. 安装xanmod内核并启用bbr(推荐)"
-        tyblue " 3. 升级最新版内核并启用bbr"
+        green  "  1. 安装/升级最新稳定版内核并启用bbr  (推荐)"
+        green  "  2. 安装/升级最新xanmod内核并启用bbr  (推荐)"
+        green  "  3. 安装/升级最新xanmod内核并启用bbr2 (推荐)"
+        tyblue "  4. 安装/升级最新版内核并启用bbr"
         if version_ge $your_kernel_version 4.9; then
-            tyblue " 4. 启用bbr"
+            tyblue "  5. 启用bbr"
         else
-            tyblue " 4. 升级内核启用bbr"
+            tyblue "  5. 升级内核启用bbr"
         fi
-        tyblue " 5. 安装第三方内核并启用bbr2"
-        tyblue " 6. 安装第三方内核并启用bbrplus/bbr魔改版/暴力bbr魔改版/锐速"
-        tyblue " 7. 卸载多余内核"
-        tyblue " 8. 更换队列算法"
-        tyblue " 0. 退出bbr安装"
+        tyblue "  6. 启用bbr2"
+        tyblue "  7. 安装第三方内核并启用bbrplus/bbr魔改版/暴力bbr魔改版/锐速"
+        tyblue "  8. 更换队列算法"
+        tyblue "  9. 开启/关闭bbr2_ECN"
+        tyblue " 10. 卸载多余内核"
+        tyblue "  0. 退出bbr安装"
         tyblue "------------------关于安装bbr加速的说明------------------"
         green  " bbr拥塞算法可以大幅提升网络速度，建议启用"
         yellow " 更换第三方内核可能造成系统不稳定，甚至无法开机"
@@ -1186,24 +1214,35 @@ install_bbr()
         fi
         tyblue "   当前队列算法："
         green "       $(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')"
+        tyblue "   当前bbr2_ECN："
+        if [ "$(cat /sys/module/tcp_bbr2/parameters/ecn_enable 2>/dev/null)" == "Y" ] && [ "$(sysctl net.ipv4.tcp_ecn | cut -d = -f 2 | awk '{print $1}')" == "1" ]; then
+            green  "       已启用"
+        else
+            tyblue "       未启用"
+        fi
         echo
         local choice=""
-        while [[ ! "$choice" =~ ^(0|[1-9][0-9]*)$ ]] || ((choice>8))
+        while [[ ! "$choice" =~ ^(0|[1-9][0-9]*)$ ]] || ((choice>10))
         do
             read -p "您的选择是：" choice
         done
-        if (( 1<=choice&&choice<=3 )); then
-            if (( choice==1 || choice==3 )) && ([ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]) && ! version_ge "$(dpkg --list | grep '^[ '$'\t]*ii[ '$'\t][ '$'\t]*linux-base[ '$'\t]' | awk '{print $3}')" "4.5ubuntu1~16.04.1"; then
+        if (( 1<=choice&&choice<=4 )); then
+            if (( choice==1 || choice==4 )) && ([ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]) && ! version_ge "$(dpkg --list | grep '^[ '$'\t]*ii[ '$'\t][ '$'\t]*linux-base[ '$'\t]' | awk '{print $3}')" "4.5ubuntu1~16.04.1"; then
                 red    "系统版本太低！"
                 yellow "请更换新系统或使用xanmod内核"
-            elif [ $choice -eq 2 ] && ([ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]); then
+            elif (( choice==2 || choice==3 )) && ([ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]); then
                 red "xanmod内核仅支持Debian系的系统，如Ubuntu、Debian、deepin、UOS"
             else
-                if ! ([ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(grep '^[ '$'\t]*net.ipv4.tcp_congestion_control[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]); then
+                if [ $choice -eq 3 ]; then
+                    local temp_bbr=bbr2
+                else
+                    local temp_bbr=bbr
+                fi
+                if ! ([ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "$temp_bbr" ] && [ "$(grep '^[ '$'\t]*net.ipv4.tcp_congestion_control[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" == "$temp_bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]); then
                     sed -i '/^[ \t]*net.core.default_qdisc[ \t]*=/d' /etc/sysctl.conf
                     sed -i '/^[ \t]*net.ipv4.tcp_congestion_control[ \t]*=/d' /etc/sysctl.conf
                     echo 'net.core.default_qdisc = fq' >> /etc/sysctl.conf
-                    echo 'net.ipv4.tcp_congestion_control = bbr' >> /etc/sysctl.conf
+                    echo "net.ipv4.tcp_congestion_control = $temp_bbr" >> /etc/sysctl.conf
                     sysctl -p
                 fi
                 if [ $in_install_update_xray_tls_web -eq 1 ]; then
@@ -1219,10 +1258,10 @@ install_bbr()
                 local temp_kernel_sh_url
                 if [ $choice -eq 1 ]; then
                     temp_kernel_sh_url="https://github.com/kirin10000/update-kernel/raw/master/update-kernel-stable.sh"
-                elif [ $choice -eq 2 ]; then
-                    temp_kernel_sh_url="https://github.com/kirin10000/xanmod-install/raw/main/xanmod-install.sh"
-                else
+                elif [ $choice -eq 4 ]; then
                     temp_kernel_sh_url="https://github.com/kirin10000/update-kernel/raw/master/update-kernel.sh"
+                else
+                    temp_kernel_sh_url="https://github.com/kirin10000/xanmod-install/raw/main/xanmod-install.sh"
                 fi
                 if ! wget -O kernel.sh "$temp_kernel_sh_url"; then
                     red    "获取内核安装脚本失败"
@@ -1231,15 +1270,15 @@ install_bbr()
                 fi
                 chmod +x kernel.sh
                 ./kernel.sh
-                if [ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]; then
-                    green "--------------------bbr已安装--------------------"
+                if [ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "$temp_bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]; then
+                    green "--------------------$temp_bbr已安装--------------------"
                 else
-                    red "开启bbr失败"
+                    red "开启$temp_bbr失败"
                     red "如果刚安装完内核，请先重启"
                     red "如果重启仍然无效，请尝试选项3"
                 fi
             fi
-        elif [ $choice -eq 4 ]; then
+        elif [ $choice -eq 5 ]; then
             if [ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(grep '^[ '$'\t]*net.ipv4.tcp_congestion_control[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]; then
                 green "--------------------bbr已安装--------------------"
             else
@@ -1271,33 +1310,24 @@ install_bbr()
                     ./bbr.sh
                 fi
             fi
-        elif [ $choice -eq 5 ]; then
-            tyblue "提示：安装bbr2内核需要重启"
-            if [ $in_install_update_xray_tls_web -eq 1 ]; then
-                yellow " 重启后，请："
-                yellow "    1. 再次运行脚本，重复之前选过的选项"
-                yellow "    2. 到这一步时，再次选择这个选项完成bbr2剩余部分的安装(开启bbr2和ECN)"
-                yellow "    3. 选择 \"退出bbr安装\" 选项完成 Xray-TLS+Web 剩余部分的安装/升级"
-            else
-                yellow " 重启后，请再次运行脚本并选择这个选项完成bbr2剩余部分安装(开启bbr2和ECN)"
-            fi
-            sleep 2s
-            yellow " 按回车键以继续。。。。"
-            read -s
-            local temp_bbr2
-            if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
-                local temp_bbr2="https://github.com/yeyingorg/bbr2.sh/raw/master/bbr2.sh"
-            else
-                local temp_bbr2="https://github.com/jackjieYYY/bbr2/raw/master/bbr2.sh"
-            fi
-            if ! wget -O bbr2.sh $temp_bbr2; then
-                red    "获取bbr2脚本失败"
-                yellow "按回车键继续或者按Ctrl+c终止"
-                read -s
-            fi
-            chmod +x bbr2.sh
-            ./bbr2.sh
         elif [ $choice -eq 6 ]; then
+            if [ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "bbr2" ] && [ "$(grep '^[ '$'\t]*net.ipv4.tcp_congestion_control[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" == "bbr2" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]; then
+                green "--------------------bbr2已安装--------------------"
+            else
+                sed -i '/^[ \t]*net.core.default_qdisc[ \t]*=/d' /etc/sysctl.conf
+                sed -i '/^[ \t]*net.ipv4.tcp_congestion_control[ \t]*=/d' /etc/sysctl.conf
+                echo 'net.core.default_qdisc = fq' >> /etc/sysctl.conf
+                echo 'net.ipv4.tcp_congestion_control = bbr2' >> /etc/sysctl.conf
+                sysctl -p
+                sleep 1s
+                if [ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "bbr2" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "fq" ]; then
+                    green "--------------------bbr2已安装--------------------"
+                else
+                    red "启用bbr2失败"
+                    yellow "可能是内核不支持"
+                fi
+            fi
+        elif [ $choice -eq 7 ]; then
             tyblue "提示：安装bbrplus/bbr魔改版/暴力bbr魔改版/锐速内核需要重启"
             if [ $in_install_update_xray_tls_web -eq 1 ]; then
                 yellow " 重启后，请："
@@ -1317,12 +1347,14 @@ install_bbr()
             fi
             chmod +x tcp.sh
             ./tcp.sh
-        elif [ $choice -eq 7 ]; then
+        elif [ $choice -eq 8 ]; then
+            change_qdisc
+        elif [ $choice -eq 9 ]; then
+            enable_ecn
+        elif [ $choice -eq 10 ]; then
             tyblue " 该操作将会卸载除现在正在使用的内核外的其余内核"
             tyblue "    您正在使用的内核是：$(uname -r)"
             ask_if "是否继续？(y/n)" && remove_other_kernel
-        elif [ $choice -eq 8 ]; then
-            change_qdisc
         else
             break
         fi
