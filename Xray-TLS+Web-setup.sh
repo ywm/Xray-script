@@ -362,7 +362,7 @@ ask_if()
 #卸载函数
 remove_xray()
 {
-    if ! bash <(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh) remove --purge; then
+    if ! bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ remove --purge; then
         systemctl stop xray
         systemctl disable xray
         rm -rf /usr/local/bin/xray
@@ -1524,6 +1524,9 @@ readDomain()
         elif [ "${1%%.*}" == "www" ]; then
             red "域名前面不要带www！"
             return 1
+        elif [ "$(echo -n "$1" | wc -c)" -gt 42 ]; then
+            red "域名过长！"
+            return 1
         else
             return 0
         fi
@@ -1558,6 +1561,10 @@ readDomain()
             while [ -z "$domain" ]
             do
                 read -p "请输入域名：" domain
+                if [ "$(echo -n "$domain" | wc -c)" -gt 46 ]; then
+                    red "域名过长！"
+                    domain=""
+                fi
             done
         fi
         echo
@@ -1875,6 +1882,7 @@ EOF
         systemctl daemon-reload
         systemctl -q is-active xray && systemctl restart xray
     fi
+    systemctl enable xray
     xray_is_installed=1
     [ $nginx_is_installed -eq 1 ] && is_installed=1 || is_installed=0
 }
@@ -2957,6 +2965,15 @@ add_domain()
     local need_cloudreve=0
     check_need_cloudreve && need_cloudreve=1
     readDomain
+    local i
+    for ((i=${#domain_list[@]}-1; i!=0;))
+    do
+        ((i--))
+        if [ "${domain_list[-1]}" == "${domain_list[$i]}" ] || [ "${domain_list[-1]}" == "${true_domain_list[$i]}" ] || [ "${true_domain_list[-1]}" == "${domain_list[$i]}" ] || [ "${true_domain_list[-1]}" == "${true_domain_list[$i]}" ]; then
+            red "域名已存在！"
+            return 1
+        fi
+    done
     if [ "${pretend_list[-1]}" == "1" ] && [ $need_cloudreve -eq 1 ]; then
         yellow "Cloudreve只能用于一个域名！！"
         tyblue "Nextcloud可以用于多个域名"
