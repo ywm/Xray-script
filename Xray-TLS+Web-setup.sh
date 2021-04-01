@@ -2418,7 +2418,7 @@ print_share_link()
     echo
     tyblue "分享链接："
     if [ $protocol_1 -eq 1 ]; then
-        green  "VLESS-TCP+XTLS\\033[35m(不走CDN)\\033[32m："
+        green  "VLESS-TCP-XTLS\\033[35m(不走CDN)\\033[32m："
         yellow " Linux/安卓/路由器："
         for i in ${!domain_list[@]}
         do
@@ -2439,13 +2439,13 @@ print_share_link()
         done
     fi
     if [ $protocol_3 -eq 1 ]; then
-        green  "VLESS-WebSocket+TLS\\033[35m(有CDN则走CDN，否则直连)\\033[32m："
+        green  "VLESS-WebSocket-TLS\\033[35m(有CDN则走CDN，否则直连)\\033[32m："
         for i in ${!domain_list[@]}
         do
             tyblue "vless://${xid_3}@${domain_list[$i]}:443?type=ws&security=tls&path=%2F${path#/}%3Fed=2048"
         done
     elif [ $protocol_3 -eq 2 ]; then
-        green  "VMess-WebSocket+TLS\\033[35m(有CDN则走CDN，否则直连)\\033[32m："
+        green  "VMess-WebSocket-TLS\\033[35m(有CDN则走CDN，否则直连)\\033[32m："
         for i in ${!domain_list[@]}
         do
             tyblue "vmess://${xid_3}@${domain_list[$i]}:443?type=ws&security=tls&path=%2F${path#/}%3Fed=2048"
@@ -2535,7 +2535,7 @@ print_config_info()
         purple "   (Qv2ray:TLS设置-允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
         tyblue "  fingerprint                   ：空"
         tyblue "  alpn                          ：h2,http/1.1"
-        purple "   (Qv2ray:TLS设置-ALPN)"
+        purple "   (Qv2ray:TLS设置-ALPN填写\"h2|http/1.1\")"
         tyblue " ------------------------其他-----------------------"
         tyblue "  Mux(多路复用)                 ：强烈建议关闭"
         purple "   (V2RayN:设置页面-开启Mux多路复用)"
