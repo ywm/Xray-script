@@ -2466,7 +2466,7 @@ print_config_info()
         blue   "                         使用XTLS ："
         blue   "                                    Linux/安卓/路由器：\\033[36mxtls-rprx-splice\\033[32m(推荐)\\033[36m或xtls-rprx-direct"
         blue   "                                    其它             ：\\033[36mxtls-rprx-direct"
-        tyblue "                         使用TLS  ：\\033[36m空"
+        blue   "                         使用TLS  ：\\033[36m空"
         tyblue " encryption(加密)      ：none"
         tyblue " ---Transport/StreamSettings(底层传输方式/流设置)---"
         tyblue "  network(传输协议)             ：tcp"
