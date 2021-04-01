@@ -19,7 +19,7 @@ using_swap=""
 using_swap_now=0
 
 #安装信息
-nginx_version="nginx-1.19.8"
+nginx_version="nginx-1.19.9"
 openssl_version="openssl-openssl-3.0.0-alpha13"
 nginx_prefix="/usr/local/nginx"
 nginx_config="${nginx_prefix}/conf.d/xray.conf"
@@ -1378,7 +1378,7 @@ readProtocolConfig()
     echo
     blue   " 注："
     blue   "   1. 不知道什么是CDN或不使用CDN，请选择TCP"
-    blue   "   2. gRPC和WebSocket支持通过CDN，关于两者的区别，详见：施工中。。。"
+    blue   "   2. gRPC和WebSocket支持通过CDN，关于两者的区别，详见：https://github.com/kirin10000/Xray-script#关于grpc与websocket"
     blue   "   3. 只有TCP能使用XTLS，且XTLS完全兼容TLS"
     blue   "   4. 能使用TCP传输的只有VLESS"
     echo
@@ -2456,15 +2456,17 @@ print_config_info()
 {
     echo -e "\\n\\n\\n"
     if [ $protocol_1 -ne 0 ]; then
-        tyblue "---------------------- Xray-TCP+XTLS+Web (不走CDN) ---------------------"
+        tyblue "--------------------- VLESS-TCP-XTLS/TLS (不走CDN) ---------------------"
         tyblue " 服务器类型            ：VLESS"
         tyblue " address(地址)         ：服务器ip"
         purple "  (Qv2ray:主机)"
         tyblue " port(端口)            ：443"
         tyblue " id(用户ID/UUID)       ：${xid_1}"
-        tyblue " flow(流控)            ：使用XTLS ：Linux/安卓/路由器:xtls-rprx-splice\\033[32m(推荐)\\033[36m或xtls-rprx-direct"
-        tyblue "                                    其它:xtls-rprx-direct"
-        tyblue "                         使用TLS  ：空"
+        tyblue " flow(流控)            ："
+        blue   "                         使用XTLS ："
+        blue   "                                    Linux/安卓/路由器：\\033[36mxtls-rprx-splice\\033[32m(推荐)\\033[36m或xtls-rprx-direct"
+        blue   "                                    其它             ：\\033[36mxtls-rprx-direct"
+        tyblue "                         使用TLS  ：\\033[36m空"
         tyblue " encryption(加密)      ：none"
         tyblue " ---Transport/StreamSettings(底层传输方式/流设置)---"
         tyblue "  network(传输协议)             ：tcp"
@@ -2481,7 +2483,13 @@ print_config_info()
         purple "   (V2RayN(G):SNI;Qv2ray:TLS设置-服务器地址;Shadowrocket:Peer 名称)"
         tyblue "  allowInsecure                 ：false"
         purple "   (Qv2ray:TLS设置-允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
-        tyblue "  alpn                          ：若serverName填的域名对应的伪装网站为网盘则设置为http/1.1，否则保持默认/缺省"
+        tyblue "  fingerprint                   ："
+        blue   "                                  使用XTLS ：\\033[36m空"
+        blue   "                                  使用TLS  ：\\033[36m空/chrome/firefox/safari"
+        purple "                                           (此选项决定是否伪造浏览器指纹，空代表不伪造)"
+        tyblue "  alpn                          ："
+        blue   "                                  伪造浏览器指纹  ：\\033[36m此参数不生效 \\033[35m(可随意填写)"
+        blue   "                                  不伪造浏览器指纹：\\033[36mserverName填的域名对应的伪装网站为网盘则设置为http/1.1，否则保持默认/缺省"
         purple "   (Qv2ray:TLS设置-ALPN)"
         tyblue " ------------------------其他-----------------------"
         tyblue "  Mux(多路复用)                 ：使用XTLS必须关闭;不使用XTLS也建议关闭"
@@ -2492,10 +2500,11 @@ print_config_info()
     fi
     if [ $protocol_2 -ne 0 ]; then
         echo
-        tyblue "------------ Xray-gRPC+TLS+Web (有CDN则走CDN，否则直连) -----------"
         if [ $protocol_2 -eq 1 ]; then
+            tyblue "---------------- VLESS-gRPC-TLS (有CDN则走CDN，否则直连) ---------------"
             tyblue " 服务器类型            ：VLESS"
         else
+            tyblue "---------------- VMess-gRPC-TLS (有CDN则走CDN，否则直连) ---------------"
             tyblue " 服务器类型            ：VMess"
         fi
         if [ ${#domain_list[@]} -eq 1 ]; then
@@ -2524,6 +2533,9 @@ print_config_info()
         purple "   (V2RayN(G):SNI和伪装域名;Qv2ray:TLS设置-服务器地址;Shadowrocket:Peer 名称)"
         tyblue "  allowInsecure                 ：false"
         purple "   (Qv2ray:TLS设置-允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
+        tyblue "  fingerprint                   ：空"
+        tyblue "  alpn                          ：h2,http/1.1"
+        purple "   (Qv2ray:TLS设置-ALPN)"
         tyblue " ------------------------其他-----------------------"
         tyblue "  Mux(多路复用)                 ：强烈建议关闭"
         purple "   (V2RayN:设置页面-开启Mux多路复用)"
@@ -2533,10 +2545,11 @@ print_config_info()
     fi
     if [ $protocol_3 -ne 0 ]; then
         echo
-        tyblue "------------ Xray-WebSocket+TLS+Web (有CDN则走CDN，否则直连) -----------"
         if [ $protocol_3 -eq 1 ]; then
+            tyblue "------------- VLESS-WebSocket-TLS (有CDN则走CDN，否则直连) -------------"
             tyblue " 服务器类型            ：VLESS"
         else
+            tyblue "------------- VMess-WebSocket-TLS (有CDN则走CDN，否则直连) -------------"
             tyblue " 服务器类型            ：VMess"
         fi
         if [ ${#domain_list[@]} -eq 1 ]; then
@@ -2567,6 +2580,9 @@ print_config_info()
         purple "   (V2RayN(G):SNI和伪装域名;Qv2ray:TLS设置-服务器地址;Shadowrocket:Peer 名称)"
         tyblue "  allowInsecure                 ：false"
         purple "   (Qv2ray:TLS设置-允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
+        tyblue "  fingerprint                   ：空"
+        tyblue "  alpn                          ：此参数不生效 \\033[35m(可随意填写)"
+        purple "   (Qv2ray:TLS设置-ALPN)"
         tyblue " ------------------------其他-----------------------"
         tyblue "  Mux(多路复用)                 ：建议关闭"
         purple "   (V2RayN:设置页面-开启Mux多路复用)"
@@ -2576,6 +2592,8 @@ print_config_info()
     fi
     echo
     ask_if "是否生成分享链接？(y/n)" && print_share_link
+    echo
+    yellow " 关于fingerprint与alpn，详见：https://github.com/kirin10000/Xray-script#关于tls握手tls指纹和alpn"
     echo
     blue   " 若想实现Fullcone(NAT类型开放)，需要达成以下条件："
     blue   "   1. 确保客户端核心为 Xray v1.3.0+"
