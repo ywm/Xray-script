@@ -12,11 +12,15 @@
 
 [6. 伪装网站说明](#伪装网站说明)
 
-[7. 安装位置](#安装位置)
+[7. 关于TLS握手、TLS指纹和ALPN](#关于TLS握手、TLS指纹和ALPN)
 
-[8. 依赖列表](#依赖列表)
+[8. 关于gRPC与WebSocket](#关于gRPC与WebSocket)
 
-[9. 注](#注)
+[9. 安装位置](#安装位置)
+
+[10. 依赖列表](#依赖列表)
+
+[11. 注](#注)
 ## 脚本特性
 1. 支持 (VLESS/VMess)-(TCP/gRPC/WebSocket)-(XTLS/TLS) + Web 的搭建/管理，支持多种协议并存
 
@@ -130,7 +134,7 @@ bash Xray-TLS+Web-setup.sh
 
 * **单点性** 指使用的人少，一般只有自己，即使分享给朋友，一般也不会太多。
 * **长时间性** 不单指时间长，也指坚持一个月或一年每天都使用代理。
-* **GO-TLS指纹特性** 在不使用uTLS的前提下，从TLS握手信息中可以判断出客户端是GO程序。
+* **GO-TLS指纹特性** **在不伪装浏览器指纹的前提下**，从TLS握手信息中可以判断出客户端是GO程序，详见[此处](#关于TLS握手、TLS指纹和ALPN)。
 * **出入相同性** 指入VPS和出VPS的流量在时间和大小上几乎相同，比如使用Xray代理浏览`BiliBili`，从`BiliBili`到`VPS(Xray服务端)`的流量，和从`VPS`到`Xray客户端`的流量在时间上和大小上是几乎相同的。**出入相同性** 是所有代理的通病，目前还没有太好的伪装方法，但是因为VPS不在大陆，如果不是被特别关注的对象，一般不会被审查。
 
 既然使用Xray进行代理的全部流量都将伪装成访问这个网站的流量，那么我们选择伪装网站就是要尽量选择**流量特征与Xray代理的流量特征相同的网站**。
@@ -141,7 +145,7 @@ bash Xray-TLS+Web-setup.sh
 
 个人网盘与上面所说特征的吻合数最多，包括 **单点性** 、 **大流量性** 、 **GO-TLS指纹特性** 、 **长时间性** 等，建议选择。
 
-关于**GO-TLS指纹特性**，在不开启uTLS的前提下，将alpn设置为"http/1.1"，可以伪装成GO语言写的WebDav客户端 (比如 **[gowebdav](https://github.com/studio-b12/gowebdav)**)。
+关于**GO-TLS指纹特性**，**在不伪装浏览器指纹的前提下**，将alpn设置为http/1.1，可以伪装成GO语言实现的WebDav客户端，详见[此处](#关于TLS握手、TLS指纹和ALPN)。
 
 Cloudreve 与 Nextcloud 的区别如下：
 ||优点|缺点|
@@ -161,6 +165,26 @@ Cloudreve 与 Nextcloud 的区别如下：
 4. **自定义反向代理网站**
 
 不建议选择，因为反向代理往往只是反向代理几个html和js文件，网站里面的大部分内容依然是网站后台提供的。不符合大流量特点。
+## 关于TLS握手、TLS指纹和ALPN
+虽然TLS是一项加密技术，但在TLS握手的过程中会有一些明文的信息传输，其中包括SNI信息(由serverName参数指定)、ALPN、加密套件等。
+
+目前TLS的标准中并没有对这些明文做严格的要求，所以在不同的TLS实现下这些明文信息的格式可谓五花八门，这些不同TLS实现所具有的不同的明文特征就是TLS指纹。
+
+通过TLS指纹可以反推你所使用的TLS实现，比如Chrome的TLS，FireFox的TLS，GO语言官方库的TLS等。
+
+Xray默认使用的是GO语言官方提供的TLS库，这也是几乎所有GO语言程序所使用的TLS库。Xray也可以模拟Chrome、FireFox、Safari的指纹，但目前只有TCP协议支持。
+
+当使用TCP且不伪装浏览器指纹时，可以自由指定义ALPN。建议设置为http/1.1，这样可以将Xray客户端伪装成GO语言实现的WebDav客户端(如 **[gowebdav](https://github.com/studio-b12/gowebdav)**)。WebDav是网盘特有的协议，且该协议基于HTTP/1.1，详见： **[WebDav](https://en.wikipedia.org/wiki/WebDAV)** 。
+
+若选择伪装浏览器指纹，客户端配置中的alpn参数失效，且ALPN将被固定为h2,http/1.1。同样，当使用WebSocket时，ALPN将被固定为http/1.1；当使用gRPC时，ALPN将被强制添加h2。因此，使用WebSocket还是可以伪装成GO语言WebDav客户端的，gRPC则不行。
+## 关于gRPC与WebSocket
+当正在使用的CDN同时支持gRPC与WebSocket时，两者之间改如何选择呢？他们的主要区别体现在以下三个方面：ALPN、延迟和性能。
+
+关于ALPN，见： **[关于TLS握手、TLS指纹和ALPN](#关于TLS握手、TLS指纹和ALPN)** 。
+
+关于延迟，gRPC自带mux，因此延迟更低。注意这里指的是打开网站的延迟，mux并不能降低游戏延迟。
+
+关于性能，WebSocket的性能更强，如果你的设备性能较弱的话，如家用普通路由器，用WebSocket速度会快一些。
 ## 安装位置
 **Nginx：**`/usr/local/nginx`
 
