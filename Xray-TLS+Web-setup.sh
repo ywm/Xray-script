@@ -532,6 +532,10 @@ else
     red "不支持的系统"
     exit 1
 fi
+if [[ -z "${BASH_SOURCE[0]}" ]]; then
+    red "请以文件的形式运行脚本，或不支持的bash版本"
+    exit 1
+fi
 if [ "$EUID" != "0" ]; then
     red "请用root用户运行此脚本！！"
     exit 1
@@ -2621,7 +2625,7 @@ install_update_xray_tls_web()
     check_important_dependence_installed ca-certificates ca-certificates
     check_important_dependence_installed wget wget
     check_centos8_epel
-    if [ $update -eq 0 ] && [[ -n "${BASH_SOURCE[0]}" ]] && check_script_update; then
+    if [ $update -eq 0 ] && check_script_update; then
         green "脚本可升级"
         if ask_if "是否升级脚本？(y/n)"; then
             update_script
@@ -2810,18 +2814,10 @@ install_update_xray_tls_web()
 #功能型函数
 check_script_update()
 {
-    if [[ -z "${BASH_SOURCE[0]}" ]]; then
-        red "脚本不是文件，无法检查更新"
-        exit 1
-    fi
     [ "$(md5sum "${BASH_SOURCE[0]}" | awk '{print $1}')" == "$(md5sum <(wget -O - "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh") | awk '{print $1}')" ] && return 1 || return 0
 }
 update_script()
 {
-    if [[ -z "${BASH_SOURCE[0]}" ]]; then
-        red "脚本不是文件，无法更新"
-        return 1
-    fi
     rm -rf "${BASH_SOURCE[0]}"
     if ! wget -O "${BASH_SOURCE[0]}" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh" && ! wget -O "${BASH_SOURCE[0]}" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh"; then
         red "更新脚本失败！"
@@ -3474,6 +3470,7 @@ start_menu()
             tyblue "在 修改伪装网站类型/重置域名/添加域名 里选择Cloudreve"
             return 1
         fi
+        check_script_update && red "脚本可升级，请先更新脚本" && return 1
         update_cloudreve
         green "Cloudreve更新完成！"
     elif [ $choice -eq 9 ]; then
