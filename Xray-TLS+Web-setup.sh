@@ -3087,10 +3087,16 @@ reinit_cloudreve()
     done
     systemctl stop cloudreve
     sleep 1s
-    shopt -s extglob
-    temp="rm -rf $cloudreve_prefix/!(cloudreve|conf.ini)"
-    $temp
+    enter_temp_dir
+    mv "$cloudreve_prefix/cloudreve" "$temp_dir"
+    mv "$cloudreve_prefix/conf.ini" "$temp_dir"
+    rm -rf "$cloudreve_prefix"
+    mkdir -p "$cloudreve_prefix"
+    mv "$temp_dir/cloudreve" "$cloudreve_prefix"
+    mv "$temp_dir/conf.ini" "$cloudreve_prefix"
     init_cloudreve "$i"
+    cd /
+    rm -rf "$temp_dir"
     green "重置完成！"
 }
 change_pretend()
