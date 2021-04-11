@@ -2498,8 +2498,6 @@ print_config_info()
         tyblue " ------------------------其他-----------------------"
         tyblue "  Mux(多路复用)                 ：使用XTLS必须关闭;不使用XTLS也建议关闭"
         purple "   (V2RayN:设置页面-开启Mux多路复用)"
-        tyblue "  socks入站的Sniffing(流量探测) ：建议开启"
-        purple "   (V2rayN(G):设置页面-开启流量探测;Qv2ray:首选项-入站设置-SOCKS设置-嗅探)"
         tyblue "------------------------------------------------------------------------"
     fi
     if [ $protocol_2 -ne 0 ]; then
@@ -2543,8 +2541,6 @@ print_config_info()
         tyblue " ------------------------其他-----------------------"
         tyblue "  Mux(多路复用)                 ：强烈建议关闭"
         purple "   (V2RayN:设置页面-开启Mux多路复用)"
-        tyblue "  socks入站的Sniffing(流量探测) ：建议开启"
-        purple "   (V2rayN(G):设置页面-开启流量探测;Qv2ray:首选项-入站设置-SOCKS设置-嗅探)"
         tyblue "------------------------------------------------------------------------"
     fi
     if [ $protocol_3 -ne 0 ]; then
@@ -2590,8 +2586,6 @@ print_config_info()
         tyblue " ------------------------其他-----------------------"
         tyblue "  Mux(多路复用)                 ：建议关闭"
         purple "   (V2RayN:设置页面-开启Mux多路复用)"
-        tyblue "  socks入站的Sniffing(流量探测) ：建议开启"
-        purple "   (V2rayN(G):设置页面-开启流量探测;Qv2ray:首选项-入站设置-SOCKS设置-嗅探)"
         tyblue "------------------------------------------------------------------------"
     fi
     echo
@@ -2601,8 +2595,8 @@ print_config_info()
     echo
     blue   " 若想实现Fullcone(NAT类型开放)，需要达成以下条件："
     blue   "   1. 确保客户端核心为 Xray v1.3.0+"
-    blue   "   2. 若您正在使用Netch作为客户端，请不要使用[模式1]连接 (可使用[模式3 TUN/TAP])"
-    blue   "   3. 如果测试系统为Windows，并且正在使用透明代理或TUN/TAP，请确保当前网络设置为专用网络"
+    blue   "   2. 若您正在使用Netch作为客户端，请不要使用模式 [1] 连接 (可使用模式 [3] Bypass LAN )"
+    blue   "   3. 如果测试系统为Windows，并且正在使用透明代理或TUN/Bypass LAN，请确保当前网络设置为专用网络"
     echo
     blue   " 若想实现WebSocket 0-rtt，请将客户端核心升级至 Xray v1.4.0+"
     echo
