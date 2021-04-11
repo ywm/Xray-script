@@ -811,9 +811,9 @@ doupdate()
         fi
         echo -e "\\n\\n\\n"
         tyblue "------------------请选择升级系统版本--------------------"
-        tyblue " 1.最新beta版(现在是21.04)(2020.11)"
-        tyblue " 2.最新发行版(现在是20.10)(2020.11)"
-        tyblue " 3.最新LTS版(现在是20.04)(2020.11)"
+        tyblue " 1.最新beta版(现在是21.04)(2021.4)"
+        tyblue " 2.最新发行版(现在是21.04)(2021.4)"
+        tyblue " 3.最新LTS版(现在是20.04)(2021.4)"
         tyblue "-------------------------版本说明-------------------------"
         tyblue " beta版：即测试版"
         tyblue " 发行版：即稳定版"
@@ -3082,7 +3082,6 @@ reinit_cloudreve()
         [ "${pretend_list[$i]}" == "1" ] && break
     done
     systemctl stop cloudreve
-    sleep 1s
     enter_temp_dir
     mv "$cloudreve_prefix/cloudreve" "$temp_dir"
     mv "$cloudreve_prefix/conf.ini" "$temp_dir"
