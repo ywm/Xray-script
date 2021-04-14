@@ -19,7 +19,7 @@ using_swap=""
 using_swap_now=0
 
 #安装信息
-nginx_version="nginx-1.19.9"
+nginx_version="nginx-1.19.10"
 openssl_version="openssl-openssl-3.0.0-alpha14"
 nginx_prefix="/usr/local/nginx"
 nginx_config="${nginx_prefix}/conf.d/xray.conf"
@@ -36,7 +36,7 @@ cloudreve_prefix="/usr/local/cloudreve"
 cloudreve_service="/etc/systemd/system/cloudreve.service"
 cloudreve_is_installed=""
 
-nextcloud_url="https://download.nextcloud.com/server/releases/nextcloud-21.0.0.zip"
+nextcloud_url="https://download.nextcloud.com/server/releases/nextcloud-21.0.1.zip"
 
 xray_config="/usr/local/etc/xray/config.json"
 xray_is_installed=""
@@ -812,7 +812,7 @@ doupdate()
         echo -e "\\n\\n\\n"
         tyblue "------------------请选择升级系统版本--------------------"
         tyblue " 1.最新beta版(现在是21.04)(2021.4)"
-        tyblue " 2.最新发行版(现在是21.04)(2021.4)"
+        tyblue " 2.最新发行版(现在是20.10)(2021.4)"
         tyblue " 3.最新LTS版(现在是20.04)(2021.4)"
         tyblue "-------------------------版本说明-------------------------"
         tyblue " beta版：即测试版"
