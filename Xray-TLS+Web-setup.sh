@@ -2428,7 +2428,7 @@ print_share_link()
             read -p "请输入您的VPS IP：" ip
         done
     fi
-    if [[ "$ip" =~ : ]] && ! [[ "$ip" =~ ^[.*:.*]$ ]]; then
+    if [[ "$ip" =~ : ]] && ! [[ "$ip" =~ ^\[.*:.*\]$ ]]; then
         ip="[$ip]"
     fi
     echo
