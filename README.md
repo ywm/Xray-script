@@ -242,7 +242,7 @@ Xray默认使用的是GO语言官方提供的TLS库，这也是几乎所有GO语
 |--with-db4|libdb-dev|libdb-devel|
 |--with-tcadb|libtokyocabinet-dev|tokyocabinet-devel|
 |--with-lmdb|liblmdb-dev|lmdb-devel|
-|--with-enchant|libenchant-dev|enchant-devel|
+|--with-enchant|libenchant-2-dev/libenchant-dev|enchant-devel|
 |--with-ffi|libffi-dev|libffi-devel|
 |--enable-gd|libpng-dev|libpng-devel|
 |--with-external-gd|libgd-dev|gd-devel|
