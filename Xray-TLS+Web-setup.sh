@@ -20,13 +20,13 @@ using_swap_now=0
 
 #安装信息
 nginx_version="nginx-1.20.0"
-openssl_version="openssl-openssl-3.0.0-alpha15"
+openssl_version="openssl-openssl-3.0.0-alpha16"
 nginx_prefix="/usr/local/nginx"
 nginx_config="${nginx_prefix}/conf.d/xray.conf"
 nginx_service="/etc/systemd/system/nginx.service"
 nginx_is_installed=""
 
-php_version="php-8.0.5"
+php_version="php-8.0.6"
 php_prefix="/usr/local/php"
 php_service="/etc/systemd/system/php-fpm.service"
 php_is_installed=""
