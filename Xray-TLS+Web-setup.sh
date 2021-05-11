@@ -2824,7 +2824,6 @@ check_script_update()
 }
 update_script()
 {
-    rm -rf "${BASH_SOURCE[0]}"
     if ! wget -O "${BASH_SOURCE[0]}" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh" && ! wget -O "${BASH_SOURCE[0]}" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh"; then
         red "更新脚本失败！"
         yellow "按回车键继续或Ctrl+c中止"
