@@ -2891,7 +2891,7 @@ install_check_update_update_php()
     else
         systemctl stop php-fpm
     fi
-    green "更新完成！"
+    green "安装/更新完成！"
 }
 check_update_update_nginx()
 {
