@@ -19,8 +19,8 @@ using_swap=""
 using_swap_now=0
 
 #安装信息
-nginx_version="nginx-1.20.0"
-openssl_version="openssl-openssl-3.0.0-alpha16"
+nginx_version="nginx-1.21.0"
+openssl_version="openssl-openssl-3.0.0-alpha17"
 nginx_prefix="/usr/local/nginx"
 nginx_config="${nginx_prefix}/conf.d/xray.conf"
 nginx_service="/etc/systemd/system/nginx.service"
@@ -36,7 +36,7 @@ cloudreve_prefix="/usr/local/cloudreve"
 cloudreve_service="/etc/systemd/system/cloudreve.service"
 cloudreve_is_installed=""
 
-nextcloud_url="https://download.nextcloud.com/server/releases/nextcloud-21.0.1.zip"
+nextcloud_url="https://download.nextcloud.com/server/releases/nextcloud-21.0.2.zip"
 
 xray_config="/usr/local/etc/xray/config.json"
 xray_is_installed=""
