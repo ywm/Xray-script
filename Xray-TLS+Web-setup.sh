@@ -811,9 +811,9 @@ doupdate()
         fi
         echo -e "\\n\\n\\n"
         tyblue "------------------请选择升级系统版本--------------------"
-        tyblue " 1.最新beta版(现在是21.04)(2021.4)"
-        tyblue " 2.最新发行版(现在是20.10)(2021.4)"
-        tyblue " 3.最新LTS版(现在是20.04)(2021.4)"
+        tyblue " 1.最新beta版(现在是21.10)(2021.5)"
+        tyblue " 2.最新发行版(现在是21.04)(2021.5)"
+        tyblue " 3.最新LTS版(现在是20.04)(2021.5)"
         tyblue "-------------------------版本说明-------------------------"
         tyblue " beta版：即测试版"
         tyblue " 发行版：即稳定版"
@@ -878,11 +878,6 @@ doupdate()
                     do-release-upgrade
                     ;;
             esac
-            if ! version_ge "$systemVersion" 20.04; then
-                sed -i 's/Prompt=lts/Prompt=normal/' /etc/update-manager/release-upgrades
-                do-release-upgrade
-                do-release-upgrade
-            fi
             $debian_package_manager update
             $debian_package_manager -y --auto-remove --purge --no-install-recommends full-upgrade
         done
@@ -1678,6 +1673,8 @@ install_php_part1()
     cd "${php_version}"
     make install
     mv sapi/fpm/php-fpm.service "${php_prefix}/php-fpm.service.default.temp"
+    mv php.ini-production "${php_prefix}"
+    mv php.ini-development "${php_prefix}"
     cd ..
     rm -rf "${php_version}"
     instal_php_imagick
@@ -1693,7 +1690,10 @@ install_php_part2()
     echo "listen = /dev/shm/php-fpm_unixsocket/php.sock" >> ${php_prefix}/etc/php-fpm.d/www.conf
     sed -i '/^[ \t]*env\[PATH\][ \t]*=/d' ${php_prefix}/etc/php-fpm.d/www.conf
     echo "env[PATH] = $PATH" >> ${php_prefix}/etc/php-fpm.d/www.conf
-cat > ${php_prefix}/etc/php.ini << EOF
+    rm -rf "${php_prefix}/etc/php.ini"
+    cp "${php_prefix}/php.ini-production" "${php_prefix}/etc/php.ini"
+cat >> ${php_prefix}/etc/php.ini << EOF
+
 [PHP]
 memory_limit=-1
 upload_max_filesize=-1
