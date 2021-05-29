@@ -1840,9 +1840,10 @@ cat > ${nginx_prefix}/conf.d/nextcloud.conf <<EOF
     location ~ ^/(?:\\.|autotest|occ|issue|indie|db_|console)              { return 404; }
     location ~ \\.php(?:$|/) {
         fastcgi_split_path_info ^(.+?\\.php)(/.*)$;
+        set \$path_info \$fastcgi_path_info;
         try_files \$fastcgi_script_name =404;
-        fastcgi_param PATH_INFO \$fastcgi_path_info;
         include fastcgi.conf;
+        fastcgi_param PATH_INFO \$path_info;
         fastcgi_param REMOTE_ADDR 127.0.0.1;
         fastcgi_param SERVER_PORT 443;
         fastcgi_param HTTPS on;
