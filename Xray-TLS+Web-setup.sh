@@ -1831,13 +1831,14 @@ cat > ${nginx_prefix}/conf.d/nextcloud.conf <<EOF
         access_log off;
     }
     location ^~ /.well-known {
-        location = /.well-known/carddav     { return 301 https://\$host/remote.php/dav/; }
-        location = /.well-known/caldav      { return 301 https://\$host/remote.php/dav/; }
-        location ^~ /.well-known            { return 301 https://\$host/index.php\$uri; }
-        try_files \$uri \$uri/ =404;
+        location = /.well-known/carddav { return 301 https://\$host/remote.php/dav/; }
+        location = /.well-known/caldav  { return 301 https://\$host/remote.php/dav/; }
+        location /.well-known/acme-challenge    { try_files \$uri \$uri/ =404; }
+        location /.well-known/pki-validation    { try_files \$uri \$uri/ =404; }
+        return 301 https://\$host/index.php\$request_uri;
     }
     location ~ ^/(?:build|tests|config|lib|3rdparty|templates|data)(?:$|/)  { return 404; }
-    location ~ ^/(?:\\.|autotest|occ|issue|indie|db_|console)              { return 404; }
+    location ~ ^/(?:\\.|autotest|occ|issue|indie|db_|console)                { return 404; }
     location ~ \\.php(?:$|/) {
         fastcgi_split_path_info ^(.+?\\.php)(/.*)$;
         set \$path_info \$fastcgi_path_info;
@@ -1862,6 +1863,9 @@ cat > ${nginx_prefix}/conf.d/nextcloud.conf <<EOF
         try_files \$uri /index.php\$request_uri;
         expires 7d;
         access_log off;
+    }
+    location /remote {
+        return 301 https://\$host/remote.php\$request_uri;
     }
     location / {
         try_files \$uri \$uri/ /index.php\$request_uri;
