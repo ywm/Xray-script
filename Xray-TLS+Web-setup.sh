@@ -132,6 +132,22 @@ version_ge()
 {
     test "$(echo -e "$1\\n$2" | sort -rV | head -n 1)" == "$1"
 }
+#检查脚本更新
+check_script_update()
+{
+    [ "$(md5sum "${BASH_SOURCE[0]}" | awk '{print $1}')" == "$(md5sum <(wget -O - "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh") | awk '{print $1}')" ] && return 1 || return 0
+}
+#更新脚本
+update_script()
+{
+    if ! wget -O "${BASH_SOURCE[0]}" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh" && ! wget -O "${BASH_SOURCE[0]}" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh"; then
+        red "更新脚本失败！"
+        yellow "按回车键继续或Ctrl+c中止"
+        read -s
+    fi
+    green "脚本更新完成，请重新运行脚本！"
+    exit 0
+}
 #安装单个重要依赖
 check_important_dependence_installed()
 {
@@ -2637,11 +2653,7 @@ install_update_xray_tls_web()
     check_centos8_epel
     if [ $update -eq 0 ] && check_script_update; then
         green "脚本可升级"
-        if ask_if "是否升级脚本？(y/n)"; then
-            update_script
-            tyblue "升级完成，请重新运行脚本"
-            exit 0
-        fi
+        ask_if "是否升级脚本？(y/n)" && update_script
     fi
     check_ssh_timeout
     uninstall_firewall
@@ -2822,18 +2834,6 @@ install_update_xray_tls_web()
 }
 
 #功能型函数
-check_script_update()
-{
-    [ "$(md5sum "${BASH_SOURCE[0]}" | awk '{print $1}')" == "$(md5sum <(wget -O - "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh") | awk '{print $1}')" ] && return 1 || return 0
-}
-update_script()
-{
-    if ! wget -O "${BASH_SOURCE[0]}" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh" && ! wget -O "${BASH_SOURCE[0]}" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh"; then
-        red "更新脚本失败！"
-        yellow "按回车键继续或Ctrl+c中止"
-        read -s
-    fi
-}
 full_install_php()
 {
     install_base_dependence
@@ -3453,11 +3453,15 @@ start_menu()
     if [ $choice -eq 1 ]; then
         install_update_xray_tls_web
     elif [ $choice -eq 2 ]; then
-        update_script && bash "${BASH_SOURCE[0]}" --update
+        if check_script_update; then
+            green "脚本可升级！"
+            ask_if "是否升级脚本？(y/n)" && update_script
+        fi
+        bash "${BASH_SOURCE[0]}" --update
     elif [ $choice -eq 3 ]; then
         if check_script_update; then
             green "脚本可升级！"
-            ask_if "是否升级脚本？(y/n)" && update_script && green "脚本更新完成"
+            ask_if "是否升级脚本？(y/n)" && update_script
         else
             green "脚本已经是最新版本"
         fi
