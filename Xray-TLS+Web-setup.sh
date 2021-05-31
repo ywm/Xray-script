@@ -142,10 +142,11 @@ update_script()
 {
     if wget -O "${BASH_SOURCE[0]}" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh" || wget -O "${BASH_SOURCE[0]}" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh"; then
         green "脚本更新完成，请重新运行脚本！"
+        exit 0
     else
         red "更新脚本失败！"
+        exit 1
     fi
-    exit 0
 }
 #安装单个重要依赖
 check_important_dependence_installed()
