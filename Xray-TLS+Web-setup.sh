@@ -140,12 +140,11 @@ check_script_update()
 #更新脚本
 update_script()
 {
-    if ! wget -O "${BASH_SOURCE[0]}" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh" && ! wget -O "${BASH_SOURCE[0]}" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh"; then
+    if wget -O "${BASH_SOURCE[0]}" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh" || wget -O "${BASH_SOURCE[0]}" "https://github.com/kirin10000/Xray-script/raw/main/Xray-TLS+Web-setup.sh"; then
+        green "脚本更新完成，请重新运行脚本！"
+    else
         red "更新脚本失败！"
-        yellow "按回车键继续或Ctrl+c中止"
-        read -s
     fi
-    green "脚本更新完成，请重新运行脚本！"
     exit 0
 }
 #安装单个重要依赖
