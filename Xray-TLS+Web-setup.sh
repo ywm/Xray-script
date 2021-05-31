@@ -3454,7 +3454,12 @@ start_menu()
     elif [ $choice -eq 2 ]; then
         if check_script_update; then
             green "脚本可升级！"
-            ask_if "是否升级脚本？(y/n)" && update_script
+            if ask_if "是否升级脚本？(y/n)"; then
+                update_script
+            else
+                red "请先升级脚本！"
+                exit 0
+            fi
         fi
         bash "${BASH_SOURCE[0]}" --update
     elif [ $choice -eq 3 ]; then
