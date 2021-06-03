@@ -1712,7 +1712,9 @@ cat >> ${php_prefix}/etc/php.ini << EOF
 
 [PHP]
 memory_limit=-1
-upload_max_filesize=-1
+post_max_size=0
+upload_max_filesize=0
+max_file_uploads=50000
 extension=imagick.so
 zend_extension=opcache.so
 opcache.enable=1
