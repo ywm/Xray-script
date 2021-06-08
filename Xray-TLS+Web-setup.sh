@@ -9,6 +9,8 @@ release=""
 systemVersion=""
 debian_package_manager=""
 redhat_package_manager=""
+#CPU线程数
+cpu_thread_num=""
 #物理内存大小
 mem=""
 #在运行脚本前物理内存+swap大小
@@ -17,6 +19,8 @@ mem_total=""
 using_swap=""
 #现在有没有通过脚本启动swap
 using_swap_now=0
+#系统时区
+timezone=""
 
 #安装信息
 nginx_version="nginx-1.21.0"
@@ -526,6 +530,10 @@ if [[ ! -d /dev/shm ]]; then
     red "/dev/shm不存在，不支持的系统"
     exit 1
 fi
+if [[ ! -f /etc/timezone ]]; then
+    red "/etc/timezone不存在，不支持的系统"
+    exit 1
+fi
 if [[ "$(type -P apt)" ]]; then
     if [[ "$(type -P dnf)" ]] || [[ "$(type -P yum)" ]]; then
         red "同时存在apt和yum/dnf"
@@ -567,6 +575,12 @@ fi
 [ -e ${cloudreve_prefix}/cloudreve.db ] && cloudreve_is_installed=1 || cloudreve_is_installed=0
 [ -e /usr/local/bin/xray ] && xray_is_installed=1 || xray_is_installed=0
 ([ $xray_is_installed -eq 1 ] && [ $nginx_is_installed -eq 1 ]) && is_installed=1 || is_installed=0
+timezone="$(cat /etc/timezone)"
+cpu_thread_num="$(grep '^processor[ '$'\t]*:' /proc/cpuinfo | uniq | wc -l)"
+if [ -z "$cpu_thread_num" ] || [ $cpu_thread_num -lt 1 ]; then
+    red "获取CPU线程数失败！"
+    exit 1
+fi
 case "$(uname -m)" in
     'amd64' | 'x86_64')
         machine='amd64'
@@ -1648,7 +1662,7 @@ compile_php()
         ./configure --prefix=${php_prefix} --with-libdir=lib64 --enable-embed=shared --enable-fpm --with-fpm-user=www-data --with-fpm-group=www-data --with-fpm-systemd --with-fpm-acl --disable-phpdbg --with-layout=GNU --with-openssl --with-kerberos --with-external-pcre --with-pcre-jit --with-zlib --enable-bcmath --with-bz2 --enable-calendar --with-curl --enable-dba --with-gdbm --with-db4 --with-db1 --with-tcadb --with-lmdb --with-enchant --enable-exif --with-ffi --enable-ftp --enable-gd --with-external-gd --with-webp --with-jpeg --with-xpm --with-freetype --enable-gd-jis-conv --with-gettext --with-gmp --with-mhash --with-imap --with-imap-ssl --enable-intl --with-ldap --with-ldap-sasl --enable-mbstring --with-mysqli --with-mysql-sock --with-unixODBC --enable-pcntl --with-pdo-dblib --with-pdo-mysql --with-zlib-dir --with-pdo-odbc=unixODBC,/usr --with-pdo-pgsql --with-pgsql --with-pspell --with-libedit --enable-shmop --with-snmp --enable-soap --enable-sockets --with-sodium --with-password-argon2 --enable-sysvmsg --enable-sysvsem --enable-sysvshm --with-tidy --with-xsl --with-zip --enable-mysqlnd --with-pear CPPFLAGS="-g0 -O3" CFLAGS="-g0 -O3" CXXFLAGS="-g0 -O3"
     fi
     swap_on 1800
-    if ! make; then
+    if ! make -j$cpu_thread_num; then
         swap_off
         red    "php编译失败！"
         green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
@@ -1669,7 +1683,7 @@ instal_php_imagick()
     ${php_prefix}/bin/phpize
     ./configure --with-php-config=${php_prefix}/bin/php-config CFLAGS="-g0 -O3"
     swap_on 380
-    if ! make; then
+    if ! make -j$cpu_thread_num; then
         swap_off
         yellow "php-imagick编译失败"
         green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
@@ -1702,10 +1716,18 @@ install_php_part2()
     useradd -r -s /bin/bash www-data
     cp ${php_prefix}/etc/php-fpm.conf.default ${php_prefix}/etc/php-fpm.conf
     cp ${php_prefix}/etc/php-fpm.d/www.conf.default ${php_prefix}/etc/php-fpm.d/www.conf
-    sed -i '/^[ \t]*listen[ \t]*=/d' ${php_prefix}/etc/php-fpm.d/www.conf
-    echo "listen = /dev/shm/php-fpm_unixsocket/php.sock" >> ${php_prefix}/etc/php-fpm.d/www.conf
-    sed -i '/^[ \t]*env\[PATH\][ \t]*=/d' ${php_prefix}/etc/php-fpm.d/www.conf
-    echo "env[PATH] = $PATH" >> ${php_prefix}/etc/php-fpm.d/www.conf
+    sed -i 's/^[ \t]*listen[ \t]*=/;&/g' ${php_prefix}/etc/php-fpm.d/www.conf
+    sed -i 's/^[ \t]*env\[PATH\][ \t]*=/;&/g' ${php_prefix}/etc/php-fpm.d/www.conf
+cat >> ${php_prefix}/etc/php-fpm.d/www.conf << EOF
+
+listen = /dev/shm/php-fpm_unixsocket/php.sock
+pm = dynamic
+pm.max_children = $((8*cpu_thread_num))
+pm.start_servers = $cpu_thread_num
+pm.min_spare_servers = $cpu_thread_num
+pm.max_spare_servers = $((8*cpu_thread_num))
+env[PATH] = $PATH
+EOF
     rm -rf "${php_prefix}/etc/php.ini"
     cp "${php_prefix}/php.ini-production" "${php_prefix}/etc/php.ini"
 cat >> ${php_prefix}/etc/php.ini << EOF
@@ -1718,6 +1740,10 @@ max_file_uploads=50000
 extension=imagick.so
 zend_extension=opcache.so
 opcache.enable=1
+date.timezone=$timezone
+;如果使用mysql，并且使用unix domain socket方式连接，请正确设置以下内容
+;pdo_mysql.default_socket=/var/run/mysqld/mysqld.sock
+;mysqli.default_socket=/var/run/mysqld/mysqld.sock
 EOF
     install -m 644 "${php_prefix}/php-fpm.service.default" $php_service
 cat >> $php_service <<EOF
@@ -1754,7 +1780,7 @@ compile_nginx()
     sed -i "s/OPTIMIZE[ \\t]*=>[ \\t]*'-O'/OPTIMIZE          => '-O3'/g" src/http/modules/perl/Makefile.PL
     ./configure --prefix=/usr/local/nginx --with-openssl=../$openssl_version --with-mail=dynamic --with-mail_ssl_module --with-stream=dynamic --with-stream_ssl_module --with-stream_realip_module --with-stream_geoip_module=dynamic --with-stream_ssl_preread_module --with-http_ssl_module --with-http_v2_module --with-http_realip_module --with-http_addition_module --with-http_xslt_module=dynamic --with-http_image_filter_module=dynamic --with-http_geoip_module=dynamic --with-http_sub_module --with-http_dav_module --with-http_flv_module --with-http_mp4_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_auth_request_module --with-http_random_index_module --with-http_secure_link_module --with-http_degradation_module --with-http_slice_module --with-http_stub_status_module --with-http_perl_module=dynamic --with-pcre --with-libatomic --with-compat --with-cpp_test_module --with-google_perftools_module --with-file-aio --with-threads --with-poll_module --with-select_module --with-cc-opt="-Wno-error -g0 -O3"
     swap_on 480
-    if ! make; then
+    if ! make -j$cpu_thread_num; then
         swap_off
         red    "Nginx编译失败！"
         green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
