@@ -530,8 +530,8 @@ if [[ ! -d /dev/shm ]]; then
     red "/dev/shm不存在，不支持的系统"
     exit 1
 fi
-if [[ ! -f /etc/localtime ]]; then
-    red "/etc/localtime不存在，不支持的系统"
+if [[ ! -L /etc/localtime ]]; then
+    red "/etc/localtime不是链接，不支持的系统"
     exit 1
 fi
 if [[ "$(type -P apt)" ]]; then
