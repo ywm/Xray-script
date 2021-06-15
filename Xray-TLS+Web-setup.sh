@@ -1722,10 +1722,10 @@ cat >> ${php_prefix}/etc/php-fpm.d/www.conf << EOF
 
 listen = /dev/shm/php-fpm_unixsocket/php.sock
 pm = dynamic
-pm.max_children = $((8*cpu_thread_num))
+pm.max_children = $((16*cpu_thread_num))
 pm.start_servers = $cpu_thread_num
 pm.min_spare_servers = $cpu_thread_num
-pm.max_spare_servers = $((8*cpu_thread_num))
+pm.max_spare_servers = $((16*cpu_thread_num))
 env[PATH] = $PATH
 EOF
     rm -rf "${php_prefix}/etc/php.ini"
