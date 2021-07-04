@@ -11,10 +11,6 @@ debian_package_manager=""
 redhat_package_manager=""
 #CPU线程数
 cpu_thread_num=""
-#物理内存大小
-mem=""
-#在运行脚本前物理内存+swap大小
-mem_total=""
 #在运行脚本前是否有启用swap
 using_swap=""
 #现在有没有通过脚本启动swap
@@ -286,9 +282,9 @@ swap_on()
         yellow "按回车键继续或者Ctrl+c退出"
         read -s
     fi
-    if [ $mem_total -lt $1 ]; then
-        tyblue "内存不足$1M，自动申请swap。。"
-        if dd if=/dev/zero of=${temp_dir}/swap bs=1M count=$(($1-mem)); then
+    if (( $(free -m | sed -n 2p | awk '{print $2}')-$(free -m | sed -n 2p | awk '{print $3}')+$(free -m | sed -n 3p | awk '{print $2}')-$(free -m | sed -n 3p | awk '{print $3}')<$1 )); then
+        tyblue "可用内存不足$1M，自动申请swap。。"
+        if dd if=/dev/zero of=${temp_dir}/swap bs=1M count=$(($1+$(free -m | sed -n 2p | awk '{print $3}')-$(free -m | sed -n 2p | awk '{print $2}'))); then
             chmod 0600 ${temp_dir}/swap
             mkswap ${temp_dir}/swap
             swapoff -a
@@ -596,8 +592,6 @@ case "$(uname -m)" in
         ;;
 esac
 
-mem="$(free -m | sed -n 2p | awk '{print $2}')"
-mem_total="$(($(free -m | sed -n 2p | awk '{print $2}')+$(free -m | tail -n 1 | awk '{print $2}')))"
 [[ "$(free -b | tail -n 1 | awk '{print $2}')" -ne "0" ]] && using_swap=1 || using_swap=0
 if [ $is_installed -eq 1 ] && ! grep -q "domain_list=" $nginx_config; then
     red "脚本进行了一次不向下兼容的更新"
@@ -919,7 +913,7 @@ doupdate()
         green  " 1. 更新已安装软件，并升级系统 (Ubuntu专享)"
         green  " 2. 仅更新已安装软件"
         red    " 3. 不更新"
-        if [ "$release" == "ubuntu" ] && ((mem<400)); then
+        if [ "$release" == "ubuntu" ] && (($(free -m | sed -n 2p | awk '{print $2}')<400)); then
             red "检测到内存过小，升级系统可能导致无法开机，请谨慎选择"
         fi
         echo
@@ -1661,7 +1655,7 @@ compile_php()
     else
         ./configure --prefix=${php_prefix} --with-libdir=lib64 --enable-embed=shared --enable-fpm --with-fpm-user=www-data --with-fpm-group=www-data --with-fpm-systemd --with-fpm-acl --disable-phpdbg --with-layout=GNU --with-openssl --with-kerberos --with-external-pcre --with-pcre-jit --with-zlib --enable-bcmath --with-bz2 --enable-calendar --with-curl --enable-dba --with-gdbm --with-db4 --with-db1 --with-tcadb --with-lmdb --with-enchant --enable-exif --with-ffi --enable-ftp --enable-gd --with-external-gd --with-webp --with-jpeg --with-xpm --with-freetype --enable-gd-jis-conv --with-gettext --with-gmp --with-mhash --with-imap --with-imap-ssl --enable-intl --with-ldap --with-ldap-sasl --enable-mbstring --with-mysqli --with-mysql-sock --with-unixODBC --enable-pcntl --with-pdo-dblib --with-pdo-mysql --with-zlib-dir --with-pdo-odbc=unixODBC,/usr --with-pdo-pgsql --with-pgsql --with-pspell --with-libedit --enable-shmop --with-snmp --enable-soap --enable-sockets --with-sodium --with-password-argon2 --enable-sysvmsg --enable-sysvsem --enable-sysvshm --with-tidy --with-xsl --with-zip --enable-mysqlnd --with-pear CPPFLAGS="-g0 -O3" CFLAGS="-g0 -O3" CXXFLAGS="-g0 -O3"
     fi
-    swap_on 1800
+    swap_on 2048
     if ! make -j$cpu_thread_num; then
         swap_off
         red    "php编译失败！"
