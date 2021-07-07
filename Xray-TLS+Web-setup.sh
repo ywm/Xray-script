@@ -11,15 +11,13 @@ debian_package_manager=""
 redhat_package_manager=""
 #CPU线程数
 cpu_thread_num=""
-#在运行脚本前是否有启用swap
-using_swap=""
 #现在有没有通过脚本启动swap
 using_swap_now=0
 #系统时区
 timezone=""
 
 #安装信息
-nginx_version="nginx-1.21.0"
+nginx_version="nginx-1.21.1"
 openssl_version="openssl-openssl-3.0.0-beta1"
 nginx_prefix="/usr/local/nginx"
 nginx_config="${nginx_prefix}/conf.d/xray.conf"
@@ -100,7 +98,7 @@ blue()                             #蓝色
 check_base_command()
 {
     local i
-    local temp_command_list=('bash' 'true' 'false' 'exit' 'echo' 'test' 'free' 'sort' 'sed' 'awk' 'grep' 'cut' 'cd' 'rm' 'cp' 'mv' 'head' 'tail' 'uname' 'tr' 'md5sum' 'tar' 'cat' 'find' 'type' 'command' 'kill' 'pkill' 'wc' 'ls' 'mktemp')
+    local temp_command_list=('bash' 'true' 'false' 'exit' 'echo' 'test' 'free' 'sort' 'sed' 'awk' 'grep' 'cut' 'cd' 'rm' 'cp' 'mv' 'head' 'tail' 'uname' 'tr' 'md5sum' 'tar' 'cat' 'find' 'type' 'command' 'kill' 'pkill' 'wc' 'ls' 'mktemp' 'swapon' 'swapoff' 'mkswap' 'chmod' 'chown')
     for i in ${!temp_command_list[@]}
     do
         if ! command -V "${temp_command_list[$i]}" > /dev/null; then
@@ -282,17 +280,14 @@ swap_on()
         yellow "按回车键继续或者Ctrl+c退出"
         read -s
     fi
-    if (( $(free -m | sed -n 2p | awk '{print $2}')-$(free -m | sed -n 2p | awk '{print $3}')+$(free -m | sed -n 3p | awk '{print $2}')-$(free -m | sed -n 3p | awk '{print $3}')<$1 )); then
+    need_swap_size=$(( $1+$(free -m | sed -n 2p | awk '{print $3}')+$(free -m | sed -n 3p | awk '{print $3}')-$(free -m | sed -n 2p | awk '{print $2}')-$(free -m | sed -n 3p | awk '{print $2}') ))
+    if [ $need_swap_size -gt 0 ]; then
         tyblue "可用内存不足$1M，自动申请swap。。"
-        if dd if=/dev/zero of=${temp_dir}/swap bs=1M count=$(($1+$(free -m | sed -n 2p | awk '{print $3}')-$(free -m | sed -n 2p | awk '{print $2}'))); then
-            chmod 0600 ${temp_dir}/swap
-            mkswap ${temp_dir}/swap
-            swapoff -a
-            swapon ${temp_dir}/swap
+        if dd if=/dev/zero of=${temp_dir}/swap bs=1M count=$need_swap_size && chmod 0600 ${temp_dir}/swap && mkswap ${temp_dir}/swap && swapon ${temp_dir}/swap; then
             using_swap_now=1
         else
             rm -rf ${temp_dir}/swap
-            red   "开启swap失败！"
+            red    "开启swap失败！"
             yellow "可能是机器内存和硬盘空间都不足"
             green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
             yellow "按回车键继续或者Ctrl+c退出"
@@ -304,10 +299,15 @@ swap_off()
 {
     if [ $using_swap_now -eq 1 ]; then
         tyblue "正在恢复swap。。。"
-        swapoff -a
-        rm -rf ${temp_dir}/swap
-        [ $using_swap -ne 0 ] && swapon -a
-        using_swap_now=0
+        if swapoff ${temp_dir}/swap && rm -rf ${temp_dir}/swap; then
+            using_swap_now=0
+        else
+            red    "关闭swap失败！"
+            green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的
+支持"
+            yellow "按回车键继续或者Ctrl+c退出"
+            read -s
+        fi
     fi
 }
 #启用/禁用php cloudreve
@@ -592,7 +592,6 @@ case "$(uname -m)" in
         ;;
 esac
 
-[[ "$(free -b | tail -n 1 | awk '{print $2}')" -ne "0" ]] && using_swap=1 || using_swap=0
 if [ $is_installed -eq 1 ] && ! grep -q "domain_list=" $nginx_config; then
     red "脚本进行了一次不向下兼容的更新"
     yellow "请选择 \"重新安装\"选项 来升级"
