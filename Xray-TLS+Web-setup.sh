@@ -202,8 +202,13 @@ install_dependence()
             local temp_redhat_install="$redhat_package_manager -y --enablerepo "
         fi
         if ! $redhat_package_manager -y install "$@"; then
-            if [ "$release" == "centos" ] && version_ge "$systemVersion" 8 && $temp_redhat_install"epel,PowerTools" install "$@";then
+            if $temp_redhat_install'epel' install "$@"; then
                 return 0
+            fi
+            if [ "$release" == "centos" ] && version_ge "$systemVersion" 8;then
+                if $temp_redhat_install"epel,powertools" install "$@" || $temp_redhat_install"epel,PowerTools" install "$@"; then
+                    return 0
+                fi
             fi
             if $temp_redhat_install'*' install "$@"; then
                 return 0
@@ -822,16 +827,7 @@ doupdate()
 {
     updateSystem()
     {
-        if ! [[ "$(type -P do-release-upgrade)" ]]; then
-            if ! $debian_package_manager -y --no-install-recommends install ubuntu-release-upgrader-core; then
-                $debian_package_manager update
-                if ! $debian_package_manager -y --no-install-recommends install ubuntu-release-upgrader-core; then
-                    red    "脚本出错！"
-                    yellow "按回车键继续或者Ctrl+c退出"
-                    read -s
-                fi
-            fi
-        fi
+        check_important_dependence_installed "ubuntu-release-upgrader-core"
         echo -e "\\n\\n\\n"
         tyblue "------------------请选择升级系统版本--------------------"
         tyblue " 1.最新beta版(现在是21.10)(2021.5)"
@@ -901,8 +897,12 @@ doupdate()
                     do-release-upgrade
                     ;;
             esac
+            $debian_package_manager -y --purge autoremove
             $debian_package_manager update
+            $debian_package_manager -y --purge autoremove
             $debian_package_manager -y --auto-remove --purge --no-install-recommends full-upgrade
+            $debian_package_manager -y --purge autoremove
+            $debian_package_manager clean
         done
     }
     while ((1))
@@ -937,12 +937,14 @@ doupdate()
         yellow " 更新过程中遇到问话/对话框，如果不明白，选择yes/y/第一个选项"
         yellow " 按回车键继续。。。"
         read -s
-        $redhat_package_manager -y autoremove
-        $redhat_package_manager -y update
+        $debian_package_manager -y --purge autoremove
         $debian_package_manager update
+        $debian_package_manager -y --purge autoremove
         $debian_package_manager -y --auto-remove --purge --no-install-recommends full-upgrade
         $debian_package_manager -y --purge autoremove
         $debian_package_manager clean
+        $redhat_package_manager -y autoremove
+        $redhat_package_manager -y update
         $redhat_package_manager -y autoremove
         $redhat_package_manager clean all
     fi
@@ -3320,7 +3322,7 @@ simplify_system()
     if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         $redhat_package_manager -y remove openssl "perl*"
     else
-        local temp_remove_list=('openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' 'libffi-dev' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^python.*:i386' '^libpython' '^libpython.*:i386' 'dbus' 'cron' 'anacron' 'cron' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)')
+        local temp_remove_list=('openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' 'libffi-dev' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^python.*:i386' '^libpython' '^libpython.*:i386' 'dbus' 'cron' 'anacron' 'cron' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' 'thermald' 'libdbus-glib-1-2' 'libevdev2' 'libupower-glib3' 'usb.ids')
         if ! $debian_package_manager -y --auto-remove purge "${temp_remove_list[@]}"; then
             $debian_package_manager -y -f install
             for i in ${!temp_remove_list[@]}
