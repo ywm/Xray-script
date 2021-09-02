@@ -17,14 +17,14 @@ using_swap_now=0
 timezone=""
 
 #安装信息
-nginx_version="nginx-1.21.1"
+nginx_version="nginx-1.21.2"
 openssl_version="openssl-openssl-3.0.0-beta2"
 nginx_prefix="/usr/local/nginx"
 nginx_config="${nginx_prefix}/conf.d/xray.conf"
 nginx_service="/etc/systemd/system/nginx.service"
 nginx_is_installed=""
 
-php_version="php-8.0.9"
+php_version="php-8.0.10"
 php_prefix="/usr/local/php"
 php_service="/etc/systemd/system/php-fpm.service"
 php_is_installed=""
@@ -34,7 +34,7 @@ cloudreve_prefix="/usr/local/cloudreve"
 cloudreve_service="/etc/systemd/system/cloudreve.service"
 cloudreve_is_installed=""
 
-nextcloud_url="https://download.nextcloud.com/server/releases/nextcloud-22.1.0.zip"
+nextcloud_url="https://download.nextcloud.com/server/releases/nextcloud-22.1.1.zip"
 
 xray_config="/usr/local/etc/xray/config.json"
 xray_is_installed=""
@@ -798,9 +798,15 @@ uninstall_firewall()
     systemctl disable YDService
     rm -rf /lib/systemd/system/YDService.service
     systemctl daemon-reload
+    systemctl stop tat_agent
+    systemctl disable tat_agent
+    rm -rf /etc/systemd/system/tat_agent.service
+    systemctl daemon-reload
     sed -i 's#/usr/local/qcloud#rcvtevyy4f5d#g' /etc/rc.local
     sed -i '/rcvtevyy4f5d/d' /etc/rc.local
     rm -rf $(find /etc/udev/rules.d -iname "*qcloud*" 2>/dev/null)
+    pkill -9 watchdog.sh
+    pkill -9 secu-tcs-agent
     pkill -9 YDService
     pkill -9 YDLive
     pkill -9 sgagent
@@ -809,6 +815,7 @@ uninstall_firewall()
     pkill -9 barad_agent
     kill -s 9 "$(ps -aux | grep '/usr/local/qcloud/nv//nv_driver_install_helper\.sh' | awk '{print $2}')"
     rm -rf /usr/local/qcloud
+    rm -rf /usr/local/sa
     rm -rf /usr/local/yd.socket.client
     rm -rf /usr/local/yd.socket.server
     mkdir /usr/local/qcloud
