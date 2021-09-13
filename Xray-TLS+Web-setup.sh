@@ -2478,7 +2478,7 @@ print_share_link()
         local ip=""
         while [ -z "$ip" ]
         do
-            read -p "请输入您的VPS IP：" ip
+            read -p "请输入您的服务器IP(用于生成分享链接)：" ip
         done
     fi
     if [[ "$ip" =~ : ]] && ! [[ "$ip" =~ ^\[.*:.*\]$ ]]; then
@@ -2507,14 +2507,27 @@ print_share_link()
             fi
         done
     fi
+    if [ $protocol_2 -eq 1 ]; then
+        green  "VLESS-gRPC-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m："
+        for i in ${!domain_list[@]}
+        do
+            tyblue "vless://${xid_2}@${domain_list[$i]}:443?type=grpc&security=tls&serviceName=${serviceName}&mode=multi"
+        done
+    elif [ $protocol_2 -eq 2 ]; then
+        green  "VMess-gRPC-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m："
+        for i in ${!domain_list[@]}
+        do
+            tyblue "vmess://${xid_2}@${domain_list[$i]}:443?type=grpc&security=tls&serviceName=${serviceName}&mode=multi"
+        done
+    fi
     if [ $protocol_3 -eq 1 ]; then
-        green  "VLESS-WebSocket-TLS\\033[35m(有CDN则走CDN，否则直连)\\033[32m："
+        green  "VLESS-WebSocket-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m："
         for i in ${!domain_list[@]}
         do
             tyblue "vless://${xid_3}@${domain_list[$i]}:443?type=ws&security=tls&path=%2F${path#/}%3Fed=2048"
         done
     elif [ $protocol_3 -eq 2 ]; then
-        green  "VMess-WebSocket-TLS\\033[35m(有CDN则走CDN，否则直连)\\033[32m："
+        green  "VMess-WebSocket-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m："
         for i in ${!domain_list[@]}
         do
             tyblue "vmess://${xid_3}@${domain_list[$i]}:443?type=ws&security=tls&path=%2F${path#/}%3Fed=2048"
