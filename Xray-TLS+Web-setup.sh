@@ -1615,9 +1615,9 @@ readDomain()
 install_base_dependence()
 {
     if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        install_dependence net-tools redhat-lsb-core ca-certificates wget unzip curl gzip xz-utils openssl crontabs gcc gcc-c++ make
+        install_dependence net-tools redhat-lsb-core ca-certificates wget unzip curl openssl crontabs gcc gcc-c++ make
     else
-        install_dependence net-tools lsb-release ca-certificates wget unzip curl openssl cron gcc g++ make
+        install_dependence net-tools lsb-release ca-certificates wget unzip curl gzip xz-utils openssl cron gcc g++ make
     fi
 }
 install_nginx_dependence()
