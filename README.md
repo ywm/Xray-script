@@ -99,7 +99,7 @@
 ### 1. 安装wget
 Debian基系统(包括Ubuntu、Debian、deepin)：
 ```bash
-[[ "$(type -P wget)" ]] || apt -y install wget || (apt update && apt -y install wget)
+[[ "$(type -P wget)" ]] || apt --no-install-recommends -y install wget || (apt update && apt --no-install-recommends -y install wget)
 ```
 Red Hat基系统(包括CentOS、fedora)：
 ```bash
