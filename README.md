@@ -204,6 +204,7 @@ Xray默认使用的是GO语言官方提供的TLS库，这也是几乎所有GO语
 |unzip|unzip|unzip|
 |curl|curl|curl|
 |解压tar.gz文件|gzip|gzip|
+|解压tar.xz文件|xz-utils|xz-utils|
 |acme.sh依赖|openssl|openssl|
 |acme.sh依赖|cron|crontabs|
 |编译基础：|||
@@ -269,7 +270,6 @@ Xray默认使用的是GO语言官方提供的TLS库，这也是几乎所有GO语
 |--with-tidy|libtidy-dev|libtidy-devel|
 |--with-xsl|libxslt1-dev|libxslt-devel|
 |--with-zip|libzip-dev|libzip-devel|
-|解压tar.xz文件|xz-utils|xz-utils|
 |编译php-imagick：|||
 ||autoconf|autoconf|
 ||git|git|
