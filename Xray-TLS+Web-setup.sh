@@ -98,7 +98,7 @@ blue()                             #蓝色
 check_base_command()
 {
     local i
-    local temp_command_list=('bash' 'true' 'false' 'exit' 'echo' 'test' 'free' 'sort' 'sed' 'awk' 'grep' 'cut' 'cd' 'rm' 'cp' 'mv' 'head' 'tail' 'uname' 'tr' 'md5sum' 'cat' 'find' 'type' 'command' 'kill' 'pkill' 'wc' 'ls' 'mktemp' 'swapon' 'swapoff' 'mkswap' 'chmod' 'chown' 'export')
+    local temp_command_list=('bash' 'true' 'false' 'exit' 'echo' 'test' 'sort' 'sed' 'awk' 'grep' 'cut' 'cd' 'rm' 'cp' 'mv' 'head' 'tail' 'uname' 'tr' 'md5sum' 'cat' 'find' 'type' 'command' 'wc' 'ls' 'mktemp' 'swapon' 'swapoff' 'mkswap' 'chmod' 'chown' 'export')
     for i in ${!temp_command_list[@]}
     do
         if ! command -V "${temp_command_list[$i]}" > /dev/null; then
@@ -147,7 +147,7 @@ update_script()
     fi
 }
 #安装单个重要依赖
-check_important_dependence_installed()
+test_important_dependence_installed()
 {
     local temp_exit_code=1
     if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
@@ -171,7 +171,11 @@ check_important_dependence_installed()
             temp_exit_code=0
         fi
     fi
-    if [ $temp_exit_code -ne 0 ]; then
+    return $temp_exit_code
+}
+check_important_dependence_installed()
+{
+    if ! test_important_dependence_installed "$@"; then
         if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
             red "重要组件\"$1\"安装失败！！"
         else
@@ -218,6 +222,33 @@ install_dependence()
             yellow "按回车键继续或者Ctrl+c退出"
             read -s
         fi
+    fi
+}
+#检查CentOS8 epel源是否安装
+check_centos8_epel()
+{
+    if [ $release == "centos" ] && version_ge "$systemVersion" "8"; then
+        if $redhat_package_manager --help | grep -qw "\\-\\-all"; then
+            local temp_command="$redhat_package_manager --all repolist"
+        else
+            local temp_command="$redhat_package_manager repolist all"
+        fi
+        if ! $temp_command | awk '{print $1}' | grep -q epel; then
+            check_important_dependence_installed "" "epel-release"
+        fi
+    fi
+}
+# 检查procps是否安装
+check_procps_installed()
+{
+    if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+        if ! test_important_dependence_installed "" "procps-ng" && ! test_important_dependence_installed "" "procps"; then
+            red '重要组件"procps"安装失败！！'
+            yellow "按回车键继续或者Ctrl+c退出"
+            read -s
+        fi
+    else
+        check_important_dependence_installed "procps" ""
     fi
 }
 #进入工作目录
@@ -597,18 +628,6 @@ case "$(uname -m)" in
         ;;
 esac
 
-if [ $is_installed -eq 1 ] && ! grep -q "domain_list=" $nginx_config; then
-    red "脚本进行了一次不向下兼容的更新"
-    yellow "请选择 \"重新安装\"选项 来升级"
-    [ "$1" == "--update" ] && exit 1
-    sleep 3s
-fi
-if [ $is_installed -eq 1 ] && ! grep -q "# This file has been edited by Xray-TLS-Web setup script" /etc/systemd/system/xray.service && ! [ "$1" == "--update" ]; then
-    red "脚本进行了一次不向下兼容的更新"
-    yellow "请选择 \"更新Xray\"选项 来升级"
-    sleep 3s
-fi
-
 #获取系统版本信息
 get_system_info()
 {
@@ -628,21 +647,6 @@ get_system_info()
         release="fedora"
     fi
     systemVersion="$(lsb_release -r -s)"
-}
-
-#检查CentOS8 epel源是否安装
-check_centos8_epel()
-{
-    if [ $release == "centos" ] && version_ge "$systemVersion" "8"; then
-        if $redhat_package_manager --help | grep -qw "\\-\\-all"; then
-            local temp_command="$redhat_package_manager --all repolist"
-        else
-            local temp_command="$redhat_package_manager repolist all"
-        fi
-        if ! $temp_command | awk '{print $1}' | grep -q epel; then
-            check_important_dependence_installed "" "epel-release"
-        fi
-    fi
 }
 
 #检查80端口和443端口是否被占用
@@ -695,13 +699,21 @@ check_SELinux()
 {
     turn_off_selinux()
     {
-        check_important_dependence_installed selinux-utils libselinux-utils
+        if command -V setenforce >/dev/null 2>&1; then
+            local selinux_utils_is_installed=1
+        else
+            local selinux_utils_is_installed=0
+            check_important_dependence_installed selinux-utils libselinux-utils
+        fi
         setenforce 0
         sed -i 's/^[ \t]*SELINUX[ \t]*=[ \t]*enforcing[ \t]*$/SELINUX=disabled/g' /etc/sysconfig/selinux
-        $redhat_package_manager -y remove libselinux-utils
-        $debian_package_manager -y purge selinux-utils
+        sed -i 's/^[ \t]*SELINUX[ \t]*=[ \t]*enforcing[ \t]*$/SELINUX=disabled/g' /etc/selinux/config
+        if [ $selinux_utils_is_installed -eq 0 ]; then
+            $redhat_package_manager -y remove libselinux-utils
+            $debian_package_manager -y purge selinux-utils
+        fi
     }
-    if getenforce 2>/dev/null | grep -wqi Enforcing || grep -Eq '^[ '$'\t]*SELINUX[ '$'\t]*=[ '$'\t]*enforcing[ '$'\t]*$' /etc/sysconfig/selinux 2>/dev/null; then
+    if getenforce 2>/dev/null | grep -wqi Enforcing || grep -Eq '^[ '$'\t]*SELINUX[ '$'\t]*=[ '$'\t]*enforcing[ '$'\t]*$' /etc/sysconfig/selinux 2>/dev/null || grep -Eq '^[ '$'\t]*SELINUX[ '$'\t]*=[ '$'\t]*enforcing[ '$'\t]*$' /etc/selinux/config 2>/dev/null; then
         yellow "检测到SELinux已开启，脚本可能无法正常运行"
         if ask_if "尝试关闭SELinux?(y/n)"; then
             turn_off_selinux
@@ -2696,6 +2708,7 @@ install_update_xray_tls_web()
     get_system_info
     check_important_dependence_installed ca-certificates ca-certificates
     check_important_dependence_installed wget wget
+    check_procps_installed
     check_centos8_epel
     if [ $update -eq 0 ] && check_script_update; then
         green "脚本可升级"
@@ -2882,6 +2895,7 @@ install_update_xray_tls_web()
 #功能型函数
 full_install_php()
 {
+    check_centos8_epel
     install_base_dependence
     install_php_dependence
     enter_temp_dir
@@ -2895,7 +2909,6 @@ full_install_php()
 #安装/检查更新/更新php
 install_check_update_update_php()
 {
-    check_script_update && red "脚本可升级，请先更新脚本" && return 1
     if ([ $release == "centos" ] && ! version_ge "$systemVersion" "8" ) || ([ $release == "rhel" ] && ! version_ge "$systemVersion" "8") || ([ $release == "fedora" ] && ! version_ge "$systemVersion" "30") || ([ $release == "ubuntu" ] && ! version_ge "$systemVersion" "20.04") || ([ $release == "debian" ] && ! version_ge "$systemVersion" "10") || ([ $release == "deepin" ] && ! version_ge "$systemVersion" "20"); then
         red "系统版本过低！"
         tyblue "安装Nextcloud需要安装php"
@@ -2923,7 +2936,9 @@ install_check_update_update_php()
         yellow " 8. 其他以 Red Hat 8+ 为基的系统"
         ! ask_if "确定选择吗？(y/n)" && return 0
     fi
+    local php_status=0
     if [ $php_is_installed -eq 1 ]; then
+        check_script_update && red "脚本可升级，请先更新脚本" && return 1
         if check_php_update; then
             green "php有新版本"
             ! ask_if "是否更新？(y/n)" && return 0
@@ -2931,9 +2946,17 @@ install_check_update_update_php()
             green "php已是最新版本"
             return 0
         fi
+        systemctl -q is-active php-fpm && php_status=1
+    else
+        if check_script_update; then
+            green "脚本可升级"
+            ask_if "是否升级脚本？(y/n)" && update_script
+        fi
+        tyblue "安装php用于运行nextcloud网盘"
+        yellow "编译&&安装php可能需要消耗15-60分钟"
+        yellow "且php将占用一定系统资源，不建议内存<512M的机器使用"
+        ! ask_if "是否继续？(y/n)" && return 0
     fi
-    local php_status=0
-    systemctl -q is-active php-fpm && php_status=1
     full_install_php
     turn_on_off_php
     if [ $php_status -eq 1 ]; then
@@ -3338,11 +3361,17 @@ simplify_system()
     yellow "警告：此功能可能导致某些VPS无法开机，请谨慎使用"
     tyblue "建议在纯净系统下使用此功能"
     ! ask_if "是否要继续?(y/n)" && return 0
+    echo
+    yellow "提示：在精简系统前请先设置apt/yum/dnf的软件源为http/ftp而非https/ftps"
+    purple "通常来说系统默认即是http/ftp"
+    ! ask_if "是否要继续?(y/n)" && return 0
     uninstall_firewall
     if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        $redhat_package_manager -y remove openssl "perl*" "xz"
+        $redhat_package_manager -y remove openssl "perl*" xz libselinux-utils
+        $redhat_package_manager -y remove procps-ng
+        $redhat_package_manager -y remove procps
     else
-        local temp_remove_list=('openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' 'libffi-dev' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^python.*:i386' '^libpython' '^libpython.*:i386' 'dbus' 'cron' 'anacron' 'cron' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' 'thermald' 'libdbus-glib-1-2' 'libevdev2' 'libupower-glib3' 'usb.ids' 'readline-common' '^libreadline' 'xz-utils')
+        local temp_remove_list=('openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' 'libffi-dev' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^python.*:i386' '^libpython' '^libpython.*:i386' 'dbus' 'cron' 'anacron' 'cron' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' 'thermald' 'libdbus-glib-1-2' 'libevdev2' 'libupower-glib3' 'usb.ids' 'readline-common' '^libreadline' 'xz-utils' 'procps' 'selinux-utils')
         if ! $debian_package_manager -y --auto-remove purge "${temp_remove_list[@]}"; then
             $debian_package_manager -y -f install
             for i in ${!temp_remove_list[@]}
@@ -3353,6 +3382,7 @@ simplify_system()
         [ $release == "ubuntu" ] && version_ge "$systemVersion" "18.04" && check_important_dependence_installed netplan.io
     fi
     check_important_dependence_installed openssh-server openssh-server
+    ([ $nginx_is_installed -eq 1 ] || [ $php_is_installed -eq 1 ] || [ $is_installed -eq 1 ]) && check_centos8_epel
     [ $nginx_is_installed -eq 1 ] && install_nginx_dependence
     [ $php_is_installed -eq 1 ] && install_php_dependence
     [ $is_installed -eq 1 ] && install_base_dependence
@@ -3486,6 +3516,7 @@ start_menu()
     fi
     (( 3<=choice&&choice<=6 || choice==10 || choice==25 )) && [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
     (( 4<=choice&&choice<=6 || choice==25 )) && check_important_dependence_installed lsb-release redhat-lsb-core
+    (( 4<=choice&&choice<=7 || choice==25 )) && check_procps_installed
     if (( choice==3 || choice==5 || choice==6 || choice==10 )); then
         check_important_dependence_installed ca-certificates ca-certificates
         if [ $choice -eq 10 ]; then
