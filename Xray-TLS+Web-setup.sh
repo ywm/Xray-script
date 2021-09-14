@@ -293,9 +293,9 @@ check_need_php()
 {
     [ $is_installed -eq 0 ] && return 1
     local i
-    for i in ${!pretend_list[@]}
+    for i in "${pretend_list[@]}"
     do
-        [ "${pretend_list[$i]}" == "2" ] && return 0
+        [ "$i" == "2" ] && return 0
     done
     return 1
 }
@@ -304,9 +304,9 @@ check_need_cloudreve()
 {
     [ $is_installed -eq 0 ] && return 1
     local i
-    for i in ${!pretend_list[@]}
+    for i in "${pretend_list[@]}"
     do
-        [ "${pretend_list[$i]}" == "1" ] && return 0
+        [ "$i" == "1" ] && return 0
     done
     return 1
 }
@@ -1605,9 +1605,9 @@ readDomain()
 install_base_dependence()
 {
     if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        install_dependence unzip tar gzip xz gcc gcc-c++ make
+        install_dependence wget tar gzip xz gcc gcc-c++ make
     else
-        install_dependence unzip tar gzip xz-utils gcc g++ make
+        install_dependence wget tar gzip xz-utils gcc g++ make
     fi
 }
 install_acme_dependence()
@@ -2806,6 +2806,13 @@ install_update_xray_tls_web()
     fi
 
     green "正在安装依赖。。。。"
+    for i in "${pretend_list[@]}"
+    do
+        if [ "$i" == "2" ] || [ "$i" == "4" ]; then
+            check_important_dependence_installed unzip unzip
+            break
+        fi
+    done
     install_base_dependence
     install_acme_dependence
     install_nginx_dependence
@@ -3060,7 +3067,7 @@ reinit_domain()
     get_system_info
     check_important_dependence_installed ca-certificates ca-certificates
     check_important_dependence_installed wget wget
-    check_important_dependence_installed curl curl
+    install_acme_dependence
     ask_update_script
     yellow "重置域名将删除所有现有域名(包括域名证书、伪装网站等)"
     ! ask_if "是否继续？(y/n)" && return 0
@@ -3070,12 +3077,17 @@ reinit_domain()
         check_SELinux
         check_procps_installed
         check_centos8_epel
+        check_important_dependence_installed unzip unzip
         in_install_update_xray_tls_web=1
         check_ssh_timeout
         in_install_update_xray_tls_web=0
         full_install_php
     elif [ "${pretend_list[-1]}" == "1" ]; then
         check_SELinux
+        check_important_dependence_installed tar tar
+        check_important_dependence_installed gzip gzip
+    elif [ "${pretend_list[-1]}" == "4" ]; then
+        check_important_dependence_installed unzip unzip
     fi
     green "重置域名中。。。"
     local temp_domain="${domain_list[-1]}"
@@ -3159,12 +3171,17 @@ add_domain()
         check_SELinux
         check_procps_installed
         check_centos8_epel
+        check_important_dependence_installed unzip unzip
         in_install_update_xray_tls_web=1
         check_ssh_timeout
         in_install_update_xray_tls_web=0
         full_install_php
     elif [ "${pretend_list[-1]}" == "1" ]; then
         check_SELinux
+        check_important_dependence_installed tar tar
+        check_important_dependence_installed gzip gzip
+    elif [ "${pretend_list[-1]}" == "4" ]; then
+        check_important_dependence_installed unzip unzip
     fi
     if ! get_cert "-1"; then
         sleep 2s
@@ -3296,12 +3313,17 @@ change_pretend()
         check_SELinux
         check_procps_installed
         check_centos8_epel
+        check_important_dependence_installed unzip unzip
         in_install_update_xray_tls_web=1
         check_ssh_timeout
         in_install_update_xray_tls_web=0
         full_install_php
     elif [ "$pretend" == "1" ]; then
         check_SELinux
+        check_important_dependence_installed tar tar
+        check_important_dependence_installed gzip gzip
+    elif [ "$pretend" == "4" ]; then
+        check_important_dependence_installed unzip unzip
     fi
     init_web "$change"
     config_nginx
@@ -3327,6 +3349,8 @@ reinstall_cloudreve()
     check_SELinux
     check_important_dependence_installed ca-certificates ca-certificates
     check_important_dependence_installed wget wget
+    check_important_dependence_installed tar tar
+    check_important_dependence_installed gzip gzip
     ask_update_script
     get_config_info
     ! check_need_cloudreve && red "Cloudreve目前没有绑定域名" && return 1
@@ -3678,6 +3702,8 @@ start_menu()
         check_SELinux
         check_important_dependence_installed ca-certificates ca-certificates
         check_important_dependence_installed wget wget
+        check_important_dependence_installed tar tar
+        check_important_dependence_installed gzip gzip
         ask_update_script_force
         enter_temp_dir
         update_cloudreve
