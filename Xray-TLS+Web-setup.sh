@@ -146,6 +146,29 @@ update_script()
         exit 1
     fi
 }
+ask_update_script()
+{
+    if check_script_update; then
+        green "脚本可升级"
+        ask_if "是否升级脚本？(y/n)" && update_script
+    else
+        green "脚本已经是最新版本"
+    fi
+}
+ask_update_script_force()
+{
+    if check_script_update; then
+        green "脚本可升级"
+        if ask_if "是否升级脚本？(y/n)"; then
+            update_script
+        else
+            red "请先更新脚本"
+            exit 0
+        fi
+    else
+        green "脚本已经是最新版本"
+    fi
+}
 #安装单个重要依赖
 test_important_dependence_installed()
 {
@@ -1627,9 +1650,9 @@ readDomain()
 install_base_dependence()
 {
     if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        install_dependence net-tools redhat-lsb-core ca-certificates wget unzip curl tar gzip xz openssl crontabs gcc gcc-c++ make
+        install_dependence unzip curl tar gzip xz openssl crontabs gcc gcc-c++ make
     else
-        install_dependence net-tools lsb-release ca-certificates wget unzip curl tar gzip xz-utils openssl cron gcc g++ make
+        install_dependence unzip curl tar gzip xz-utils openssl cron gcc g++ make
     fi
 }
 install_nginx_dependence()
@@ -2710,10 +2733,7 @@ install_update_xray_tls_web()
     check_important_dependence_installed wget wget
     check_procps_installed
     check_centos8_epel
-    if [ $update -eq 0 ] && check_script_update; then
-        green "脚本可升级"
-        ask_if "是否升级脚本？(y/n)" && update_script
-    fi
+    ask_update_script
     check_ssh_timeout
     uninstall_firewall
     doupdate
@@ -2892,10 +2912,11 @@ install_update_xray_tls_web()
     in_install_update_xray_tls_web=0
 }
 
-#功能型函数
+#主菜单函数
 full_install_php()
 {
-    check_centos8_epel
+    green "开始安装/更新php。。。"
+    sleep 3s
     install_base_dependence
     install_php_dependence
     enter_temp_dir
@@ -2906,9 +2927,20 @@ full_install_php()
     cd /
     rm -rf "$temp_dir"
 }
+full_install_init_cloudreve()
+{
+    enter_temp_dir
+    install_init_cloudreve "$1"
+    cd /
+    rm -rf "$temp_dir"
+}
 #安装/检查更新/更新php
 install_check_update_update_php()
 {
+    [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
+    check_SELinux
+    check_important_dependence_installed lsb-release redhat-lsb-core
+    get_system_info
     if ([ $release == "centos" ] && ! version_ge "$systemVersion" "8" ) || ([ $release == "rhel" ] && ! version_ge "$systemVersion" "8") || ([ $release == "fedora" ] && ! version_ge "$systemVersion" "30") || ([ $release == "ubuntu" ] && ! version_ge "$systemVersion" "20.04") || ([ $release == "debian" ] && ! version_ge "$systemVersion" "10") || ([ $release == "deepin" ] && ! version_ge "$systemVersion" "20"); then
         red "系统版本过低！"
         tyblue "安装Nextcloud需要安装php"
@@ -2936,9 +2968,13 @@ install_check_update_update_php()
         yellow " 8. 其他以 Red Hat 8+ 为基的系统"
         ! ask_if "确定选择吗？(y/n)" && return 0
     fi
+    check_important_dependence_installed ca-certificates ca-certificates
+    check_important_dependence_installed wget wget
+    check_procps_installed
+    check_centos8_epel
     local php_status=0
     if [ $php_is_installed -eq 1 ]; then
-        check_script_update && red "脚本可升级，请先更新脚本" && return 1
+        ask_update_script_force
         if check_php_update; then
             green "php有新版本"
             ! ask_if "是否更新？(y/n)" && return 0
@@ -2948,15 +2984,14 @@ install_check_update_update_php()
         fi
         systemctl -q is-active php-fpm && php_status=1
     else
-        if check_script_update; then
-            green "脚本可升级"
-            ask_if "是否升级脚本？(y/n)" && update_script
-        fi
+        ask_update_script
         tyblue "安装php用于运行nextcloud网盘"
         yellow "编译&&安装php可能需要消耗15-60分钟"
         yellow "且php将占用一定系统资源，不建议内存<512M的机器使用"
         ! ask_if "是否继续？(y/n)" && return 0
     fi
+    check_ssh_timeout
+    get_config_info
     full_install_php
     turn_on_off_php
     if [ $php_status -eq 1 ]; then
@@ -2968,7 +3003,16 @@ install_check_update_update_php()
 }
 check_update_update_nginx()
 {
-    check_script_update && red "脚本可升级，请先更新脚本" && return 1
+    check_nginx_installed_system
+    [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
+    check_SELinux
+    check_important_dependence_installed lsb-release redhat-lsb-core
+    get_system_info
+    check_important_dependence_installed ca-certificates ca-certificates
+    check_important_dependence_installed wget wget
+    check_procps_installed
+    check_centos8_epel
+    ask_update_script_force
     if check_nginx_update; then
         green "Nginx有新版本"
         ! ask_if "是否更新？(y/n)" && return 0
@@ -2976,6 +3020,8 @@ check_update_update_nginx()
         green "Nginx已是最新版本"
         return 0
     fi
+    check_ssh_timeout
+    get_config_info
     local nginx_status=0
     local xray_status=0
     systemctl -q is-active nginx && nginx_status=1
@@ -3005,19 +3051,49 @@ check_update_update_nginx()
     rm -rf "$temp_dir"
     green "更新完成！"
 }
-full_install_init_cloudreve()
+restart_xray_tls_web()
 {
-    enter_temp_dir
-    install_init_cloudreve "$1"
-    cd /
-    rm -rf "$temp_dir"
+    get_config_info
+    systemctl restart xray nginx
+    systemctl stop php-fpm cloudreve
+    turn_on_off_php
+    turn_on_off_cloudreve
+    sleep 1s
+    if ! systemctl -q is-active xray; then
+        red "Xray启动失败！！"
+    elif ! systemctl -q is-active nginx; then
+        red "Nginx启动失败！！"
+    elif check_need_php && ! systemctl -q is-active php-fpm; then
+        red "php启动失败！！"
+    elif check_need_cloudreve && ! systemctl -q is-active cloudreve; then
+        red "Cloudreve启动失败！！"
+    else
+        green "重启/启动成功！！"
+    fi
 }
 reinit_domain()
 {
+    [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
+    check_important_dependence_installed net-tools net-tools
+    check_port
+    check_important_dependence_installed lsb-release redhat-lsb-core
+    get_system_info
+    check_important_dependence_installed ca-certificates ca-certificates
+    check_important_dependence_installed wget wget
+    ask_update_script
     yellow "重置域名将删除所有现有域名(包括域名证书、伪装网站等)"
     ! ask_if "是否继续？(y/n)" && return 0
+    get_config_info
     readDomain
-    [ "${pretend_list[-1]}" == "2" ] && [ $php_is_installed -eq 0 ] && full_install_php
+    if [ "${pretend_list[-1]}" == "2" ] && [ $php_is_installed -eq 0 ]; then
+        check_SELinux
+        check_procps_installed
+        check_centos8_epel
+        check_ssh_timeout
+        full_install_php
+    elif [ "${pretend_list[-1]}" == "1" ]; then
+        check_SELinux
+    fi
     green "重置域名中。。。"
     local temp_domain="${domain_list[-1]}"
     local temp_true_domain="${true_domain_list[-1]}"
@@ -3054,6 +3130,15 @@ reinit_domain()
 }
 add_domain()
 {
+    [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
+    check_important_dependence_installed net-tools net-tools
+    check_port
+    check_important_dependence_installed lsb-release redhat-lsb-core
+    get_system_info
+    check_important_dependence_installed ca-certificates ca-certificates
+    check_important_dependence_installed wget wget
+    ask_update_script
+    get_config_info
     local need_cloudreve=0
     check_need_cloudreve && need_cloudreve=1
     readDomain
@@ -3071,7 +3156,15 @@ add_domain()
         tyblue "Nextcloud可以用于多个域名"
         return 1
     fi
-    [ "${pretend_list[-1]}" == "2" ] && [ $php_is_installed -eq 0 ] && full_install_php
+    if [ "${pretend_list[-1]}" == "2" ] && [ $php_is_installed -eq 0 ]; then
+        check_SELinux
+        check_procps_installed
+        check_centos8_epel
+        check_ssh_timeout
+        full_install_php
+    elif [ "${pretend_list[-1]}" == "1" ]; then
+        check_SELinux
+    fi
     if ! get_cert "-1"; then
         sleep 2s
         systemctl restart xray nginx
@@ -3102,6 +3195,7 @@ add_domain()
 }
 delete_domain()
 {
+    get_config_info
     if [ ${#domain_list[@]} -le 1 ]; then
         red "只有一个域名"
         return 1
@@ -3148,32 +3242,15 @@ delete_domain()
     green "域名删除完成！！"
     print_config_info
 }
-reinit_cloudreve()
-{
-    ! check_need_cloudreve && red "Cloudreve目前没有绑定域名" && return 1
-    red "重置Cloudreve将删除所有的Cloudreve网盘文件以及帐户信息，相当于重新安装"
-    tyblue "管理员密码忘记可以用此选项恢复"
-    ! ask_if "确定要继续吗？(y/n)" && return 0
-    local i
-    for i in ${!pretend_list[@]}
-    do
-        [ "${pretend_list[$i]}" == "1" ] && break
-    done
-    systemctl stop cloudreve
-    enter_temp_dir
-    mv "$cloudreve_prefix/cloudreve" "$temp_dir"
-    mv "$cloudreve_prefix/conf.ini" "$temp_dir"
-    rm -rf "$cloudreve_prefix"
-    mkdir -p "$cloudreve_prefix"
-    mv "$temp_dir/cloudreve" "$cloudreve_prefix"
-    mv "$temp_dir/conf.ini" "$cloudreve_prefix"
-    init_cloudreve "$i"
-    cd /
-    rm -rf "$temp_dir"
-    green "重置完成！"
-}
 change_pretend()
 {
+    [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
+    check_important_dependence_installed lsb-release redhat-lsb-core
+    get_system_info
+    check_important_dependence_installed ca-certificates ca-certificates
+    check_important_dependence_installed wget wget
+    ask_update_script
+    get_config_info
     local change=""
     if [ ${#domain_list[@]} -eq 1 ]; then
         change=0
@@ -3214,7 +3291,15 @@ change_pretend()
         tyblue "Nextcloud可以用于多个域名"
         return 1
     fi
-    [ "$pretend" == "2" ] && [ $php_is_installed -eq 0 ] && full_install_php
+    if [ "$pretend" == "2" ] && [ $php_is_installed -eq 0 ]; then
+        check_SELinux
+        check_procps_installed
+        check_centos8_epel
+        check_ssh_timeout
+        full_install_php
+    elif [ "$pretend" == "1" ]; then
+        check_SELinux
+    fi
     init_web "$change"
     config_nginx
     systemctl restart nginx
@@ -3233,8 +3318,39 @@ change_pretend()
     fi
     green "修改完成！"
 }
+reinit_cloudreve()
+{
+    [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
+    check_SELinux
+    check_important_dependence_installed ca-certificates ca-certificates
+    check_important_dependence_installed wget wget
+    ask_update_script
+    get_config_info
+    ! check_need_cloudreve && red "Cloudreve目前没有绑定域名" && return 1
+    red "重置Cloudreve将删除所有的Cloudreve网盘文件以及帐户信息，相当于重新安装"
+    tyblue "管理员密码忘记可以用此选项恢复"
+    ! ask_if "确定要继续吗？(y/n)" && return 0
+    local i
+    for i in ${!pretend_list[@]}
+    do
+        [ "${pretend_list[$i]}" == "1" ] && break
+    done
+    systemctl stop cloudreve
+    enter_temp_dir
+    mv "$cloudreve_prefix/cloudreve" "$temp_dir"
+    mv "$cloudreve_prefix/conf.ini" "$temp_dir"
+    rm -rf "$cloudreve_prefix"
+    mkdir -p "$cloudreve_prefix"
+    mv "$temp_dir/cloudreve" "$cloudreve_prefix"
+    mv "$temp_dir/conf.ini" "$cloudreve_prefix"
+    init_cloudreve "$i"
+    cd /
+    rm -rf "$temp_dir"
+    green "重置完成！"
+}
 change_xray_protocol()
 {
+    get_config_info
     local protocol_1_old=$protocol_1
     local protocol_2_old=$protocol_2
     local protocol_3_old=$protocol_3
@@ -3261,6 +3377,7 @@ change_xray_protocol()
 }
 change_xray_id()
 {
+    get_config_info
     local flag=""
     tyblue "-------------请输入你要修改的id-------------"
     tyblue " 1. TCP的id"
@@ -3304,6 +3421,7 @@ change_xray_id()
 }
 change_xray_serviceName()
 {
+    get_config_info
     if [ $protocol_2 -eq 0 ]; then
         red "没有使用gRPC协议！"
         return 1
@@ -3330,6 +3448,7 @@ change_xray_serviceName()
 }
 change_xray_path()
 {
+    get_config_info
     if [ $protocol_3 -eq 0 ]; then
         red "没有使用WebSocket协议！"
         return 1
@@ -3358,6 +3477,10 @@ simplify_system()
         yellow "请先停止Xray-TLS+Web"
         return 1
     fi
+    [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
+    check_important_dependence_installed lsb-release redhat-lsb-core
+    get_system_info
+    check_procps_installed
     yellow "警告：此功能可能导致某些VPS无法开机，请谨慎使用"
     tyblue "建议在纯净系统下使用此功能"
     ! ask_if "是否要继续?(y/n)" && return 0
@@ -3514,43 +3637,32 @@ start_menu()
         red "请先启动Xray-TLS+Web！！"
         return 1
     fi
-    (( 3<=choice&&choice<=6 || choice==10 || choice==25 )) && [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
-    (( 4<=choice&&choice<=6 || choice==25 )) && check_important_dependence_installed lsb-release redhat-lsb-core
-    (( 4<=choice&&choice<=7 || choice==25 )) && check_procps_installed
-    if (( choice==3 || choice==5 || choice==6 || choice==10 )); then
-        check_important_dependence_installed ca-certificates ca-certificates
-        if [ $choice -eq 10 ]; then
-            check_important_dependence_installed curl curl
-        else
-            check_important_dependence_installed wget wget
-        fi
-    fi
-    (( (4<=choice&&choice<=7) || choice==16 || choice==17 || choice==19 || choice==25 )) && get_system_info
-    (( choice==6 || choice==7 || (11<=choice&&choice<=13) || (15<=choice&&choice<=24) )) && get_config_info
     if [ $choice -eq 1 ]; then
         install_update_xray_tls_web
     elif [ $choice -eq 2 ]; then
-        if check_script_update; then
-            green "脚本可升级！"
-            if ask_if "是否升级脚本？(y/n)"; then
-                update_script
-            else
-                red "请先升级脚本！"
-                exit 0
-            fi
-        fi
+        [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
+        check_important_dependence_installed ca-certificates ca-certificates
+        check_important_dependence_installed wget wget
+        ask_update_script_force
         bash "${BASH_SOURCE[0]}" --update
     elif [ $choice -eq 3 ]; then
-        if check_script_update; then
-            green "脚本可升级！"
-            ask_if "是否升级脚本？(y/n)" && update_script
-        else
-            green "脚本已经是最新版本"
-        fi
+        [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
+        check_important_dependence_installed ca-certificates ca-certificates
+        check_important_dependence_installed wget wget
+        ask_update_script
     elif [ $choice -eq 4 ]; then
+        [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
+        check_important_dependence_installed lsb-release redhat-lsb-core
+        get_system_info
+        check_ssh_timeout
+        check_procps_installed
         doupdate
         green "更新完成！"
     elif [ $choice -eq 5 ]; then
+        [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
+        check_important_dependence_installed ca-certificates ca-certificates
+        check_important_dependence_installed wget wget
+        check_procps_installed
         enter_temp_dir
         install_bbr
         $debian_package_manager -y -f install
@@ -3565,14 +3677,25 @@ start_menu()
             tyblue "在 修改伪装网站类型/重置域名/添加域名 里选择Cloudreve"
             return 1
         fi
-        check_script_update && red "脚本可升级，请先更新脚本" && return 1
+        [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
+        check_SELinux
+        check_important_dependence_installed ca-certificates ca-certificates
+        check_important_dependence_installed wget wget
+        ask_update_script_force
         update_cloudreve
         green "Cloudreve更新完成！"
     elif [ $choice -eq 9 ]; then
+        [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
+        check_SELinux
+        check_important_dependence_installed ca-certificates ca-certificates
+        check_important_dependence_installed curl curl
         install_update_xray
         green "Xray更新完成！"
     elif [ $choice -eq 10 ]; then
         ! ask_if "确定要删除吗?(y/n)" && return 0
+        [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
+        check_important_dependence_installed ca-certificates ca-certificates
+        check_important_dependence_installed curl curl
         remove_xray
         remove_nginx
         remove_php
@@ -3581,35 +3704,24 @@ start_menu()
         rm -rf $HOME/.acme.sh
         green "删除完成！"
     elif [ $choice -eq 11 ]; then
+        get_config_info
         [ $is_installed -eq 1 ] && check_need_php && red "有域名正在使用php" && return 1
         ! ask_if "确定要删除php吗?(y/n)" && return 0
         remove_php && green "删除完成！"
     elif [ $choice -eq 12 ]; then
+        get_config_info
         [ $is_installed -eq 1 ] && check_need_cloudreve && red "有域名正在使用Cloudreve" && return 1
         ! ask_if "确定要删除cloudreve吗?(y/n)" && return 0
         remove_cloudreve && green "删除完成！"
     elif [ $choice -eq 13 ]; then
-        systemctl restart xray nginx
-        turn_on_off_php
-        turn_on_off_cloudreve
-        sleep 1s
-        if ! systemctl -q is-active xray; then
-            red "Xray启动失败！！"
-        elif ! systemctl -q is-active nginx; then
-            red "Nginx启动失败！！"
-        elif check_need_php && ! systemctl -q is-active php-fpm; then
-            red "php启动失败！！"
-        elif check_need_cloudreve && ! systemctl -q is-active cloudreve; then
-            red "Cloudreve启动失败！！"
-        else
-            green "重启/启动成功！！"
-        fi
+        restart_xray_tls_web
     elif [ $choice -eq 14 ]; then
         systemctl stop xray nginx
         [ $php_is_installed -eq 1 ] && systemctl stop php-fpm
         [ $cloudreve_is_installed -eq 1 ] && systemctl stop cloudreve
         green "已停止！"
     elif [ $choice -eq 15 ]; then
+        get_config_info
         print_config_info
     elif [ $choice -eq 16 ]; then
         reinit_domain
