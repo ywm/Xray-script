@@ -3567,9 +3567,9 @@ simplify_system()
     [ $php_is_installed -eq 1 ] && install_php_dependence
     [ $is_installed -eq 1 ] && install_acme_dependence
     if [ $save_ssh -eq 1 ]; then
+        cp sshd_config /etc/ssh/sshd_config
         cd /
         rm -rf "$temp_dir"
-        cp sshd_config /etc/ssh/sshd_config
     fi
     green "精简完成"
 }
