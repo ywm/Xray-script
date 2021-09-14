@@ -96,14 +96,14 @@
 ```
 缺点就是编译耗时长
 ## 脚本使用说明
-### 1. 安装wget
+### 1. 安装wget && ca-certificates
 Debian基系统(包括Ubuntu、Debian、deepin)：
 ```bash
-[[ "$(type -P wget)" ]] || apt --no-install-recommends -y install wget || (apt update && apt --no-install-recommends -y install wget)
+apt --no-install-recommends -y install wget ca-certificates || (apt update && apt --no-install-recommends -y install wget ca-certificates)
 ```
 Red Hat基系统(包括CentOS、fedora)：
 ```bash
-[[ "$(type -P wget)" ]] || dnf -y install wget || yum -y install wget
+dnf -y install wget ca-certificates || yum -y install wget ca-certificates
 ```
 ### 2. 获取/更新脚本
 ```bash
@@ -210,6 +210,7 @@ Xray默认使用的是GO语言官方提供的TLS库，这也是几乎所有GO语
 |unzip|unzip|unzip|
 |curl|curl|curl|
 |**编译基础：**|||
+|下载源码文件|wget|wget|
 |解压tar源码文件|tar|tar|
 |解压tar.gz源码文件|gzip|gzip|
 |解压tar.xz源码文件|xz-utils|xz|
