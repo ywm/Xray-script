@@ -3521,9 +3521,10 @@ simplify_system()
         local temp_remove_list=('openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' 'libffi-dev' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^python.*:i386' '^libpython' '^libpython.*:i386' 'dbus' 'cron' 'anacron' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' 'thermald' 'libdbus-glib-1-2' 'libevdev2' 'libupower-glib3' 'usb.ids' 'readline-common' '^libreadline' 'xz-utils' 'procps' 'selinux-utils' 'wget' 'zip' 'unzip' 'bzip2')
         if ! $debian_package_manager -y --auto-remove purge "${temp_remove_list[@]}"; then
             $debian_package_manager -y -f install
-            for i in ${!temp_remove_list[@]}
+            $debian_package_manager -y --auto-remove purge cron anacron || $debian_package_manager -y -f install
+            for i in "${temp_remove_list[@]}"
             do
-                $debian_package_manager -y --auto-remove purge "${temp_remove_list[$i]}" || $debian_package_manager -y -f install
+                $debian_package_manager -y --auto-remove purge "$i" || $debian_package_manager -y -f install
             done
         fi
         [ $release == "ubuntu" ] && version_ge "$systemVersion" "18.04" && check_important_dependence_installed netplan.io
