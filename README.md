@@ -197,14 +197,20 @@ Xray默认使用的是GO语言官方提供的TLS库，这也是几乎所有GO语
 脚本可能自动安装以下依赖：
 |用途|Debian基系统|Red Hat基系统|
 |-|-|-|
+|yumdb set reason user||yum-utils|
+|setenforce/getenforce|selinux-utils|libselinux-utils|
 |netstat|net-tools|net-tools|
 |lsb_release|lsb-release|redhat-lsb-core|
 |wget/curl https|ca-certificates|ca-certificates|
 |wget|wget|wget|
+|kill/pkill/ps/sysctl/free|procps|procps-ng|
+|epel源|-|epel-release|
+|do-release-upgrade|ubuntu-release-upgrader-core||
 |unzip|unzip|unzip|
 |curl|curl|curl|
+|解压tar文件|tar|tar|
 |解压tar.gz文件|gzip|gzip|
-|解压tar.xz文件|xz-utils|xz-utils|
+|解压tar.xz文件|xz-utils|xz|
 |acme.sh依赖|openssl|openssl|
 |acme.sh依赖|cron|crontabs|
 |编译基础：|||
