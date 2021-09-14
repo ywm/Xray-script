@@ -522,31 +522,6 @@ get_config_info()
     domain_config_list=($(grep "^#domain_config_list=" $nginx_config | cut -d = -f 2))
     pretend_list=($(grep "^#pretend_list=" $nginx_config | cut -d = -f 2))
 }
-#删除所有域名
-remove_all_domains()
-{
-    systemctl stop xray
-    systemctl stop nginx
-    systemctl stop php-fpm
-    systemctl disable php-fpm
-    systemctl stop cloudreve
-    systemctl disable cloudreve
-    local i
-    for i in ${!true_domain_list[@]}
-    do
-        rm -rf ${nginx_prefix}/html/${true_domain_list[$i]}
-    done
-    rm -rf "${nginx_prefix}/certs"
-    mkdir "${nginx_prefix}/certs"
-    $HOME/.acme.sh/acme.sh --uninstall
-    rm -rf $HOME/.acme.sh
-    curl https://get.acme.sh | sh -s email=my@example.com
-    $HOME/.acme.sh/acme.sh --upgrade --auto-upgrade
-    unset domain_list
-    unset true_domain_list
-    unset domain_config_list
-    unset pretend_list
-}
 
 check_base_command
 if [[ ! -f '/etc/os-release' ]]; then
@@ -1630,9 +1605,17 @@ readDomain()
 install_base_dependence()
 {
     if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        install_dependence unzip curl tar gzip xz openssl crontabs gcc gcc-c++ make
+        install_dependence unzip tar gzip xz gcc gcc-c++ make
     else
-        install_dependence unzip curl tar gzip xz-utils openssl cron gcc g++ make
+        install_dependence unzip tar gzip xz-utils gcc g++ make
+    fi
+}
+install_acme_dependence()
+{
+    if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+        install_dependence curl openssl crontabs
+    else
+        install_dependence curl openssl cron
     fi
 }
 install_nginx_dependence()
@@ -2824,6 +2807,7 @@ install_update_xray_tls_web()
 
     green "正在安装依赖。。。。"
     install_base_dependence
+    install_acme_dependence
     install_nginx_dependence
     [ $install_php -eq 1 ] && install_php_dependence
     $debian_package_manager clean
@@ -3076,6 +3060,7 @@ reinit_domain()
     get_system_info
     check_important_dependence_installed ca-certificates ca-certificates
     check_important_dependence_installed wget wget
+    check_important_dependence_installed curl curl
     ask_update_script
     yellow "重置域名将删除所有现有域名(包括域名证书、伪装网站等)"
     ! ask_if "是否继续？(y/n)" && return 0
@@ -3097,11 +3082,27 @@ reinit_domain()
     local temp_true_domain="${true_domain_list[-1]}"
     local temp_domain_config="${domain_config_list[-1]}"
     local temp_pretend="${pretend_list[-1]}"
-    unset 'domain_list[-1]'
-    unset 'true_domain_list[-1]'
-    unset 'domain_config_list[-1]'
-    unset 'pretend_list[-1]'
-    remove_all_domains
+    systemctl stop xray
+    systemctl stop nginx
+    systemctl stop php-fpm
+    systemctl disable php-fpm
+    systemctl stop cloudreve
+    systemctl disable cloudreve
+    local i
+    for i in ${!true_domain_list[@]}
+    do
+        rm -rf ${nginx_prefix}/html/${true_domain_list[$i]}
+    done
+    rm -rf "${nginx_prefix}/certs"
+    mkdir "${nginx_prefix}/certs"
+    $HOME/.acme.sh/acme.sh --uninstall
+    rm -rf $HOME/.acme.sh
+    curl https://get.acme.sh | sh -s email=my@example.com
+    $HOME/.acme.sh/acme.sh --upgrade --auto-upgrade
+    unset domain_list
+    unset true_domain_list
+    unset domain_config_list
+    unset pretend_list
     domain_list+=("$temp_domain")
     domain_config_list+=("$temp_domain_config")
     true_domain_list+=("$temp_true_domain")
@@ -3486,11 +3487,11 @@ simplify_system()
     ! ask_if "是否要继续?(y/n)" && return 0
     uninstall_firewall
     if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        $redhat_package_manager -y remove openssl "perl*" xz libselinux-utils
+        $redhat_package_manager -y remove openssl "perl*" xz libselinux-utils zip unzip bzip2 wget
         $redhat_package_manager -y remove procps-ng
         $redhat_package_manager -y remove procps
     else
-        local temp_remove_list=('openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' 'libffi-dev' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^python.*:i386' '^libpython' '^libpython.*:i386' 'dbus' 'cron' 'anacron' 'cron' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' 'thermald' 'libdbus-glib-1-2' 'libevdev2' 'libupower-glib3' 'usb.ids' 'readline-common' '^libreadline' 'xz-utils' 'procps' 'selinux-utils')
+        local temp_remove_list=('openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' 'libffi-dev' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^python.*:i386' '^libpython' '^libpython.*:i386' 'dbus' 'cron' 'anacron' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' 'thermald' 'libdbus-glib-1-2' 'libevdev2' 'libupower-glib3' 'usb.ids' 'readline-common' '^libreadline' 'xz-utils' 'procps' 'selinux-utils' 'wget' 'zip' 'unzip' 'bzip2')
         if ! $debian_package_manager -y --auto-remove purge "${temp_remove_list[@]}"; then
             $debian_package_manager -y -f install
             for i in ${!temp_remove_list[@]}
@@ -3504,7 +3505,7 @@ simplify_system()
     ([ $nginx_is_installed -eq 1 ] || [ $php_is_installed -eq 1 ] || [ $is_installed -eq 1 ]) && check_centos8_epel
     [ $nginx_is_installed -eq 1 ] && install_nginx_dependence
     [ $php_is_installed -eq 1 ] && install_php_dependence
-    [ $is_installed -eq 1 ] && install_base_dependence
+    [ $is_installed -eq 1 ] && install_acme_dependence
     green "精简完成"
 }
 repair_tuige()
