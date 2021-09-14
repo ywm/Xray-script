@@ -3550,6 +3550,8 @@ simplify_system()
         $redhat_package_manager -y remove procps-ng
         $redhat_package_manager -y remove procps
     else
+        local apt_utils_installed=0
+        dpkg -s apt-utils > /dev/null 2>&1 && apt_utils_installed=1
         local temp_remove_list=('openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' 'libffi-dev' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^python.*:i386' '^libpython' '^libpython.*:i386' 'dbus' 'cron' 'anacron' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' 'thermald' 'libdbus-glib-1-2' 'libevdev2' 'libupower-glib3' 'usb.ids' 'readline-common' '^libreadline' 'xz-utils' 'procps' 'selinux-utils' 'wget' 'zip' 'unzip' 'bzip2' 'linux-base' 'busybox-initramfs' 'initramfs-tools' 'initramfs-tools-core' 'initramfs-tools-bin' 'lz4' 'finalrd' 'cryptsetup-bin' 'libklibc' 'libplymouth5' 'udev')
         if ! $debian_package_manager -y --auto-remove purge "${temp_remove_list[@]}"; then
             $debian_package_manager -y -f install
@@ -3559,6 +3561,7 @@ simplify_system()
                 $debian_package_manager -y --auto-remove purge "$i" || $debian_package_manager -y -f install
             done
         fi
+        [ $apt_utils_installed -eq 1 ] && check_important_dependence_installed apt-utils ""
         check_important_dependence_installed udev ""
         check_important_dependence_installed init ""
         [ $release == "ubuntu" ] && version_ge "$systemVersion" "18.04" && check_important_dependence_installed netplan.io
