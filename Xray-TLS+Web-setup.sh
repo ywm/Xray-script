@@ -1248,58 +1248,75 @@ install_bbr()
             read -p "您的选择是：" choice
         done
         if (( 1<=choice&&choice<=4 )); then
-            if (( choice==1 || choice==4 )) && ([ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]) && ! version_ge "$(dpkg --list | grep '^[ '$'\t]*ii[ '$'\t][ '$'\t]*linux-base[ '$'\t]' | awk '{print $3}')" "4.5ubuntu1~16.04.1"; then
-                red    "当前系统版本过低，不支持安装此内核！"
-                green  "请使用新系统或选择安装xanmod内核"
-            elif (( choice==1 || choice==4 )) && ([ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]) && ! dpkg-deb --help | grep -qw "zstd"; then
+            if (( choice==1 || choice==4 )) && ([ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]) && ! dpkg-deb --help | grep -qw "zstd"; then
                 red    "当前系统版本过低，不支持安装此内核！"
                 green  "请使用新系统或选择安装xanmod内核"
             elif (( choice==2 || choice==3 )) && ([ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]); then
                 red "xanmod内核仅支持Debian系的系统，如Ubuntu、Debian、deepin、UOS"
             else
-                if [ $choice -eq 3 ]; then
-                    local temp_bbr=bbr2
+                if (( choice==1 || choice==4 )) && ([ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]); then
+                    check_important_dependence_installed "linux-base" ""
+                    if ! version_ge "$(dpkg --list | grep '^[ '$'\t]*ii[ '$'\t][ '$'\t]*linux-base[ '$'\t]' | awk '{print $3}')" "4.5ubuntu1~16.04.1"; then
+                        install_dependence linux-base
+                        if ! version_ge "$(dpkg --list | grep '^[ '$'\t]*ii[ '$'\t][ '$'\t]*linux-base[ '$'\t]' | awk '{print $3}')" "4.5ubuntu1~16.04.1"; then
+                            if ! $debian_package_manager update; then
+                                red "$debian_package_manager update出错"
+                                green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
+                                yellow "按回车键继续或者Ctrl+c退出"
+                                read -s
+                            fi
+                            install_dependence linux-base
+                        fi
+                    fi
+                fi
+                if (( choice==1 || choice==4 )) && ([ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]) && ! version_ge "$(dpkg --list | grep '^[ '$'\t]*ii[ '$'\t][ '$'\t]*linux-base[ '$'\t]' | awk '{print $3}')" "4.5ubuntu1~16.04.1"; then
+                    red    "当前系统版本过低，不支持安装此内核！"
+                    green  "请使用新系统或选择安装xanmod内核"
                 else
-                    local temp_bbr=bbr
-                fi
-                if ! ([ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "$temp_bbr" ] && [ "$(grep '^[ '$'\t]*net.ipv4.tcp_congestion_control[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" == "$temp_bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]); then
-                    sed -i '/^[ \t]*net.core.default_qdisc[ \t]*=/d' /etc/sysctl.conf
-                    sed -i '/^[ \t]*net.ipv4.tcp_congestion_control[ \t]*=/d' /etc/sysctl.conf
-                    echo 'net.core.default_qdisc = fq' >> /etc/sysctl.conf
-                    echo "net.ipv4.tcp_congestion_control = $temp_bbr" >> /etc/sysctl.conf
-                    sysctl -p
-                fi
-                if [ $in_install_update_xray_tls_web -eq 1 ]; then
-                    echo
-                    tyblue "提示："
-                    yellow " 更换内核后服务器将重启，重启后，请再次运行脚本完成 Xray-TLS+Web 剩余部分的安装/升级"
-                    yellow " 再次运行脚本时，重复之前选过的选项即可"
-                    echo
-                    sleep 2s
-                    yellow "按回车键以继续。。。"
-                    read -s
-                fi
-                local temp_kernel_sh_url
-                if [ $choice -eq 1 ]; then
-                    temp_kernel_sh_url="https://github.com/kirin10000/update-kernel/raw/master/update-kernel-stable.sh"
-                elif [ $choice -eq 4 ]; then
-                    temp_kernel_sh_url="https://github.com/kirin10000/update-kernel/raw/master/update-kernel.sh"
-                else
-                    temp_kernel_sh_url="https://github.com/kirin10000/xanmod-install/raw/main/xanmod-install.sh"
-                fi
-                if ! wget -O kernel.sh "$temp_kernel_sh_url"; then
-                    red    "获取内核安装脚本失败"
-                    yellow "按回车键继续或者按Ctrl+c终止"
-                    read -s
-                fi
-                chmod +x kernel.sh
-                ./kernel.sh
-                if [ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "$temp_bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]; then
-                    green "--------------------$temp_bbr已安装--------------------"
-                else
-                    red "开启$temp_bbr失败"
-                    red "如果刚安装完内核，请先重启"
-                    red "如果重启仍然无效，请尝试选项3"
+                    if [ $choice -eq 3 ]; then
+                        local temp_bbr=bbr2
+                    else
+                        local temp_bbr=bbr
+                    fi
+                    if ! ([ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "$temp_bbr" ] && [ "$(grep '^[ '$'\t]*net.ipv4.tcp_congestion_control[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" == "$temp_bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]); then
+                        sed -i '/^[ \t]*net.core.default_qdisc[ \t]*=/d' /etc/sysctl.conf
+                        sed -i '/^[ \t]*net.ipv4.tcp_congestion_control[ \t]*=/d' /etc/sysctl.conf
+                        echo 'net.core.default_qdisc = fq' >> /etc/sysctl.conf
+                        echo "net.ipv4.tcp_congestion_control = $temp_bbr" >> /etc/sysctl.conf
+                        sysctl -p
+                    fi
+                    if [ $in_install_update_xray_tls_web -eq 1 ]; then
+                        echo
+                        tyblue "提示："
+                        yellow " 更换内核后服务器将重启，重启后，请再次运行脚本完成 Xray-TLS+Web 剩余部分的安装/升级"
+                        yellow " 再次运行脚本时，重复之前选过的选项即可"
+                        echo
+                        sleep 2s
+                        yellow "按回车键以继续。。。"
+                        read -s
+                    fi
+                    local temp_kernel_sh_url
+                    if [ $choice -eq 1 ]; then
+                        temp_kernel_sh_url="https://github.com/kirin10000/update-kernel/raw/master/update-kernel-stable.sh"
+                    elif [ $choice -eq 4 ]; then
+                        temp_kernel_sh_url="https://github.com/kirin10000/update-kernel/raw/master/update-kernel.sh"
+                    else
+                        temp_kernel_sh_url="https://github.com/kirin10000/xanmod-install/raw/main/xanmod-install.sh"
+                    fi
+                    if ! wget -O kernel.sh "$temp_kernel_sh_url"; then
+                        red    "获取内核安装脚本失败"
+                        yellow "按回车键继续或者按Ctrl+c终止"
+                        read -s
+                    fi
+                    chmod +x kernel.sh
+                    ./kernel.sh
+                    if [ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "$temp_bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]; then
+                        green "--------------------$temp_bbr已安装--------------------"
+                    else
+                        red "开启$temp_bbr失败"
+                        red "如果刚安装完内核，请先重启"
+                        red "如果重启仍然无效，请尝试选项3"
+                    fi
                 fi
             fi
         elif [ $choice -eq 5 ]; then
@@ -3512,13 +3529,28 @@ simplify_system()
     yellow "提示：在精简系统前请先设置apt/yum/dnf的软件源为http/ftp而非https/ftps"
     purple "通常来说系统默认即是http/ftp"
     ! ask_if "是否要继续?(y/n)" && return 0
+    echo
+    local save_ssh=0
+    yellow "提示：精简系统可能导致ssh配置文件(/etc/ssh/sshd_config)恢复默认"
+    tyblue "这可能导致ssh端口恢复默认(22)，且有些系统默认仅允许密钥登录(不允许密码登录)"
+    tyblue "你可以自己备份ssh文件或使用脚本自动备份"
+    ask_if "是否备份ssh配置文件?(y/n)" && save_ssh=1
+    echo
+    yellow "如果弹出对话框，请选择Yes ！！"
+    yellow "如果弹出对话框，请选择Yes ！！"
+    yellow "如果弹出对话框，请选择Yes ！！"
+    ! ask_if "确认并继续?(y/n)" && return 0
     uninstall_firewall
+    if [ $save_ssh -eq 1 ]; then
+        enter_temp_dir
+        cp /etc/ssh/sshd_config sshd_config
+    fi
     if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         $redhat_package_manager -y remove openssl "perl*" xz libselinux-utils zip unzip bzip2 wget
         $redhat_package_manager -y remove procps-ng
         $redhat_package_manager -y remove procps
     else
-        local temp_remove_list=('openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' 'libffi-dev' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^python.*:i386' '^libpython' '^libpython.*:i386' 'dbus' 'cron' 'anacron' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' 'thermald' 'libdbus-glib-1-2' 'libevdev2' 'libupower-glib3' 'usb.ids' 'readline-common' '^libreadline' 'xz-utils' 'procps' 'selinux-utils' 'wget' 'zip' 'unzip' 'bzip2')
+        local temp_remove_list=('openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' 'libffi-dev' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^python.*:i386' '^libpython' '^libpython.*:i386' 'dbus' 'cron' 'anacron' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' 'thermald' 'libdbus-glib-1-2' 'libevdev2' 'libupower-glib3' 'usb.ids' 'readline-common' '^libreadline' 'xz-utils' 'procps' 'selinux-utils' 'wget' 'zip' 'unzip' 'bzip2' 'linux-base' 'busybox-initramfs' 'initramfs-tools' 'initramfs-tools-core' 'initramfs-tools-bin' 'lz4' 'finalrd' 'cryptsetup-bin' 'libklibc' 'libplymouth5' 'udev')
         if ! $debian_package_manager -y --auto-remove purge "${temp_remove_list[@]}"; then
             $debian_package_manager -y -f install
             $debian_package_manager -y --auto-remove purge cron anacron || $debian_package_manager -y -f install
@@ -3534,6 +3566,11 @@ simplify_system()
     [ $nginx_is_installed -eq 1 ] && install_nginx_dependence
     [ $php_is_installed -eq 1 ] && install_php_dependence
     [ $is_installed -eq 1 ] && install_acme_dependence
+    if [ $save_ssh -eq 1 ]; then
+        cd /
+        rm -rf "$temp_dir"
+        cp sshd_config /etc/ssh/sshd_config
+    fi
     green "精简完成"
 }
 repair_tuige()
