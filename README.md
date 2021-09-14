@@ -209,6 +209,7 @@ Xray默认使用的是GO语言官方提供的TLS库，这也是几乎所有GO语
 |do-release-upgrade(升级系统)|ubuntu-release-upgrader-core||
 |unzip|unzip|unzip|
 |curl|curl|curl|
+|安装bbr内核|linux-base|linux-base|
 |**编译基础：**|||
 |下载源码文件|wget|wget|
 |解压tar源码文件|tar|tar|
