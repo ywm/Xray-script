@@ -3094,6 +3094,7 @@ reinit_domain()
         check_SELinux
         check_procps_installed
         check_centos8_epel
+        check_important_dependence_installed unzip unzip
         in_install_update_xray_tls_web=1
         check_ssh_timeout
         in_install_update_xray_tls_web=0
@@ -3189,6 +3190,7 @@ add_domain()
         check_SELinux
         check_procps_installed
         check_centos8_epel
+        check_important_dependence_installed unzip unzip
         in_install_update_xray_tls_web=1
         check_ssh_timeout
         in_install_update_xray_tls_web=0
@@ -3332,6 +3334,7 @@ change_pretend()
         check_SELinux
         check_procps_installed
         check_centos8_epel
+        check_important_dependence_installed unzip unzip
         in_install_update_xray_tls_web=1
         check_ssh_timeout
         in_install_update_xray_tls_web=0
@@ -3563,7 +3566,6 @@ simplify_system()
         fi
         [ $apt_utils_installed -eq 1 ] && check_important_dependence_installed apt-utils ""
         check_important_dependence_installed udev ""
-        check_important_dependence_installed init ""
         [ $release == "ubuntu" ] && version_ge "$systemVersion" "18.04" && check_important_dependence_installed netplan.io
     fi
     check_important_dependence_installed openssh-server openssh-server
