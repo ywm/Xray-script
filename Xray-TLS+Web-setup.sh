@@ -3559,6 +3559,8 @@ simplify_system()
                 $debian_package_manager -y --auto-remove purge "$i" || $debian_package_manager -y -f install
             done
         fi
+        check_important_dependence_installed udev ""
+        check_important_dependence_installed init ""
         [ $release == "ubuntu" ] && version_ge "$systemVersion" "18.04" && check_important_dependence_installed netplan.io
     fi
     check_important_dependence_installed openssh-server openssh-server
@@ -3570,6 +3572,7 @@ simplify_system()
         cp sshd_config /etc/ssh/sshd_config
         cd /
         rm -rf "$temp_dir"
+        systemctl restart sshd
     fi
     green "精简完成"
 }
