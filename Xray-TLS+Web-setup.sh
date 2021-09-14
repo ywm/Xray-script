@@ -3077,7 +3077,6 @@ reinit_domain()
         check_SELinux
         check_procps_installed
         check_centos8_epel
-        check_important_dependence_installed unzip unzip
         in_install_update_xray_tls_web=1
         check_ssh_timeout
         in_install_update_xray_tls_web=0
@@ -3086,6 +3085,8 @@ reinit_domain()
         check_SELinux
         check_important_dependence_installed tar tar
         check_important_dependence_installed gzip gzip
+    elif [ "${pretend_list[-1]}" == "2" ]; then
+        check_important_dependence_installed unzip unzip
     elif [ "${pretend_list[-1]}" == "4" ]; then
         check_important_dependence_installed unzip unzip
     fi
@@ -3171,7 +3172,6 @@ add_domain()
         check_SELinux
         check_procps_installed
         check_centos8_epel
-        check_important_dependence_installed unzip unzip
         in_install_update_xray_tls_web=1
         check_ssh_timeout
         in_install_update_xray_tls_web=0
@@ -3180,6 +3180,8 @@ add_domain()
         check_SELinux
         check_important_dependence_installed tar tar
         check_important_dependence_installed gzip gzip
+    elif [ "${pretend_list[-1]}" == "2" ]; then
+        check_important_dependence_installed unzip unzip
     elif [ "${pretend_list[-1]}" == "4" ]; then
         check_important_dependence_installed unzip unzip
     fi
@@ -3313,7 +3315,6 @@ change_pretend()
         check_SELinux
         check_procps_installed
         check_centos8_epel
-        check_important_dependence_installed unzip unzip
         in_install_update_xray_tls_web=1
         check_ssh_timeout
         in_install_update_xray_tls_web=0
@@ -3322,6 +3323,8 @@ change_pretend()
         check_SELinux
         check_important_dependence_installed tar tar
         check_important_dependence_installed gzip gzip
+    elif [ "$pretend" == "2" ]; then
+        check_important_dependence_installed unzip unzip
     elif [ "$pretend" == "4" ]; then
         check_important_dependence_installed unzip unzip
     fi
