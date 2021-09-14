@@ -403,26 +403,6 @@ let_change_cloudreve_domain()
     read -s
     read -s
 }
-init_cloudreve()
-{
-    local temp
-    temp="$(timeout 5s $cloudreve_prefix/cloudreve | grep "初始管理员密码：" | awk '{print $4}')"
-    sleep 1s
-    systemctl start cloudreve
-    systemctl enable cloudreve
-    tyblue "-------- 请打开\"https://${domain_list[$1]}\"进行Cloudreve初始化 -------"
-    tyblue "  1. 登陆帐号"
-    purple "    初始管理员账号：admin@cloudreve.org"
-    purple "    $temp"
-    tyblue "  2. 右上角头像 -> 管理面板"
-    tyblue "  3. 这时会弹出对话框 \"确定站点URL设置\" 选择 \"更改\""
-    tyblue "  4. 左侧参数设置 -> 注册与登陆 -> 不允许新用户注册 -> 往下拉点击保存"
-    sleep 15s
-    echo -e "\\n\\n"
-    tyblue "按两次回车键以继续。。。"
-    read -s
-    read -s
-}
 ask_if()
 {
     local choice=""
@@ -2487,7 +2467,23 @@ install_init_cloudreve()
     remove_cloudreve
     mkdir -p $cloudreve_prefix
     update_cloudreve
-    init_cloudreve "$1"
+    local temp
+    temp="$(timeout 5s $cloudreve_prefix/cloudreve | grep "初始管理员密码：" | awk '{print $4}')"
+    sleep 1s
+    systemctl start cloudreve
+    systemctl enable cloudreve
+    tyblue "-------- 请打开\"https://${domain_list[$1]}\"进行Cloudreve初始化 -------"
+    tyblue "  1. 登陆帐号"
+    purple "    初始管理员账号：admin@cloudreve.org"
+    purple "    $temp"
+    tyblue "  2. 右上角头像 -> 管理面板"
+    tyblue "  3. 这时会弹出对话框 \"确定站点URL设置\" 选择 \"更改\""
+    tyblue "  4. 左侧参数设置 -> 注册与登陆 -> 不允许新用户注册 -> 往下拉点击保存"
+    sleep 15s
+    echo -e "\\n\\n"
+    tyblue "按两次回车键以继续。。。"
+    read -s
+    read -s
     cloudreve_is_installed=1
 }
 
@@ -3318,7 +3314,7 @@ change_pretend()
     fi
     green "修改完成！"
 }
-reinit_cloudreve()
+reinstall_cloudreve()
 {
     [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
     check_SELinux
@@ -3327,26 +3323,20 @@ reinit_cloudreve()
     ask_update_script
     get_config_info
     ! check_need_cloudreve && red "Cloudreve目前没有绑定域名" && return 1
-    red "重置Cloudreve将删除所有的Cloudreve网盘文件以及帐户信息，相当于重新安装"
-    tyblue "管理员密码忘记可以用此选项恢复"
+    red "重新安装Cloudreve将删除所有的网盘文件以及帐户信息，并重置管理员密码"
     ! ask_if "确定要继续吗？(y/n)" && return 0
+    enter_temp_dir
     local i
     for i in ${!pretend_list[@]}
     do
-        [ "${pretend_list[$i]}" == "1" ] && break
+        if [ "${pretend_list[$i]}" == "1" ]; then
+            install_init_cloudreve "$i"
+            break
+        fi
     done
-    systemctl stop cloudreve
-    enter_temp_dir
-    mv "$cloudreve_prefix/cloudreve" "$temp_dir"
-    mv "$cloudreve_prefix/conf.ini" "$temp_dir"
-    rm -rf "$cloudreve_prefix"
-    mkdir -p "$cloudreve_prefix"
-    mv "$temp_dir/cloudreve" "$cloudreve_prefix"
-    mv "$temp_dir/conf.ini" "$cloudreve_prefix"
-    init_cloudreve "$i"
     cd /
     rm -rf "$temp_dir"
-    green "重置完成！"
+    green "重装完成！"
 }
 change_xray_protocol()
 {
@@ -3608,7 +3598,7 @@ start_menu()
     tyblue "  17. 添加域名"
     tyblue "  18. 删除域名"
     tyblue "  19. 修改伪装网站类型"
-    tyblue "  20. 重新初始化Cloudreve"
+    tyblue "  20. 重新安装Cloudreve"
     purple "         将删除所有Cloudreve网盘的文件和帐户信息，管理员密码忘记可用此选项恢复"
     tyblue "  21. 修改传输协议"
     tyblue "  22. 修改id(用户ID/UUID)"
@@ -3732,7 +3722,7 @@ start_menu()
     elif [ $choice -eq 19 ]; then
         change_pretend
     elif [ $choice -eq 20 ]; then
-        reinit_cloudreve
+        reinstall_cloudreve
     elif [ $choice -eq 21 ]; then
         change_xray_protocol
     elif [ $choice -eq 22 ]; then
