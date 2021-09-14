@@ -734,7 +734,7 @@ check_ssh_timeout()
     fi
     echo -e "\\n\\n\\n"
     tyblue "------------------------------------------"
-    tyblue " 安装可能需要比较长的时间(5-40分钟)"
+    tyblue " 安装可能需要比较长的时间"
     tyblue " 如果中途断开连接将会很麻烦"
     tyblue " 设置ssh连接超时时间将有效降低断连可能性"
     echo
@@ -3085,7 +3085,9 @@ reinit_domain()
         check_SELinux
         check_procps_installed
         check_centos8_epel
+        in_install_update_xray_tls_web=1
         check_ssh_timeout
+        in_install_update_xray_tls_web=0
         full_install_php
     elif [ "${pretend_list[-1]}" == "1" ]; then
         check_SELinux
@@ -3156,7 +3158,9 @@ add_domain()
         check_SELinux
         check_procps_installed
         check_centos8_epel
+        in_install_update_xray_tls_web=1
         check_ssh_timeout
+        in_install_update_xray_tls_web=0
         full_install_php
     elif [ "${pretend_list[-1]}" == "1" ]; then
         check_SELinux
@@ -3291,7 +3295,9 @@ change_pretend()
         check_SELinux
         check_procps_installed
         check_centos8_epel
+        in_install_update_xray_tls_web=1
         check_ssh_timeout
+        in_install_update_xray_tls_web=0
         full_install_php
     elif [ "$pretend" == "1" ]; then
         check_SELinux
