@@ -3672,7 +3672,10 @@ start_menu()
         check_important_dependence_installed ca-certificates ca-certificates
         check_important_dependence_installed wget wget
         ask_update_script_force
+        enter_temp_dir
         update_cloudreve
+        cd /
+        rm -rf "$temp_dir"
         green "Cloudreve更新完成！"
     elif [ $choice -eq 9 ]; then
         [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
