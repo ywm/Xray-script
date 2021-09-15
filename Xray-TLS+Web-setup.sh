@@ -174,8 +174,15 @@ test_important_dependence_installed()
 {
     local temp_exit_code=1
     if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
-        if dpkg -s "$1" > /dev/null 2>&1; then
-            apt-mark manual "$1" && temp_exit_code=0
+        if LANG="en_US.UTF-8" LANGUAGE="en_US:en" dpkg -s "$1" 2>/dev/null | grep -qi 'status[ '$'\t]*:[ '$'\t]*install[ '$'\t]*ok[ '$'\t]*installed[ '$'\t]*$'; then
+            if LANG="en_US.UTF-8" LANGUAGE="en_US:en" apt-mark manual "$1" | grep -qi 'was[ '$'\t]*already[ '$'\t]*set[ '$'\t]*to[ '$'\t]*manually[ '$'\t]*installed'; then
+                temp_exit_code=0
+            else
+                red "安装依赖出错！"
+                green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
+                yellow "按回车键继续或者Ctrl+c退出"
+                read -s
+            fi
         elif $debian_package_manager -y --no-install-recommends install "$1"; then
             temp_exit_code=0
         else
@@ -232,7 +239,7 @@ install_dependence()
             if $temp_redhat_install'epel' install "$@"; then
                 return 0
             fi
-            if [ "$release" == "centos" ] && version_ge "$systemVersion" 8;then
+            if [ $release == "centos" ] && version_ge "$systemVersion" 8;then
                 if $temp_redhat_install"epel,powertools" install "$@" || $temp_redhat_install"epel,PowerTools" install "$@"; then
                     return 0
                 fi
@@ -909,7 +916,7 @@ doupdate()
         green  " 1. 更新已安装软件，并升级系统 (Ubuntu专享)"
         green  " 2. 仅更新已安装软件"
         red    " 3. 不更新"
-        if [ "$release" == "ubuntu" ] && (($(free -m | sed -n 2p | awk '{print $2}')<400)); then
+        if [ $release == "ubuntu" ] && (($(free -m | sed -n 2p | awk '{print $2}')<400)); then
             red "检测到内存过小，升级系统可能导致无法开机，请谨慎选择"
         fi
         echo
@@ -918,7 +925,7 @@ doupdate()
         do
             read -p "您的选择是：" choice
         done
-        if [ "$release" == "ubuntu" ] || [ $choice -ne 1 ]; then
+        if [ $release == "ubuntu" ] || [ $choice -ne 1 ]; then
             break
         fi
         echo
@@ -3524,6 +3531,10 @@ simplify_system()
     [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
     check_important_dependence_installed lsb-release redhat-lsb-core
     get_system_info
+    if ([ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]) && ! LANG="en_US.UTF-8" LANGUAGE="en_US:en" dpkg -s systemd-sysv 2>/dev/null | grep -qi 'status[ '$'\t]*:[ '$'\t]*install[ '$'\t]*ok[ '$'\t]*installed[ '$'\t]*$'; then
+        red "不支持该系统！"
+        return 1
+    fi
     check_procps_installed
     yellow "警告：此功能可能导致某些VPS无法开机，请谨慎使用"
     tyblue "建议在纯净系统下使用此功能"
@@ -3549,12 +3560,10 @@ simplify_system()
         cp /etc/ssh/sshd_config sshd_config
     fi
     if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        $redhat_package_manager -y remove openssl "perl*" xz libselinux-utils zip unzip bzip2 wget
-        $redhat_package_manager -y remove procps-ng
-        $redhat_package_manager -y remove procps
+        $redhat_package_manager -y remove openssl "perl*" xz libselinux-utils zip unzip bzip2 wget procps-ng procps
     else
         local apt_utils_installed=0
-        dpkg -s apt-utils > /dev/null 2>&1 && apt_utils_installed=1
+        LANG="en_US.UTF-8" LANGUAGE="en_US:en" dpkg -s apt-utils 2>/dev/null | grep -qi 'status[ '$'\t]*:[ '$'\t]*install[ '$'\t]*ok[ '$'\t]*installed[ '$'\t]*$' && apt_utils_installed=1
         local temp_remove_list=('openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' 'libffi-dev' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^python.*:i386' '^libpython' '^libpython.*:i386' 'dbus' 'cron' 'anacron' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' 'thermald' 'libdbus-glib-1-2' 'libevdev2' 'libupower-glib3' 'usb.ids' 'readline-common' '^libreadline' 'xz-utils' 'procps' 'selinux-utils' 'wget' 'zip' 'unzip' 'bzip2' 'linux-base' 'busybox-initramfs' 'initramfs-tools' 'initramfs-tools-core' 'initramfs-tools-bin' 'lz4' 'finalrd' 'cryptsetup-bin' 'libklibc' 'libplymouth5' 'udev' 'apt-utils')
         if ! $debian_package_manager -y --auto-remove purge "${temp_remove_list[@]}"; then
             $debian_package_manager -y -f install
@@ -3565,6 +3574,7 @@ simplify_system()
             done
         fi
         [ $apt_utils_installed -eq 1 ] && check_important_dependence_installed apt-utils ""
+        check_important_dependence_installed systemd-sysv ""
         check_important_dependence_installed udev ""
         [ $release == "ubuntu" ] && version_ge "$systemVersion" "18.04" && check_important_dependence_installed netplan.io
     fi
