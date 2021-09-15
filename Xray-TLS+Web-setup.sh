@@ -175,7 +175,7 @@ test_important_dependence_installed()
     local temp_exit_code=1
     if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
         if LANG="en_US.UTF-8" LANGUAGE="en_US:en" dpkg -s "$1" 2>/dev/null | grep -qi 'status[ '$'\t]*:[ '$'\t]*install[ '$'\t]*ok[ '$'\t]*installed[ '$'\t]*$'; then
-            if LANG="en_US.UTF-8" LANGUAGE="en_US:en" apt-mark manual "$1" | grep -qi 'was[ '$'\t]*already[ '$'\t]*set[ '$'\t]*to[ '$'\t]*manually[ '$'\t]*installed'; then
+            if LANG="en_US.UTF-8" LANGUAGE="en_US:en" apt-mark manual "$1" | grep -qi 'set[ '$'\t]*to[ '$'\t]*manually[ '$'\t]*installed'; then
                 temp_exit_code=0
             else
                 red "安装依赖 \"$1\" 出错！"
