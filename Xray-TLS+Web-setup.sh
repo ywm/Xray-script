@@ -1256,7 +1256,7 @@ install_bbr()
         done
         if (( 1<=choice&&choice<=4 )); then
             if (( choice==1 || choice==4 )) && ([ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]) && ! dpkg-deb --help | grep -qw "zstd"; then
-                red    "当前系统版本过低，不支持安装此内核！"
+                red    "当前系统dpkg不支持解压zst包，不支持安装此内核！"
                 green  "请使用新系统或选择安装xanmod内核"
             elif (( choice==2 || choice==3 )) && ([ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]); then
                 red "xanmod内核仅支持Debian系的系统，如Ubuntu、Debian、deepin、UOS"
@@ -3549,16 +3549,10 @@ simplify_system()
         enter_temp_dir
         cp /etc/ssh/sshd_config sshd_config
     fi
+    uninstall_firewall
     if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        uninstall_firewall
         $redhat_package_manager -y remove openssl "perl*" xz libselinux-utils zip unzip bzip2 wget procps-ng procps
     else
-        $debian_package_manager -y --purge autoremove
-        if ([ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]) && ! LANG="en_US.UTF-8" LANGUAGE="en_US:en" dpkg -s systemd-sysv 2>/dev/null | grep -qi 'status[ '$'\t]*:[ '$'\t]*install[ '$'\t]*ok[ '$'\t]*installed[ '$'\t]*$'; then
-            red "不支持该系统！"
-            return 1
-        fi
-        uninstall_firewall
         local apt_utils_installed=0
         LANG="en_US.UTF-8" LANGUAGE="en_US:en" dpkg -s apt-utils 2>/dev/null | grep -qi 'status[ '$'\t]*:[ '$'\t]*install[ '$'\t]*ok[ '$'\t]*installed[ '$'\t]*$' && apt_utils_installed=1
         local temp_remove_list=('openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^libpython' 'dbus' 'cron' 'anacron' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' 'thermald' 'libdbus-glib-1-2' 'libevdev2' 'libupower-glib3' 'usb.ids' 'readline-common' '^libreadline' 'xz-utils' 'selinux-utils' 'wget' 'zip' 'unzip' 'bzip2' 'lz4' 'finalrd' '^cryptsetup' '^libplymouth' 'apt-utils' '^lib.*-dev' 'perl' '^perl-modules' '^x11' '^libx11')
@@ -3571,7 +3565,6 @@ simplify_system()
             done
         fi
         [ $apt_utils_installed -eq 1 ] && check_important_dependence_installed apt-utils ""
-        check_important_dependence_installed systemd-sysv ""
         [ $release == "ubuntu" ] && version_ge "$systemVersion" "18.04" && check_important_dependence_installed netplan.io
     fi
     check_important_dependence_installed openssh-server openssh-server
