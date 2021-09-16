@@ -3545,11 +3545,6 @@ simplify_system()
     tyblue "这可能导致ssh端口恢复默认(22)，且有些系统默认仅允许密钥登录(不允许密码登录)"
     tyblue "你可以自己备份ssh文件或使用脚本自动备份"
     ask_if "是否备份ssh配置文件?(y/n)" && save_ssh=1
-    echo
-    yellow "如果弹出对话框，请选择Yes ！！"
-    yellow "如果弹出对话框，请选择Yes ！！"
-    yellow "如果弹出对话框，请选择Yes ！！"
-    ! ask_if "确认并继续?(y/n)" && return 0
     if [ $save_ssh -eq 1 ]; then
         enter_temp_dir
         cp /etc/ssh/sshd_config sshd_config
@@ -3566,7 +3561,7 @@ simplify_system()
         uninstall_firewall
         local apt_utils_installed=0
         LANG="en_US.UTF-8" LANGUAGE="en_US:en" dpkg -s apt-utils 2>/dev/null | grep -qi 'status[ '$'\t]*:[ '$'\t]*install[ '$'\t]*ok[ '$'\t]*installed[ '$'\t]*$' && apt_utils_installed=1
-        local temp_remove_list=('openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' 'libffi-dev' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^python.*:i386' '^libpython' '^libpython.*:i386' 'dbus' 'cron' 'anacron' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' 'thermald' 'libdbus-glib-1-2' 'libevdev2' 'libupower-glib3' 'usb.ids' 'readline-common' '^libreadline' 'xz-utils' 'procps' 'selinux-utils' 'wget' 'zip' 'unzip' 'bzip2' 'linux-base' 'busybox-initramfs' 'initramfs-tools' 'initramfs-tools-core' 'initramfs-tools-bin' 'lz4' 'finalrd' 'cryptsetup-bin' 'libklibc' 'libplymouth5' 'udev' 'apt-utils')
+        local temp_remove_list=('openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' 'libffi-dev' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^libpython' 'dbus' 'cron' 'anacron' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' 'thermald' 'libdbus-glib-1-2' 'libevdev2' 'libupower-glib3' 'usb.ids' 'readline-common' '^libreadline' 'xz-utils' 'procps' 'selinux-utils' 'wget' 'zip' 'unzip' 'bzip2' 'lz4' 'finalrd' '^cryptsetup' '^libplymouth' 'udev' 'apt-utils' '^libc*-dev' 'perl' '^perl-modules')
         if ! $debian_package_manager -y --auto-remove purge "${temp_remove_list[@]}"; then
             $debian_package_manager -y -f install
             $debian_package_manager -y --auto-remove purge cron anacron || $debian_package_manager -y -f install
