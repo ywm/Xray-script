@@ -3561,7 +3561,7 @@ simplify_system()
         uninstall_firewall
         local apt_utils_installed=0
         LANG="en_US.UTF-8" LANGUAGE="en_US:en" dpkg -s apt-utils 2>/dev/null | grep -qi 'status[ '$'\t]*:[ '$'\t]*install[ '$'\t]*ok[ '$'\t]*installed[ '$'\t]*$' && apt_utils_installed=1
-        local temp_remove_list=('openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' 'libffi-dev' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^libpython' 'dbus' 'cron' 'anacron' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' 'thermald' 'libdbus-glib-1-2' 'libevdev2' 'libupower-glib3' 'usb.ids' 'readline-common' '^libreadline' 'xz-utils' 'procps' 'selinux-utils' 'wget' 'zip' 'unzip' 'bzip2' 'lz4' 'finalrd' '^cryptsetup' '^libplymouth' 'udev' 'apt-utils' '^libc*-dev' 'perl' '^perl-modules')
+        local temp_remove_list=('openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^libpython' 'dbus' 'cron' 'anacron' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' 'thermald' 'libdbus-glib-1-2' 'libevdev2' 'libupower-glib3' 'usb.ids' 'readline-common' '^libreadline' 'xz-utils' 'selinux-utils' 'wget' 'zip' 'unzip' 'bzip2' 'lz4' 'finalrd' '^cryptsetup' '^libplymouth' 'apt-utils' '^lib.*-dev' 'perl' '^perl-modules' '^x11' '^libx11')
         if ! $debian_package_manager -y --auto-remove purge "${temp_remove_list[@]}"; then
             $debian_package_manager -y -f install
             $debian_package_manager -y --auto-remove purge cron anacron || $debian_package_manager -y -f install
@@ -3572,7 +3572,6 @@ simplify_system()
         fi
         [ $apt_utils_installed -eq 1 ] && check_important_dependence_installed apt-utils ""
         check_important_dependence_installed systemd-sysv ""
-        check_important_dependence_installed udev ""
         [ $release == "ubuntu" ] && version_ge "$systemVersion" "18.04" && check_important_dependence_installed netplan.io
     fi
     check_important_dependence_installed openssh-server openssh-server
