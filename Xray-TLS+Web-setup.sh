@@ -731,7 +731,7 @@ check_ssh_timeout()
     green  "----------------------配置完成----------------------"
     tyblue " 请重新连接服务器以让配置生效"
     if [ $in_install_update_xray_tls_web -eq 1 ]; then
-        yellow " 重新连接服务器后，请再次运行脚本完成 Xray-TLS+Web 剩余部分的安装/升级"
+        yellow " 重新连接服务器后，请再次运行脚本完成剩余部分的安装/升级"
         yellow " 再次运行脚本时，重复之前选过的选项即可"
         yellow " 按回车键退出。。。。"
         read -s
