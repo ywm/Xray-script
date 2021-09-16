@@ -209,7 +209,7 @@ Xray默认使用的是GO语言官方提供的TLS库，这也是几乎所有GO语
 |do-release-upgrade(升级系统)|ubuntu-release-upgrader-core||
 |unzip|unzip|unzip|
 |curl|curl|curl|
-|安装bbr内核|linux-base|linux-base|
+|安装bbr内核|linux-base||
 |**编译基础：**|||
 |下载源码文件|wget|wget|
 |解压tar源码文件|tar|tar|
@@ -223,9 +223,9 @@ Xray默认使用的是GO语言官方提供的TLS库，这也是几乎所有GO语
 ||openssl|openssl|
 ||cron|crontabs|
 |**编译openssl：**|||
-|||perl-IPC-Cmd|
-|||perl-Getopt-Long|
-|||perl-Data-Dumper|
+||perl-base(within libperl-dev)|perl-IPC-Cmd|
+||perl-modules-5.32(within libperl-dev)|perl-Getopt-Long|
+||libperl5.32(within libperl-dev)|perl-Data-Dumper|
 |**编译Nginx：**|||
 ||libpcre3-dev|pcre-devel|
 ||zlib1g-dev|zlib-devel|
