@@ -1165,7 +1165,7 @@ install_bbr()
     }
     enable_ecn()
     {
-        if [[ ! -f /sys/module/tcp_bbr2/parameters/ecn_enable ]]; then
+        if [[ ! -f /sys/module/tcp_bbr2/parameters/ecn_enable ]] || [ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" != "bbr2" ]; then
             red "请先开启bbr2！"
             return 1
         fi
