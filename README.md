@@ -288,7 +288,7 @@ Xray默认使用的是GO语言官方提供的TLS库，这也是几乎所有GO语
 ## 注
 1.本文链接(官网)：https://github.com/kirin10000/Xray-script
 
-2.参考教程：https://www.v2fly.org/config/overview.html https://guide.v2fly.org/ https://docs.nextcloud.com/server/21/admin_manual/installation/source_installation.html https://docs.cloudreve.org/
+2.参考教程：https://www.v2fly.org/config/overview.html https://guide.v2fly.org/ https://docs.nextcloud.com/server/latest/admin_manual/installation/source_installation.html https://docs.cloudreve.org/
 
 3.域名证书申请：https://github.com/acmesh-official/acme.sh
 
