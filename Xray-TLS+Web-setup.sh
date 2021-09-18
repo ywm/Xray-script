@@ -1684,7 +1684,7 @@ compile_php()
         read -s
     fi
     tar -xJf "${php_version}.tar.xz"
-    rm "${php_version}.tar.xz"
+    rm -f "${php_version}.tar.xz"
     cd "${php_version}"
     sed -i 's#db$THIS_VERSION/db_185.h include/db$THIS_VERSION/db_185.h include/db/db_185.h#& include/db_185.h#' configure
     if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
@@ -1801,14 +1801,14 @@ compile_nginx()
         read -s
     fi
     tar -zxf ${nginx_version}.tar.gz
-    rm "${nginx_version}.tar.gz"
+    rm -f "${nginx_version}.tar.gz"
     if ! wget -O ${openssl_version}.tar.gz https://github.com/openssl/openssl/archive/${openssl_version#*-}.tar.gz; then
         red    "获取openssl失败"
         yellow "按回车键继续或者按Ctrl+c终止"
         read -s
     fi
     tar -zxf ${openssl_version}.tar.gz
-    rm "${openssl_version}.tar.gz"
+    rm -f "${openssl_version}.tar.gz"
     cd ${nginx_version}
     sed -i "s/OPTIMIZE[ \\t]*=>[ \\t]*'-O'/OPTIMIZE          => '-O3'/g" src/http/modules/perl/Makefile.PL
     ./configure --prefix=/usr/local/nginx --with-openssl=../$openssl_version --with-mail=dynamic --with-mail_ssl_module --with-stream=dynamic --with-stream_ssl_module --with-stream_realip_module --with-stream_geoip_module=dynamic --with-stream_ssl_preread_module --with-http_ssl_module --with-http_v2_module --with-http_realip_module --with-http_addition_module --with-http_xslt_module=dynamic --with-http_image_filter_module=dynamic --with-http_geoip_module=dynamic --with-http_sub_module --with-http_dav_module --with-http_flv_module --with-http_mp4_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_auth_request_module --with-http_random_index_module --with-http_secure_link_module --with-http_degradation_module --with-http_slice_module --with-http_stub_status_module --with-http_perl_module=dynamic --with-pcre --with-libatomic --with-compat --with-cpp_test_module --with-google_perftools_module --with-file-aio --with-threads --with-poll_module --with-select_module --with-cc-opt="-Wno-error -g0 -O3"
