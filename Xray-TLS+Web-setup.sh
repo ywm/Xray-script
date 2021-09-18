@@ -2396,47 +2396,59 @@ cat >> $xray_config <<EOF
 EOF
 }
 
-#下载nextcloud模板，用于伪装    参数：域名在列表中的位置
 init_web()
 {
-    if ! ([ "${pretend_list[$1]}" == "2" ] || [ "${pretend_list[$1]}" == "4" ]); then
-        return 0
-    fi
-    local url
-    [ ${pretend_list[$1]} -eq 2 ] && url="${nextcloud_url}" || url="https://github.com/kirin10000/Xray-script/raw/main/Website-Template.zip"
-    local info
-    [ ${pretend_list[$1]} -eq 2 ] && info="Nextcloud" || info="网站模板"
-    if ! wget -O "${nginx_prefix}/html/Website.zip" "$url"; then
-        red    "获取${info}失败"
-        yellow "按回车键继续或者按Ctrl+c终止"
-        read -s
-    fi
-    rm -rf "${nginx_prefix}/html/${true_domain_list[$1]}"
-    if [ ${pretend_list[$1]} -eq 4 ]; then
-        mkdir "${nginx_prefix}/html/${true_domain_list[$1]}"
-        unzip -q -d "${nginx_prefix}/html/${true_domain_list[$1]}" "${nginx_prefix}/html/Website.zip"
-    else
-        unzip -q -d "${nginx_prefix}/html" "${nginx_prefix}/html/Website.zip"
+    systemctl stop php-fpm
+    systemctl stop cloudreve
+    if [ "${pretend_list[$1]}" == "1" ]; then
+        if [ $cloudreve_is_installed -eq 1 ]; then
+            systemctl start cloudreve
+            systemctl enable cloudreve
+            let_change_cloudreve_domain "$1"
+        else
+            install_init_cloudreve "$1"
+        fi
+        turn_on_off_php
+    elif [ "${pretend_list[$1]}" == "2" ]; then
+        if ! wget -O "${nginx_prefix}/html/nextcloud.zip" "${nextcloud_url}"; then
+            red    "获取Nextcloud失败"
+            yellow "按回车键继续或者按Ctrl+c终止"
+            read -s
+        fi
+        rm -rf "${nginx_prefix}/html/${true_domain_list[$1]}"
+        unzip -q -d "${nginx_prefix}/html" "${nginx_prefix}/html/nextcloud.zip"
+        rm -f "${nginx_prefix}/html/nextcloud.zip"
         mv "${nginx_prefix}/html/nextcloud" "${nginx_prefix}/html/${true_domain_list[$1]}"
         chown -R www-data:www-data "${nginx_prefix}/html/${true_domain_list[$1]}"
+        systemctl start php-fpm
+        systemctl enable php-fpm
+        let_init_nextcloud "$1"
+        turn_on_off_cloudreve
+    elif [ "${pretend_list[$1]}" == "4" ]; then
+        mkdir "${nginx_prefix}/html/${true_domain_list[$1]}"
+        turn_on_off_php
+        turn_on_off_cloudreve
+    else
+        turn_on_off_php
+        turn_on_off_cloudreve
     fi
-    rm -rf "${nginx_prefix}/html/Website.zip"
 }
 
 #安装/更新Cloudreve
 update_cloudreve()
 {
     green "正在安装/更新Cloudreve。。。"
-    if ! wget -O cloudreve.tar.gz "https://github.com/cloudreve/Cloudreve/releases/download/${cloudreve_version}/cloudreve_${cloudreve_version}_linux_${machine}.tar.gz"; then
+    local temp_cloudreve_status=0
+    systemctl -q is-active cloudreve && temp_cloudreve_status=1
+    systemctl stop cloudreve
+    if ! wget -O "$cloudreve_prefix/cloudreve.tar.gz" "https://github.com/cloudreve/Cloudreve/releases/download/${cloudreve_version}/cloudreve_${cloudreve_version}_linux_${machine}.tar.gz"; then
         red "获取Cloudreve失败！！"
         yellow "按回车键继续或者按Ctrl+c终止"
         read -s
     fi
-    tar -zxf cloudreve.tar.gz
-    local temp_cloudreve_status=0
-    systemctl -q is-active cloudreve && temp_cloudreve_status=1
-    systemctl stop cloudreve
-    cp cloudreve $cloudreve_prefix
+    tar -zxf "$cloudreve_prefix/cloudreve.tar.gz" -C "$cloudreve_prefix" cloudreve
+    rm -f "$cloudreve_prefix/cloudreve.tar.gz"
+    chmod +x "$cloudreve_prefix/cloudreve"
 cat > $cloudreve_prefix/conf.ini << EOF
 [System]
 Mode = master
@@ -2720,7 +2732,7 @@ print_config_info()
     echo
     blue   " 若想实现WebSocket 0-rtt，请将客户端核心升级至 Xray v1.4.0+"
     echo
-    tyblue " 脚本最后更新时间：2020.03.19"
+    tyblue " 脚本最后更新时间：2021.09.10"
     echo
     red    " 此脚本仅供交流学习使用，请勿使用此脚本行违法之事。网络非法外之地，行非法之事，必将接受法律制裁!!!!"
     tyblue " 2020.11"
@@ -2835,7 +2847,7 @@ install_update_xray_tls_web()
 
     for i in "${pretend_list[@]}"
     do
-        if [ "$i" == "2" ] || [ "$i" == "4" ]; then
+        if [ "$i" == "2" ]; then
             check_important_dependence_installed unzip unzip
             break
         fi
@@ -2897,21 +2909,8 @@ install_update_xray_tls_web()
     sleep 2s
     systemctl restart xray nginx
     if [ $update -eq 0 ]; then
+        [ "${pretend_list[0]}" == "1" ] && [ $temp_remove_cloudreve -eq 1 ] && remove_cloudreve
         init_web 0
-        turn_on_off_php
-        if [ "${pretend_list[0]}" == "1" ]; then
-            if [ $temp_remove_cloudreve -eq 1 ]; then
-                install_init_cloudreve "0"
-            else
-                systemctl start cloudreve
-                systemctl enable cloudreve
-                let_change_cloudreve_domain "0"
-            fi
-        else
-            systemctl stop cloudreve
-            systemctl disable cloudreve
-            [ "${pretend_list[0]}" == "2" ] && let_init_nextcloud "0"
-        fi
         green "-------------------安装完成-------------------"
         print_config_info
     else
@@ -2936,13 +2935,6 @@ full_install_php()
     remove_php
     install_php_part1
     install_php_part2
-    cd /
-    rm -rf "$temp_dir"
-}
-full_install_init_cloudreve()
-{
-    enter_temp_dir
-    install_init_cloudreve "$1"
     cd /
     rm -rf "$temp_dir"
 }
@@ -3149,20 +3141,9 @@ reinit_domain()
     get_all_certs
     config_nginx
     config_xray
-    init_web 0
     sleep 2s
     systemctl restart xray nginx
-    if [ "${pretend_list[0]}" == "2" ]; then
-        systemctl --now enable php-fpm
-        let_init_nextcloud "0"
-    elif [ "${pretend_list[0]}" == "1" ]; then
-        if [ $cloudreve_is_installed -eq 0 ]; then
-            full_install_init_cloudreve "0"
-        else
-            systemctl --now enable cloudreve
-            let_change_cloudreve_domain "0"
-        fi
-    fi
+    init_web 0
     green "域名重置完成！！"
     print_config_info
 }
@@ -3219,24 +3200,12 @@ add_domain()
         red "域名添加失败"
         return 1
     fi
-    init_web "-1"
     config_nginx
     config_xray
     sleep 2s
+    systemctl stop php-fpm cloudreve
     systemctl restart xray nginx
-    turn_on_off_php
-    if [ "${pretend_list[-1]}" == "1" ]; then
-        if [ $cloudreve_is_installed -eq 0 ]; then
-            full_install_init_cloudreve "-1"
-        else
-            systemctl start cloudreve
-            systemctl enable cloudreve
-            let_change_cloudreve_domain "-1"
-        fi
-    else
-        turn_on_off_cloudreve
-        [ "${pretend_list[-1]}" == "2" ] && let_init_nextcloud "-1"
-    fi
+    init_web "-1"
     green "域名添加完成！！"
     print_config_info
 }
@@ -3356,22 +3325,10 @@ change_pretend()
     elif [ "$pretend" == "4" ]; then
         check_important_dependence_installed unzip unzip
     fi
-    init_web "$change"
     config_nginx
+    systemctl stop php-fpm cloudreve
     systemctl restart nginx
-    turn_on_off_php
-    if [ "$pretend" == "1" ]; then
-        if [ $cloudreve_is_installed -eq 0 ]; then
-            full_install_init_cloudreve "$change"
-        else
-            systemctl start cloudreve
-            systemctl enable cloudreve
-            let_change_cloudreve_domain "$change"
-        fi
-    else
-        turn_on_off_cloudreve
-        [ "$pretend" == "2" ] && let_init_nextcloud "$change"
-    fi
+    init_web "$change"
     green "修改完成！"
 }
 reinstall_cloudreve()
