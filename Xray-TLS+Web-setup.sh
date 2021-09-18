@@ -1480,7 +1480,7 @@ readProtocolConfig()
     fi
 }
 
-#读取伪装类型 输出pretend
+#读取伪装类型 输入domain 输出pretend
 readPretend()
 {
     local queren=0
@@ -1553,7 +1553,7 @@ readPretend()
                 ! ask_if "确定选择吗？(y/n)" && queren=0
             fi
         elif [ $pretend -eq 4 ]; then
-            tyblue "安装完成后请在 \"${nginx_prefix}/html/$domain\" 放置您的网站源代码"
+            tyblue "安装完成后请在 \"${nginx_prefix}/html/$1\" 放置您的网站源代码"
             ! ask_if "确认并继续？(y/n)" && queren=0
         elif [ $pretend -eq 5 ]; then
             yellow "输入反向代理网址，格式如：\"https://v.qq.com\""
@@ -1620,7 +1620,7 @@ readDomain()
         echo
         ask_if "您输入的域名是\"$domain\"，确认吗？(y/n)" && queren=1
     done
-    readPretend
+    readPretend "$domain"
     true_domain_list+=("$domain")
     [ $domain_config -eq 1 ] && domain_list+=("www.$domain") || domain_list+=("$domain")
     domain_config_list+=("$domain_config")
@@ -3287,7 +3287,7 @@ change_pretend()
         ((change--))
     fi
     local pretend
-    readPretend
+    readPretend "${true_domain_list[$change]}"
     if [ "${pretend_list[$change]}" == "$pretend" ]; then
         yellow "伪装类型没有变化"
         return 1
