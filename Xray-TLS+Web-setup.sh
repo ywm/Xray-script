@@ -1487,16 +1487,15 @@ readPretend()
     while [ $queren -ne 1 ]
     do
         echo -e "\\n\\n\\n"
-        tyblue "------------------------------请选择要伪装的网站页面------------------------------"
-        tyblue " 1. Cloudreve \\033[32m(推荐)"
+        tyblue "------------------------------请选择伪装网站页面------------------------------"
+        green  " 1. Cloudreve (推荐)"
         purple "     个人网盘"
-        tyblue " 2. Nextcloud \\033[32m(推荐)"
+        green  " 2. Nextcloud (推荐)"
         purple "     个人网盘，需安装php"
         tyblue " 3. 403页面"
         purple "     模拟网站后台"
-        tyblue " 4. 自定义静态网站"
-        purple "     不建议小白选择，默认为Nextcloud登陆界面，强烈建议自行更换"
-        tyblue " 5. 自定义反向代理网页 \\033[31m(不推荐)"
+        red    " 4. 自定义静态网站 (不推荐)"
+        red    " 5. 自定义反向代理网页 (不推荐)"
         echo
         green  " 内存<128MB 建议选择 403页面"
         green  " 128MB<=内存<1G 建议选择 Cloudreve"
@@ -1553,6 +1552,9 @@ readPretend()
                 yellow "php将占用一定系统资源，不建议内存<512M的机器使用"
                 ! ask_if "确定选择吗？(y/n)" && queren=0
             fi
+        elif [ $pretend -eq 4 ]; then
+            tyblue "安装完成后请在 \"${nginx_prefix}/html/$domain\" 放置您的网站源代码"
+            ! ask_if "确认并继续？(y/n)" && queren=0
         elif [ $pretend -eq 5 ]; then
             yellow "输入反向代理网址，格式如：\"https://v.qq.com\""
             pretend=""
@@ -1628,6 +1630,7 @@ readDomain()
 #安装依赖
 install_base_dependence()
 {
+    green "正在安装编译基础组件。。。"
     if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         install_dependence wget tar gzip xz gcc gcc-c++ make
     else
@@ -1636,6 +1639,7 @@ install_base_dependence()
 }
 install_acme_dependence()
 {
+    green "正在安装acme.sh依赖。。。"
     if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         install_dependence curl openssl crontabs
     else
@@ -1644,6 +1648,7 @@ install_acme_dependence()
 }
 install_nginx_dependence()
 {
+    green "正在安装Nginx编译依赖。。。"
     if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         install_dependence perl-IPC-Cmd perl-Getopt-Long perl-Data-Dumper pcre-devel zlib-devel libxml2-devel libxslt-devel gd-devel geoip-devel perl-ExtUtils-Embed gperftools-devel libatomic_ops-devel perl-devel
     else
@@ -1652,6 +1657,7 @@ install_nginx_dependence()
 }
 install_php_dependence()
 {
+    green "正在安装php编译依赖。。。"
     if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         install_dependence pkgconf-pkg-config libxml2-devel sqlite-devel systemd-devel libacl-devel openssl-devel krb5-devel pcre2-devel zlib-devel bzip2-devel libcurl-devel gdbm-devel libdb-devel tokyocabinet-devel lmdb-devel enchant-devel libffi-devel libpng-devel gd-devel libwebp-devel libjpeg-turbo-devel libXpm-devel freetype-devel gmp-devel libc-client-devel libicu-devel openldap-devel oniguruma-devel unixODBC-devel freetds-devel libpq-devel aspell-devel libedit-devel net-snmp-devel libsodium-devel libargon2-devel libtidy-devel libxslt-devel libzip-devel autoconf git ImageMagick-devel
     else
@@ -1979,6 +1985,11 @@ EOF
 #获取证书 参数: 域名位置
 get_cert()
 {
+    if [ ${domain_config_list[$1]} -eq 1 ]; then
+        green "正在获取 \"${domain_list[$1]}\"、\"${true_domain_list[$1]}\" 的域名证书"
+    else
+        green "正在获取 \"${domain_list[$1]}\" 的域名证书"
+    fi
     mv $xray_config ${xray_config}.bak
     mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak2
     cp ${nginx_prefix}/conf/nginx.conf.default ${nginx_prefix}/conf/nginx.conf
@@ -2411,14 +2422,6 @@ init_web()
     fi
     rm -rf "${nginx_prefix}/html/Website.zip"
 }
-init_all_webs()
-{
-    local i
-    for ((i=0;i<${#domain_list[@]};i++))
-    do
-        init_web "$i"
-    done
-}
 
 #安装/更新Cloudreve
 update_cloudreve()
@@ -2829,7 +2832,6 @@ install_update_xray_tls_web()
         sleep 3s
     fi
 
-    green "正在安装依赖。。。。"
     for i in "${pretend_list[@]}"
     do
         if [ "$i" == "2" ] || [ "$i" == "4" ]; then
@@ -2880,7 +2882,6 @@ install_update_xray_tls_web()
     remove_xray
     install_update_xray
 
-    green "正在获取证书。。。。"
     if [ $update -eq 0 ]; then
         [ -e $HOME/.acme.sh/acme.sh ] && $HOME/.acme.sh/acme.sh --uninstall
         rm -rf $HOME/.acme.sh
@@ -2892,10 +2893,10 @@ install_update_xray_tls_web()
     #配置Nginx和Xray
     config_nginx
     config_xray
-    [ $update -eq 0 ] && init_all_webs
     sleep 2s
     systemctl restart xray nginx
     if [ $update -eq 0 ]; then
+        init_web 0
         turn_on_off_php
         if [ "${pretend_list[0]}" == "1" ]; then
             if [ $temp_remove_cloudreve -eq 1 ]; then
@@ -2903,7 +2904,6 @@ install_update_xray_tls_web()
             else
                 systemctl start cloudreve
                 systemctl enable cloudreve
-                update_cloudreve
                 let_change_cloudreve_domain "0"
             fi
         else
@@ -3148,7 +3148,7 @@ reinit_domain()
     get_all_certs
     config_nginx
     config_xray
-    init_all_webs
+    init_web 0
     sleep 2s
     systemctl restart xray nginx
     if [ "${pretend_list[0]}" == "2" ]; then
