@@ -3106,8 +3106,6 @@ reinit_domain()
         check_important_dependence_installed gzip gzip
     elif [ "${pretend_list[-1]}" == "2" ]; then
         check_important_dependence_installed unzip unzip
-    elif [ "${pretend_list[-1]}" == "4" ]; then
-        check_important_dependence_installed unzip unzip
     fi
     green "重置域名中。。。"
     local temp_domain="${domain_list[-1]}"
@@ -3190,8 +3188,6 @@ add_domain()
         check_important_dependence_installed tar tar
         check_important_dependence_installed gzip gzip
     elif [ "${pretend_list[-1]}" == "2" ]; then
-        check_important_dependence_installed unzip unzip
-    elif [ "${pretend_list[-1]}" == "4" ]; then
         check_important_dependence_installed unzip unzip
     fi
     if ! get_cert "-1"; then
@@ -3322,8 +3318,6 @@ change_pretend()
         check_important_dependence_installed tar tar
         check_important_dependence_installed gzip gzip
     elif [ "$pretend" == "2" ]; then
-        check_important_dependence_installed unzip unzip
-    elif [ "$pretend" == "4" ]; then
         check_important_dependence_installed unzip unzip
     fi
     config_nginx
