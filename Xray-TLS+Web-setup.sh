@@ -2907,6 +2907,7 @@ install_update_xray_tls_web()
     config_nginx
     config_xray
     sleep 2s
+    systemctl stop cloudreve
     systemctl restart xray nginx
     if [ $update -eq 0 ]; then
         [ "${pretend_list[0]}" == "1" ] && [ $temp_remove_cloudreve -eq 1 ] && remove_cloudreve
