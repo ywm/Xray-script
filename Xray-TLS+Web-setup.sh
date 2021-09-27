@@ -24,7 +24,7 @@ nginx_config="${nginx_prefix}/conf.d/xray.conf"
 nginx_service="/etc/systemd/system/nginx.service"
 nginx_is_installed=""
 
-php_version="php-8.0.10"
+php_version="php-8.0.11"
 php_prefix="/usr/local/php"
 php_service="/etc/systemd/system/php-fpm.service"
 php_is_installed=""
@@ -99,10 +99,10 @@ check_base_command()
 {
     local i
     local temp_command_list=('bash' 'true' 'false' 'exit' 'echo' 'test' 'sort' 'sed' 'awk' 'grep' 'cut' 'cd' 'rm' 'cp' 'mv' 'head' 'tail' 'uname' 'tr' 'md5sum' 'cat' 'find' 'type' 'command' 'wc' 'ls' 'mktemp' 'swapon' 'swapoff' 'mkswap' 'chmod' 'chown' 'export')
-    for i in ${!temp_command_list[@]}
+    for i in "${temp_command_list[@]}"
     do
-        if ! command -V "${temp_command_list[$i]}" > /dev/null; then
-            red "命令\"${temp_command_list[$i]}\"未找到"
+        if ! command -V "${i}" > /dev/null; then
+            red "命令\"${i}\"未找到"
             red "不是标准的Linux系统"
             exit 1
         fi
@@ -470,12 +470,12 @@ backup_domains_web()
 {
     local i
     mkdir "${temp_dir}/domain_backup"
-    for i in ${!true_domain_list[@]}
+    for i in "${true_domain_list[@]}"
     do
         if [ "$1" == "cp" ]; then
-            cp -rf ${nginx_prefix}/html/${true_domain_list[$i]} "${temp_dir}/domain_backup" 2>/dev/null
+            cp -rf "${nginx_prefix}/html/${i}" "${temp_dir}/domain_backup" 2>/dev/null
         else
-            mv ${nginx_prefix}/html/${true_domain_list[$i]} "${temp_dir}/domain_backup" 2>/dev/null
+            mv "${nginx_prefix}/html/${i}" "${temp_dir}/domain_backup" 2>/dev/null
         fi
     done
 }
@@ -645,11 +645,11 @@ check_port()
     ([ $xray_status -eq 1 ] || [ $nginx_status -eq 1 ]) && sleep 2s
     local check_list=('80' '443')
     local i
-    for i in ${!check_list[@]}
+    for i in "${check_list[@]}"
     do
-        if netstat -tuln | awk '{print $4}'  | awk -F : '{print $NF}' | grep -E "^[0-9]+$" | grep -wq "${check_list[$i]}"; then
-            red "${check_list[$i]}端口被占用！"
-            yellow "请用 lsof -i:${check_list[$i]} 命令检查"
+        if netstat -tuln | awk '{print $4}'  | awk -F : '{print $NF}' | grep -E "^[0-9]+$" | grep -wq "${i}"; then
+            red "${i}端口被占用！"
+            yellow "请用 lsof -i:${i} 命令检查"
             exit 1
         fi
     done
@@ -2170,7 +2170,7 @@ server {
 }
 EOF
     local temp_domain_list2=()
-    for i in ${!domain_config_list[@]}
+    for i in "${!domain_config_list[@]}"
     do
         [ ${domain_config_list[$i]} -eq 1 ] && temp_domain_list2+=("${true_domain_list[$i]}")
     done
@@ -2543,7 +2543,7 @@ print_share_link()
     if [ $protocol_1 -eq 1 ]; then
         green  "VLESS-TCP-XTLS\\033[35m(不走CDN)\\033[32m："
         yellow " Linux/安卓/路由器："
-        for i in ${!domain_list[@]}
+        for i in "${!domain_list[@]}"
         do
             if [ "${pretend_list[$i]}" == "1" ] || [ "${pretend_list[$i]}" == "2" ]; then
                 tyblue " vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&alpn=http%2F1.1&flow=xtls-rprx-splice"
@@ -2552,7 +2552,7 @@ print_share_link()
             fi
         done
         yellow " 其他："
-        for i in ${!domain_list[@]}
+        for i in "${!domain_list[@]}"
         do
             if [ "${pretend_list[$i]}" == "1" ] || [ "${pretend_list[$i]}" == "2" ]; then
                 tyblue " vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&alpn=http%2F1.1&flow=xtls-rprx-direct"
@@ -2563,28 +2563,28 @@ print_share_link()
     fi
     if [ $protocol_2 -eq 1 ]; then
         green  "VLESS-gRPC-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m："
-        for i in ${!domain_list[@]}
+        for i in "${domain_list[@]}"
         do
-            tyblue "vless://${xid_2}@${domain_list[$i]}:443?type=grpc&security=tls&serviceName=${serviceName}&mode=multi"
+            tyblue "vless://${xid_2}@${i}:443?type=grpc&security=tls&serviceName=${serviceName}&mode=multi"
         done
     elif [ $protocol_2 -eq 2 ]; then
         green  "VMess-gRPC-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m："
-        for i in ${!domain_list[@]}
+        for i in "${domain_list[@]}"
         do
-            tyblue "vmess://${xid_2}@${domain_list[$i]}:443?type=grpc&security=tls&serviceName=${serviceName}&mode=multi"
+            tyblue "vmess://${xid_2}@${i}:443?type=grpc&security=tls&serviceName=${serviceName}&mode=multi"
         done
     fi
     if [ $protocol_3 -eq 1 ]; then
         green  "VLESS-WebSocket-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m："
-        for i in ${!domain_list[@]}
+        for i in "${domain_list[@]}"
         do
-            tyblue "vless://${xid_3}@${domain_list[$i]}:443?type=ws&security=tls&path=%2F${path#/}%3Fed=2048"
+            tyblue "vless://${xid_3}@${i}:443?type=ws&security=tls&path=%2F${path#/}%3Fed=2048"
         done
     elif [ $protocol_3 -eq 2 ]; then
         green  "VMess-WebSocket-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m："
-        for i in ${!domain_list[@]}
+        for i in "${domain_list[@]}"
         do
-            tyblue "vmess://${xid_3}@${domain_list[$i]}:443?type=ws&security=tls&path=%2F${path#/}%3Fed=2048"
+            tyblue "vmess://${xid_3}@${i}:443?type=ws&security=tls&path=%2F${path#/}%3Fed=2048"
         done
     fi
 }
@@ -3119,9 +3119,9 @@ reinit_domain()
     systemctl stop cloudreve
     systemctl disable cloudreve
     local i
-    for i in ${!true_domain_list[@]}
+    for i in "${true_domain_list[@]}"
     do
-        rm -rf ${nginx_prefix}/html/${true_domain_list[$i]}
+        rm -rf "${nginx_prefix}/html/${i}"
     done
     rm -rf "${nginx_prefix}/certs"
     mkdir "${nginx_prefix}/certs"
@@ -3215,7 +3215,7 @@ delete_domain()
     fi
     local i
     tyblue "-----------------------请选择要删除的域名-----------------------"
-    for i in ${!domain_list[@]}
+    for i in "${!domain_list[@]}"
     do
         if [ ${domain_config_list[$i]} -eq 1 ]; then
             tyblue " $((i+1)). ${domain_list[$i]} ${true_domain_list[$i]}"
@@ -3270,7 +3270,7 @@ change_pretend()
     else
         local i
         tyblue "-----------------------请选择要修改伪装类型的域名-----------------------"
-        for i in ${!domain_list[@]}
+        for i in "${!domain_list[@]}"
         do
             if [ ${domain_config_list[$i]} -eq 1 ]; then
                 tyblue " $((i+1)). ${domain_list[$i]} ${true_domain_list[$i]}"
@@ -3341,7 +3341,7 @@ reinstall_cloudreve()
     ! ask_if "确定要继续吗？(y/n)" && return 0
     enter_temp_dir
     local i
-    for i in ${!pretend_list[@]}
+    for i in "${!pretend_list[@]}"
     do
         if [ "${pretend_list[$i]}" == "1" ]; then
             install_init_cloudreve "$i"
@@ -3508,7 +3508,7 @@ simplify_system()
     else
         local apt_utils_installed=0
         LANG="en_US.UTF-8" LANGUAGE="en_US:en" dpkg -s apt-utils 2>/dev/null | grep -qi 'status[ '$'\t]*:[ '$'\t]*install[ '$'\t]*ok[ '$'\t]*installed[ '$'\t]*$' && apt_utils_installed=1
-        local temp_remove_list=('openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^libpython' 'dbus' 'cron' 'anacron' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' 'thermald' 'libdbus-glib-1-2' 'libevdev2' 'libupower-glib3' 'usb.ids' 'readline-common' '^libreadline' 'xz-utils' 'selinux-utils' 'wget' 'zip' 'unzip' 'bzip2' 'finalrd' '^cryptsetup' '^libplymouth' 'apt-utils' '^lib.*-dev' 'perl' '^perl-modules' '^x11' '^libx11')
+        local temp_remove_list=('cron' 'anacron' 'openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^libpython' 'dbus' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' 'thermald' 'libdbus-glib-1-2' 'libevdev2' 'libupower-glib3' 'usb.ids' 'readline-common' '^libreadline' 'xz-utils' 'selinux-utils' 'wget' 'zip' 'unzip' 'bzip2' 'finalrd' '^cryptsetup' '^libplymouth' '^lib.*-dev' 'perl' '^perl-modules' '^x11' '^libx11' '^qemu-' '^xdg-' '^libglib' '^libicu' '^libxml' '^liburing' 'apt-utils')
         if ! $debian_package_manager -y --auto-remove purge "${temp_remove_list[@]}"; then
             $debian_package_manager -y -f install
             $debian_package_manager -y --auto-remove purge cron anacron || $debian_package_manager -y -f install
