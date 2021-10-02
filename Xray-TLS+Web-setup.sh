@@ -856,6 +856,7 @@ doupdate()
         tyblue " 1. beta版(测试版)          当前版本号：21.10"
         tyblue " 2. release版(稳定版)       当前版本号：21.04"
         tyblue " 3. LTS版(长期支持版)       当前版本号：20.04"
+        tyblue " 0. 不升级"
         tyblue "-------------------------注意事项-------------------------"
         yellow " 1.升级过程中遇到问话/对话框，如果不清楚，请选择yes/y/第一个选项"
         yellow " 2.升级系统可能需要15分钟或更久"
@@ -867,25 +868,27 @@ doupdate()
         tyblue "----------------------------------------------------------"
         echo
         choice=""
-        while [ "$choice" != "1" ] && [ "$choice" != "2" ] && [ "$choice" != "3" ]
+        while [[ ! "$choice" =~ ^(0|[1-9][0-9]*)$ ]] || ((choice>3))
         do
             read -p "您的选择是：" choice
         done
-        if ! [[ "$(grep -i '^[ '$'\t]*port[ '$'\t]' /etc/ssh/sshd_config | awk '{print $2}')" =~ ^("22"|)$ ]]; then
-            red "检测到ssh端口号被修改"
-            red "升级系统后ssh端口号可能恢复默认值(22)"
-            yellow "按回车键继续。。。"
-            read -s
-        fi
-        if [ $in_install_update_xray_tls_web -eq 1 ]; then
-            echo
-            tyblue "提示：即将开始升级系统"
-            yellow " 升级完系统后服务器将重启，重启后，请再次运行脚本完成 Xray-TLS+Web 剩余部分的安装/升级"
-            yellow " 再次运行脚本时，重复之前选过的选项即可"
-            echo
-            sleep 2s
-            yellow "按回车键以继续。。。"
-            read -s
+        if [ $choice -ne 0 ]; then
+            if ! [[ "$(grep -i '^[ '$'\t]*port[ '$'\t]' /etc/ssh/sshd_config | awk '{print $2}')" =~ ^("22"|)$ ]]; then
+                red "检测到ssh端口号被修改"
+                red "升级系统后ssh端口号可能恢复默认值(22)"
+                yellow "按回车键继续。。。"
+                read -s
+            fi
+            if [ $in_install_update_xray_tls_web -eq 1 ]; then
+                echo
+                tyblue "提示：即将开始升级系统"
+                yellow " 升级完系统后服务器将重启，重启后，请再次运行脚本完成 Xray-TLS+Web 剩余部分的安装/升级"
+                yellow " 再次运行脚本时，重复之前选过的选项即可"
+                echo
+                sleep 2s
+                yellow "按回车键以继续。。。"
+                read -s
+            fi
         fi
         local i
         for ((i=0;i<2;i++))
@@ -2651,7 +2654,7 @@ print_config_info()
         purple "   (Qv2ray:TLS设置-允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
         tyblue "  fingerprint                   ："
         blue   "                                  使用XTLS ：\\033[36m空"
-        blue   "                                  使用TLS  ：\\033[36m空/chrome/firefox/safari"
+        blue   "                                  使用TLS  ：\\033[36m空/chrome\\033[32m(推荐)\\033[36m/firefox/safari"
         purple "                                           (此选项决定是否伪造浏览器指纹，空代表不伪造)"
         tyblue "  alpn                          ："
         blue   "                                  伪造浏览器指纹  ：\\033[36m此参数不生效 \\033[35m(可随意填写)"
