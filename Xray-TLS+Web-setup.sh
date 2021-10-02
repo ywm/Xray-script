@@ -853,15 +853,11 @@ doupdate()
         check_important_dependence_installed "ubuntu-release-upgrader-core"
         echo -e "\\n\\n\\n"
         tyblue "------------------请选择升级系统版本--------------------"
-        tyblue " 1.最新beta版(现在是21.10)(2021.5)"
-        tyblue " 2.最新发行版(现在是21.04)(2021.5)"
-        tyblue " 3.最新LTS版(现在是20.04)(2021.5)"
-        tyblue "-------------------------版本说明-------------------------"
-        tyblue " beta版：即测试版"
-        tyblue " 发行版：即稳定版"
-        tyblue " LTS版：长期支持版本，可以理解为超级稳定版"
+        tyblue " 1. beta版(测试版)          当前版本号：21.10"
+        tyblue " 2. release版(稳定版)       当前版本号：21.04"
+        tyblue " 3. LTS版(长期支持版)       当前版本号：20.04"
         tyblue "-------------------------注意事项-------------------------"
-        yellow " 1.升级过程中遇到问话/对话框，如果不明白，选择yes/y/第一个选项"
+        yellow " 1.升级过程中遇到问话/对话框，如果不清楚，请选择yes/y/第一个选项"
         yellow " 2.升级系统可能需要15分钟或更久"
         yellow " 3.有的时候不能一次性更新到所选择的版本，可能要更新多次"
         yellow " 4.升级系统后以下配置可能会恢复系统默认配置："
@@ -2566,47 +2562,56 @@ print_share_link()
     echo
     tyblue "分享链接："
     if [ $protocol_1 -eq 1 ]; then
-        green  "VLESS-TCP-XTLS\\033[35m(不走CDN)\\033[32m："
-        yellow " Linux/安卓/路由器："
+        green  "============ VLESS-TCP-TLS\\033[35m(不走CDN)\\033[32m ============"
         for i in "${!domain_list[@]}"
         do
             if [ "${pretend_list[$i]}" == "1" ] || [ "${pretend_list[$i]}" == "2" ]; then
-                tyblue " vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&alpn=http%2F1.1&flow=xtls-rprx-splice"
+                tyblue "vless://${xid_1}@${ip}:443?security=tls&sni=${domain_list[$i]}&alpn=http%2F1.1"
             else
-                tyblue " vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&flow=xtls-rprx-splice"
+                tyblue "vless://${xid_1}@${ip}:443?security=tls&sni=${domain_list[$i]}"
             fi
         done
-        yellow " 其他："
+        green  "============ VLESS-TCP-XTLS\\033[35m(不走CDN)\\033[32m ============"
+        yellow "Linux/安卓/路由器："
         for i in "${!domain_list[@]}"
         do
             if [ "${pretend_list[$i]}" == "1" ] || [ "${pretend_list[$i]}" == "2" ]; then
-                tyblue " vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&alpn=http%2F1.1&flow=xtls-rprx-direct"
+                tyblue "vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&alpn=http%2F1.1&flow=xtls-rprx-splice"
             else
-                tyblue " vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&flow=xtls-rprx-direct"
+                tyblue "vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&flow=xtls-rprx-splice"
+            fi
+        done
+        yellow "其他："
+        for i in "${!domain_list[@]}"
+        do
+            if [ "${pretend_list[$i]}" == "1" ] || [ "${pretend_list[$i]}" == "2" ]; then
+                tyblue "vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&alpn=http%2F1.1&flow=xtls-rprx-direct"
+            else
+                tyblue "vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&flow=xtls-rprx-direct"
             fi
         done
     fi
     if [ $protocol_2 -eq 1 ]; then
-        green  "VLESS-gRPC-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m："
+        green  "=========== VLESS-gRPC-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m ==========="
         for i in "${domain_list[@]}"
         do
             tyblue "vless://${xid_2}@${i}:443?type=grpc&security=tls&serviceName=${serviceName}&mode=multi"
         done
     elif [ $protocol_2 -eq 2 ]; then
-        green  "VMess-gRPC-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m："
+        green  "=========== VMess-gRPC-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m ==========="
         for i in "${domain_list[@]}"
         do
             tyblue "vmess://${xid_2}@${i}:443?type=grpc&security=tls&serviceName=${serviceName}&mode=multi"
         done
     fi
     if [ $protocol_3 -eq 1 ]; then
-        green  "VLESS-WebSocket-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m："
+        green  "=========== VLESS-WebSocket-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m ==========="
         for i in "${domain_list[@]}"
         do
             tyblue "vless://${xid_3}@${i}:443?type=ws&security=tls&path=%2F${path#/}%3Fed=2048"
         done
     elif [ $protocol_3 -eq 2 ]; then
-        green  "VMess-WebSocket-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m："
+        green  "=========== VMess-WebSocket-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m ==========="
         for i in "${domain_list[@]}"
         do
             tyblue "vmess://${xid_3}@${i}:443?type=ws&security=tls&path=%2F${path#/}%3Fed=2048"
@@ -2634,7 +2639,7 @@ print_config_info()
         purple "   (Shadowrocket:传输方式:none)"
         tyblue "  type(伪装类型)                ：none"
         purple "   (Qv2ray:协议设置-类型)"
-        tyblue "  security(传输层加密)          ：xtls\\033[32m(推荐)\\033[36m或tls \\033[35m(此选项将决定是使用XTLS还是TLS)"
+        tyblue "  security(传输层加密)          ：xtls或tls \\033[35m(此选项将决定是使用XTLS还是TLS)"
         purple "   (V2RayN(G):底层传输安全;Qv2ray:TLS设置-安全类型)"
         if [ ${#domain_list[@]} -eq 1 ]; then
             tyblue "  serverName                    ：${domain_list[*]}"
