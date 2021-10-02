@@ -856,7 +856,7 @@ doupdate()
         tyblue " 1. beta版(测试版)          当前版本号：21.10"
         tyblue " 2. release版(稳定版)       当前版本号：21.04"
         tyblue " 3. LTS版(长期支持版)       当前版本号：20.04"
-        tyblue " 0. 不升级"
+        tyblue " 0. 不升级系统"
         tyblue "-------------------------注意事项-------------------------"
         yellow " 1.升级过程中遇到问话/对话框，如果不清楚，请选择yes/y/第一个选项"
         yellow " 2.升级系统可能需要15分钟或更久"
@@ -2571,7 +2571,7 @@ print_share_link()
             if [ "${pretend_list[$i]}" == "1" ] || [ "${pretend_list[$i]}" == "2" ]; then
                 tyblue "vless://${xid_1}@${ip}:443?security=tls&sni=${domain_list[$i]}&alpn=http%2F1.1"
             else
-                tyblue "vless://${xid_1}@${ip}:443?security=tls&sni=${domain_list[$i]}"
+                tyblue "vless://${xid_1}@${ip}:443?security=tls&sni=${domain_list[$i]}&alpn=h2,http%2F1.1"
             fi
         done
         green  "============ VLESS-TCP-XTLS\\033[35m(不走CDN)\\033[32m ============"
@@ -2581,7 +2581,7 @@ print_share_link()
             if [ "${pretend_list[$i]}" == "1" ] || [ "${pretend_list[$i]}" == "2" ]; then
                 tyblue "vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&alpn=http%2F1.1&flow=xtls-rprx-splice"
             else
-                tyblue "vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&flow=xtls-rprx-splice"
+                tyblue "vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&alpn=h2,http%2F1.1&flow=xtls-rprx-splice"
             fi
         done
         yellow "其他："
@@ -2590,7 +2590,7 @@ print_share_link()
             if [ "${pretend_list[$i]}" == "1" ] || [ "${pretend_list[$i]}" == "2" ]; then
                 tyblue "vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&alpn=http%2F1.1&flow=xtls-rprx-direct"
             else
-                tyblue "vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&flow=xtls-rprx-direct"
+                tyblue "vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&alpn=h2,http%2F1.1&flow=xtls-rprx-direct"
             fi
         done
     fi
@@ -2598,13 +2598,13 @@ print_share_link()
         green  "=========== VLESS-gRPC-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m ==========="
         for i in "${domain_list[@]}"
         do
-            tyblue "vless://${xid_2}@${i}:443?type=grpc&security=tls&serviceName=${serviceName}&mode=multi"
+            tyblue "vless://${xid_2}@${i}:443?type=grpc&security=tls&serviceName=${serviceName}&mode=multi&alpn=h2,http%2F1.1"
         done
     elif [ $protocol_2 -eq 2 ]; then
         green  "=========== VMess-gRPC-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m ==========="
         for i in "${domain_list[@]}"
         do
-            tyblue "vmess://${xid_2}@${i}:443?type=grpc&security=tls&serviceName=${serviceName}&mode=multi"
+            tyblue "vmess://${xid_2}@${i}:443?type=grpc&security=tls&serviceName=${serviceName}&mode=multi&alpn=h2,http%2F1.1"
         done
     fi
     if [ $protocol_3 -eq 1 ]; then
@@ -2626,40 +2626,41 @@ print_config_info()
     echo -e "\\n\\n\\n"
     if [ $protocol_1 -ne 0 ]; then
         tyblue "--------------------- VLESS-TCP-XTLS/TLS (不走CDN) ---------------------"
-        tyblue " 服务器类型            ：VLESS"
-        tyblue " address(地址)         ：服务器ip"
+        tyblue " protocol(传输协议)    ：\\033[33mvless"
+        purple "  (V2RayN选择\"添加[VLESS]服务器\";V2RayNG选择\"手动输入[VLESS]\")"
+        tyblue " address(地址)         ：\\033[33m服务器ip"
         purple "  (Qv2ray:主机)"
-        tyblue " port(端口)            ：443"
-        tyblue " id(用户ID/UUID)       ：${xid_1}"
+        tyblue " port(端口)            ：\\033[33m443"
+        tyblue " id(用户ID/UUID)       ：\\033[33m${xid_1}"
         tyblue " flow(流控)            ："
-        blue   "                         使用XTLS ："
-        blue   "                                    Linux/安卓/路由器：\\033[36mxtls-rprx-splice\\033[32m(推荐)\\033[36m或xtls-rprx-direct"
-        blue   "                                    其它             ：\\033[36mxtls-rprx-direct"
-        blue   "                         使用TLS  ：\\033[36m空"
-        tyblue " encryption(加密)      ：none"
+        tyblue "                         使用XTLS ："
+        tyblue "                                    Linux/安卓/路由器：\\033[33mxtls-rprx-splice\\033[32m(推荐)\\033[36m或\\033[33mxtls-rprx-direct"
+        tyblue "                                    其它             ：\\033[33mxtls-rprx-direct"
+        tyblue "                         使用TLS  ：\\033[33m空"
+        tyblue " encryption(加密)      ：\\033[33mnone"
         tyblue " ---Transport/StreamSettings(底层传输方式/流设置)---"
-        tyblue "  network(传输协议)             ：tcp"
-        purple "   (Shadowrocket:传输方式:none)"
-        tyblue "  type(伪装类型)                ：none"
+        tyblue "  network(传输方式)             ：\\033[33mtcp"
+        purple "   (Shadowrocket传输方式选none)"
+        tyblue "  type(伪装类型)                ：\\033[33mnone"
         purple "   (Qv2ray:协议设置-类型)"
-        tyblue "  security(传输层加密)          ：xtls或tls \\033[35m(此选项将决定是使用XTLS还是TLS)"
+        tyblue "  security(传输层加密)          ：\\033[33mxtls\\033[36m或\\033[33mtls \\033[35m(此选项将决定是使用XTLS还是TLS)"
         purple "   (V2RayN(G):底层传输安全;Qv2ray:TLS设置-安全类型)"
         if [ ${#domain_list[@]} -eq 1 ]; then
-            tyblue "  serverName                    ：${domain_list[*]}"
+            tyblue "  serverName                    ：\\033[33m${domain_list[*]}"
         else
-            tyblue "  serverName                    ：${domain_list[*]} \\033[35m(任选其一)"
+            tyblue "  serverName                    ：\\033[33m${domain_list[*]} \\033[35m(任选其一)"
         fi
         purple "   (V2RayN(G):SNI;Qv2ray:TLS设置-服务器地址;Shadowrocket:Peer 名称)"
-        tyblue "  allowInsecure                 ：false"
+        tyblue "  allowInsecure                 ：\\033[33mfalse"
         purple "   (Qv2ray:TLS设置-允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
         tyblue "  fingerprint                   ："
-        blue   "                                  使用XTLS ：\\033[36m空"
-        blue   "                                  使用TLS  ：\\033[36m空/chrome\\033[32m(推荐)\\033[36m/firefox/safari"
+        tyblue "                                  使用XTLS ：\\033[33m空"
+        tyblue "                                  使用TLS  ：\\033[33m空\\033[36m/\\033[33mchrome\\033[32m(推荐)\\033[36m/\\033[33mfirefox\\033[36m/\\033[33msafari"
         purple "                                           (此选项决定是否伪造浏览器指纹，空代表不伪造)"
         tyblue "  alpn                          ："
-        blue   "                                  伪造浏览器指纹  ：\\033[36m此参数不生效 \\033[35m(可随意填写)"
-        blue   "                                  不伪造浏览器指纹：\\033[36mserverName填的域名对应的伪装网站为网盘则设置为http/1.1，否则保持默认/缺省"
-        purple "   (Qv2ray:TLS设置-ALPN)"
+        tyblue "                                  伪造浏览器指纹  ：此参数不生效，可随意设置"
+        tyblue "                                  不伪造浏览器指纹：serverName填的域名对应的伪装网站为网盘则设置为\\033[33mhttp/1.1\\033[36m，否则设置为\\033[33m空\\033[36m或\\033[33mh2,http/1.1"
+        purple "   (Qv2ray:TLS设置-ALPN) (注意Qv2ray如果要设置alpn为h2,http/1.1，请填写\"h2|http/1.1\")"
         tyblue " ------------------------其他-----------------------"
         tyblue "  Mux(多路复用)                 ：使用XTLS必须关闭;不使用XTLS也建议关闭"
         purple "   (V2RayN:设置页面-开启Mux多路复用)"
@@ -2669,40 +2670,42 @@ print_config_info()
         echo
         if [ $protocol_2 -eq 1 ]; then
             tyblue "---------------- VLESS-gRPC-TLS (有CDN则走CDN，否则直连) ---------------"
-            tyblue " 服务器类型            ：VLESS"
+            tyblue " protocol(传输协议)    ：\\033[33mvless"
+            purple "  (V2RayN选择\"添加[VLESS]服务器\";V2RayNG选择\"手动输入[VLESS]\")"
         else
             tyblue "---------------- VMess-gRPC-TLS (有CDN则走CDN，否则直连) ---------------"
-            tyblue " 服务器类型            ：VMess"
+            tyblue " protocol(传输协议)    ：\\033[33mvmess"
+            purple "  (V2RayN选择\"添加[VMess]服务器\";V2RayNG选择\"手动输入[Vmess]\")"
         fi
         if [ ${#domain_list[@]} -eq 1 ]; then
-            tyblue " address(地址)         ：${domain_list[*]}"
+            tyblue " address(地址)         ：\\033[33m${domain_list[*]}"
         else
-            tyblue " address(地址)         ：${domain_list[*]} \\033[35m(任选其一)"
+            tyblue " address(地址)         ：\\033[33m${domain_list[*]} \\033[35m(任选其一)"
         fi
         purple "  (Qv2ray:主机)"
-        tyblue " port(端口)            ：443"
-        tyblue " id(用户ID/UUID)       ：${xid_2}"
+        tyblue " port(端口)            ：\\033[33m443"
+        tyblue " id(用户ID/UUID)       ：\\033[33m${xid_2}"
         if [ $protocol_2 -eq 1 ]; then
-            tyblue " flow(流控)            ：空"
-            tyblue " encryption(加密)      ：none"
+            tyblue " flow(流控)            ：\\033[33m空"
+            tyblue " encryption(加密)      ：\\033[33mnone"
         else
-            tyblue " alterId(额外ID)       ：0"
-            tyblue " security(加密方式)    ：使用CDN，推荐auto;不使用CDN，推荐none"
+            tyblue " alterId(额外ID)       ：\\033[33m0"
+            tyblue " security(加密方式)    ：使用CDN，推荐\\033[33mauto\\033[36m;不使用CDN，推荐\\033[33mnone"
             purple "  (Qv2ray:安全选项;Shadowrocket:算法)"
         fi
         tyblue " ---Transport/StreamSettings(底层传输方式/流设置)---"
-        tyblue "  network(传输协议)             ：grpc"
-        tyblue "  serviceName                   ：${serviceName}"
-        tyblue "  multiMode                     ：true"
-        tyblue "  security(传输层加密)          ：tls"
+        tyblue "  network(传输方式)             ：\\033[33mgrpc"
+        tyblue "  serviceName                   ：\\033[33m${serviceName}"
+        tyblue "  multiMode                     ：\\033[33mtrue"
+        purple "   (V2RayN(G)伪装类型(type)选择multi"
+        tyblue "  security(传输层加密)          ：\\033[33mtls"
         purple "   (V2RayN(G):底层传输安全;Qv2ray:TLS设置-安全类型)"
-        tyblue "  serverName                    ：空"
+        tyblue "  serverName                    ：\\033[33m空"
         purple "   (V2RayN(G):SNI和伪装域名;Qv2ray:TLS设置-服务器地址;Shadowrocket:Peer 名称)"
-        tyblue "  allowInsecure                 ：false"
+        tyblue "  allowInsecure                 ：\\033[33mfalse"
         purple "   (Qv2ray:TLS设置-允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
-        tyblue "  fingerprint                   ：空"
-        tyblue "  alpn                          ：h2,http/1.1"
-        purple "   (Qv2ray:TLS设置-ALPN填写\"h2|http/1.1\")"
+        tyblue "  alpn                          ：\\033[33m空\\033[36m或\\033[33mh2,http/1.1"
+        purple "   (Qv2ray:TLS设置-ALPN) (注意Qv2ray如果要设置alpn为h2,http/1.1，请填写\"h2|http/1.1\")"
         tyblue " ------------------------其他-----------------------"
         tyblue "  Mux(多路复用)                 ：强烈建议关闭"
         purple "   (V2RayN:设置页面-开启Mux多路复用)"
@@ -2712,42 +2715,43 @@ print_config_info()
         echo
         if [ $protocol_3 -eq 1 ]; then
             tyblue "------------- VLESS-WebSocket-TLS (有CDN则走CDN，否则直连) -------------"
-            tyblue " 服务器类型            ：VLESS"
+            tyblue " protocol(传输协议)    ：\\033[33mvless"
+            purple "  (V2RayN选择\"添加[VLESS]服务器\";V2RayNG选择\"手动输入[VLESS]\")"
         else
             tyblue "------------- VMess-WebSocket-TLS (有CDN则走CDN，否则直连) -------------"
-            tyblue " 服务器类型            ：VMess"
+            tyblue " protocol(传输协议)    ：\\033[33mvmess"
+            purple "  (V2RayN选择\"添加[VMess]服务器\";V2RayNG选择\"手动输入[Vmess]\")"
         fi
         if [ ${#domain_list[@]} -eq 1 ]; then
-            tyblue " address(地址)         ：${domain_list[*]}"
+            tyblue " address(地址)         ：\\033[33m${domain_list[*]}"
         else
-            tyblue " address(地址)         ：${domain_list[*]} \\033[35m(任选其一)"
+            tyblue " address(地址)         ：\\033[33m${domain_list[*]} \\033[35m(任选其一)"
         fi
         purple "  (Qv2ray:主机)"
-        tyblue " port(端口)            ：443"
-        tyblue " id(用户ID/UUID)       ：${xid_3}"
+        tyblue " port(端口)            ：\\033[33m443"
+        tyblue " id(用户ID/UUID)       ：\\033[33m${xid_3}"
         if [ $protocol_3 -eq 1 ]; then
-            tyblue " flow(流控)            ：空"
-            tyblue " encryption(加密)      ：none"
+            tyblue " flow(流控)            ：\\033[33m空"
+            tyblue " encryption(加密)      ：\\033[33mnone"
         else
-            tyblue " alterId(额外ID)       ：0"
-            tyblue " security(加密方式)    ：使用CDN，推荐auto;不使用CDN，推荐none"
+            tyblue " alterId(额外ID)       ：\\033[33m0"
+            tyblue " security(加密方式)    ：使用CDN，推荐\\033[33mauto\\033[36m;不使用CDN，推荐\\033[33mnone"
             purple "  (Qv2ray:安全选项;Shadowrocket:算法)"
         fi
         tyblue " ---Transport/StreamSettings(底层传输方式/流设置)---"
-        tyblue "  network(传输协议)             ：ws"
-        purple "   (Shadowrocket:传输方式:websocket)"
-        tyblue "  path(路径)                    ：${path}?ed=2048"
-        tyblue "  Host                          ：空"
+        tyblue "  network(传输方式)             ：\\033[33mws"
+        purple "   (Shadowrocket传输方式选websocket)"
+        tyblue "  path(路径)                    ：\\033[33m${path}?ed=2048"
+        tyblue "  Host                          ：\\033[33m空"
         purple "   (V2RayN(G):伪装域名;Qv2ray:协议设置-请求头)"
-        tyblue "  security(传输层加密)          ：tls"
+        tyblue "  security(传输层加密)          ：\\033[33mtls"
         purple "   (V2RayN(G):底层传输安全;Qv2ray:TLS设置-安全类型)"
-        tyblue "  serverName                    ：空"
+        tyblue "  serverName                    ：\\033[33m空"
         purple "   (V2RayN(G):SNI和伪装域名;Qv2ray:TLS设置-服务器地址;Shadowrocket:Peer 名称)"
-        tyblue "  allowInsecure                 ：false"
+        tyblue "  allowInsecure                 ：\\033[33mfalse"
         purple "   (Qv2ray:TLS设置-允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
-        tyblue "  fingerprint                   ：空"
-        tyblue "  alpn                          ：此参数不生效 \\033[35m(可随意填写)"
-        purple "   (Qv2ray:TLS设置-ALPN)"
+        tyblue "  alpn                          ：此参数不生效，可随意设置"
+        purple "   (Qv2ray:TLS设置-ALPN) (注意Qv2ray如果要设置alpn为h2,http/1.1，请填写\"h2|http/1.1\")"
         tyblue " ------------------------其他-----------------------"
         tyblue "  Mux(多路复用)                 ：建议关闭"
         purple "   (V2RayN:设置页面-开启Mux多路复用)"
