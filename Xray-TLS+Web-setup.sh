@@ -2514,8 +2514,9 @@ install_init_cloudreve()
     remove_cloudreve
     mkdir -p $cloudreve_prefix
     update_cloudreve
+    rm -rf /dev/shm/cloudreve_unixsocket
     local temp
-    temp="$(timeout 5s $cloudreve_prefix/cloudreve | grep "初始管理员密码：" | awk '{print $4}')"
+    temp="$("$cloudreve_prefix/cloudreve" | grep "初始管理员密码：" | awk '{print $4}')"
     sleep 1s
     systemctl start cloudreve
     systemctl enable cloudreve
