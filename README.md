@@ -204,7 +204,7 @@ Xray默认使用的是GO语言官方提供的TLS库，这也是几乎所有GO语
 |wget/curl https|ca-certificates|ca-certificates|
 |wget|wget|wget|
 |curl|curl|curl|
-|kill/pkill/ps/sysctl/free|procps|procps-ng/procps|
+|kill/pkill/ps/sysctl/free|procps|procps-ng|
 |epel源||epel-release|
 |do-release-upgrade(升级系统)|ubuntu-release-upgrader-core||
 |unzip|unzip|unzip|
