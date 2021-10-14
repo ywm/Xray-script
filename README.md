@@ -199,7 +199,7 @@ Xray默认使用的是GO语言官方提供的TLS库，这也是几乎所有GO语
 |-|-|-|
 |yumdb set(标记包手动安装)||yum-utils|
 |setenforce/getenforce(关闭SELinux)|selinux-utils|libselinux-utils|
-|netstat(检查端口占用)|net-tools|net-tools|
+|ss(检查端口占用)|iproute2|iproute|
 |lsb_release(查看系统版本)|lsb-release|redhat-lsb-core|
 |wget/curl https|ca-certificates|ca-certificates|
 |wget|wget|wget|
