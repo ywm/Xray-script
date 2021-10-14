@@ -666,7 +666,7 @@ check_port()
     local i
     for i in "${check_list[@]}"
     do
-        if netstat -tuln | awk '{print $4}'  | awk -F : '{print $NF}' | grep -E "^[0-9]+$" | grep -wq "${i}"; then
+        if ss -natl | awk '{print $4}'  | awk -F : '{print $NF}' | grep -E "^[0-9]+$" | grep -wq "${i}"; then
             red "${i}端口被占用！"
             yellow "请用 lsof -i:${i} 命令检查"
             exit 1
@@ -2782,7 +2782,7 @@ install_update_xray_tls_web()
     check_nginx_installed_system
     [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
     check_SELinux
-    check_important_dependence_installed net-tools net-tools
+    check_important_dependence_installed iproute2 iproute
     check_port
     check_important_dependence_installed lsb-release redhat-lsb-core
     get_system_info
@@ -3117,7 +3117,7 @@ restart_xray_tls_web()
 reinit_domain()
 {
     [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
-    check_important_dependence_installed net-tools net-tools
+    check_important_dependence_installed iproute2 iproute
     check_port
     check_important_dependence_installed lsb-release redhat-lsb-core
     get_system_info
@@ -3187,7 +3187,7 @@ reinit_domain()
 add_domain()
 {
     [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
-    check_important_dependence_installed net-tools net-tools
+    check_important_dependence_installed iproute2 iproute
     check_port
     check_important_dependence_installed lsb-release redhat-lsb-core
     get_system_info
@@ -3542,11 +3542,11 @@ simplify_system()
     fi
     uninstall_firewall
     if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        $redhat_package_manager -y remove openssl "perl*" xz libselinux-utils zip unzip bzip2 wget procps-ng procps
+        $redhat_package_manager -y remove openssl "perl*" xz libselinux-utils zip unzip bzip2 wget procps-ng procps iproute
     else
         local apt_utils_installed=0
         LANG="en_US.UTF-8" LANGUAGE="en_US:en" dpkg -s apt-utils 2>/dev/null | grep -qi 'status[ '$'\t]*:[ '$'\t]*install[ '$'\t]*ok[ '$'\t]*installed[ '$'\t]*$' && apt_utils_installed=1
-        local temp_remove_list=('cron' 'anacron' 'openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^libpython' 'dbus' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' 'thermald' 'libdbus-glib-1-2' 'libevdev2' 'libupower-glib3' 'usb.ids' 'readline-common' '^libreadline' 'xz-utils' 'selinux-utils' 'wget' 'zip' 'unzip' 'bzip2' 'finalrd' '^cryptsetup' '^libplymouth' '^lib.*-dev' 'perl' '^perl-modules' '^x11' '^libx11' '^qemu-' '^xdg-' '^libglib' '^libicu' '^libxml' '^liburing' 'apt-utils')
+        local temp_remove_list=('cron' 'anacron' 'openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^libpython' 'dbus' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' 'thermald' '^libdbus' '^libevdev' '^libupower' 'usb.ids' 'readline-common' '^libreadline' 'xz-utils' 'selinux-utils' 'wget' 'zip' 'unzip' 'bzip2' 'finalrd' '^cryptsetup' '^libplymouth' '^lib.*-dev$' 'perl' '^perl-modules' '^x11' '^libx11' '^qemu' '^xdg-' '^libglib' '^libicu' '^libxml' '^liburing' '^libisc' '^libdns' '^isc-' 'iproute2' 'apt-utils')
         if ! $debian_package_manager -y --auto-remove purge "${temp_remove_list[@]}"; then
             $debian_package_manager -y -f install
             $debian_package_manager -y --auto-remove purge cron anacron || $debian_package_manager -y -f install
