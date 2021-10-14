@@ -268,19 +268,6 @@ check_centos8_epel()
         fi
     fi
 }
-# 检查procps是否安装
-check_procps_installed()
-{
-    if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        if ! test_important_dependence_installed "" "procps-ng" && ! test_important_dependence_installed "" "procps"; then
-            red '重要组件"procps"安装失败！！'
-            yellow "按回车键继续或者Ctrl+c退出"
-            read -s
-        fi
-    else
-        check_important_dependence_installed "procps" ""
-    fi
-}
 #进入工作目录
 enter_temp_dir()
 {
@@ -653,7 +640,7 @@ get_system_info()
     systemVersion="$(lsb_release -r -s)"
 }
 
-#检查80端口和443端口是否被占用
+#检查TCP 80端口和443端口是否被占用
 check_port()
 {
     green "正在检查端口占用。。。"
@@ -667,7 +654,7 @@ check_port()
     for i in "${check_list[@]}"
     do
         if ss -natl | awk '{print $4}'  | awk -F : '{print $NF}' | grep -E "^[0-9]+$" | grep -wq "${i}"; then
-            red "${i}端口被占用！"
+            red "TCP:${i}端口被占用！"
             yellow "请用 lsof -i:${i} 命令检查"
             exit 1
         fi
@@ -2788,7 +2775,7 @@ install_update_xray_tls_web()
     get_system_info
     check_important_dependence_installed ca-certificates ca-certificates
     check_important_dependence_installed wget wget
-    check_procps_installed
+    check_important_dependence_installed "procps" "procps-ng"
     check_centos8_epel
     ask_update_script
     check_ssh_timeout
@@ -3013,7 +3000,7 @@ install_check_update_update_php()
     fi
     check_important_dependence_installed ca-certificates ca-certificates
     check_important_dependence_installed wget wget
-    check_procps_installed
+    check_important_dependence_installed "procps" "procps-ng"
     check_centos8_epel
     local php_status=0
     if [ $php_is_installed -eq 1 ]; then
@@ -3053,7 +3040,7 @@ check_update_update_nginx()
     get_system_info
     check_important_dependence_installed ca-certificates ca-certificates
     check_important_dependence_installed wget wget
-    check_procps_installed
+    check_important_dependence_installed "procps" "procps-ng"
     check_centos8_epel
     ask_update_script_force
     if check_nginx_update; then
@@ -3131,7 +3118,7 @@ reinit_domain()
     readDomain
     if [ "${pretend_list[-1]}" == "2" ] && [ $php_is_installed -eq 0 ]; then
         check_SELinux
-        check_procps_installed
+        check_important_dependence_installed "procps" "procps-ng"
         check_centos8_epel
         check_important_dependence_installed unzip unzip
         in_install_update_xray_tls_web=1
@@ -3214,7 +3201,7 @@ add_domain()
     fi
     if [ "${pretend_list[-1]}" == "2" ] && [ $php_is_installed -eq 0 ]; then
         check_SELinux
-        check_procps_installed
+        check_important_dependence_installed "procps" "procps-ng"
         check_centos8_epel
         check_important_dependence_installed unzip unzip
         in_install_update_xray_tls_web=1
@@ -3344,7 +3331,7 @@ change_pretend()
     fi
     if [ "$pretend" == "2" ] && [ $php_is_installed -eq 0 ]; then
         check_SELinux
-        check_procps_installed
+        check_important_dependence_installed "procps" "procps-ng"
         check_centos8_epel
         check_important_dependence_installed unzip unzip
         in_install_update_xray_tls_web=1
@@ -3522,7 +3509,7 @@ simplify_system()
     [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
     check_important_dependence_installed lsb-release redhat-lsb-core
     get_system_info
-    check_procps_installed
+    check_important_dependence_installed "procps" "procps-ng"
     yellow "警告：此功能可能导致某些VPS无法开机，请谨慎使用"
     tyblue "建议在纯净系统下使用此功能"
     ! ask_if "是否要继续?(y/n)" && return 0
@@ -3715,14 +3702,14 @@ start_menu()
         check_important_dependence_installed lsb-release redhat-lsb-core
         get_system_info
         check_ssh_timeout
-        check_procps_installed
+        check_important_dependence_installed "procps" "procps-ng"
         doupdate
         green "更新完成！"
     elif [ $choice -eq 5 ]; then
         [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
         check_important_dependence_installed ca-certificates ca-certificates
         check_important_dependence_installed wget wget
-        check_procps_installed
+        check_important_dependence_installed "procps" "procps-ng"
         enter_temp_dir
         install_bbr
         $debian_package_manager -y -f install
