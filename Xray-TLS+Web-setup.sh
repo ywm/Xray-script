@@ -1632,14 +1632,49 @@ readDomain()
     pretend_list+=("$pretend")
 }
 
-#安装依赖
-install_base_dependence()
+install_nginx_compile_toolchains()
 {
-    green "正在安装编译基础组件。。。"
+    green "正在安装Nginx编译工具链。。。"
     if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        install_dependence wget tar gzip xz gcc gcc-c++ make
+        install_dependence ca-certificates wget tar gzip gcc gcc-c++ make perl-IPC-Cmd perl-Getopt-Long perl-Data-Dumper
     else
-        install_dependence wget tar gzip xz-utils gcc g++ make
+        install_dependence ca-certificates wget tar gzip gcc g++ make perl-base perl
+    fi
+}
+install_php_compile_toolchains()
+{
+    green "正在安装php编译工具链。。。"
+    if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+        install_dependence ca-certificates wget tar xz gcc gcc-c++ make pkgconf-pkg-config autoconf git
+    else
+        install_dependence ca-certificates wget tar xz-utils gcc g++ make pkg-config autoconf git
+    fi
+}
+install_nginx_dependence()
+{
+    green "正在安装Nginx依赖。。。"
+    if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+        install_dependence pcre-devel zlib-devel libxml2-devel libxslt-devel gd-devel geoip-devel perl-ExtUtils-Embed gperftools-devel libatomic_ops-devel perl-devel
+    else
+        install_dependence libpcre3-dev zlib1g-dev libxml2-dev libxslt1-dev libgd-dev libgeoip-dev libgoogle-perftools-dev libatomic-ops-dev libperl-dev
+    fi
+}
+install_php_dependence()
+{
+    green "正在安装php依赖。。。"
+    if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+        install_dependence libxml2-devel sqlite-devel systemd-devel libacl-devel openssl-devel krb5-devel pcre2-devel zlib-devel bzip2-devel libcurl-devel gdbm-devel libdb-devel tokyocabinet-devel lmdb-devel enchant-devel libffi-devel libpng-devel gd-devel libwebp-devel libjpeg-turbo-devel libXpm-devel freetype-devel gmp-devel libc-client-devel libicu-devel openldap-devel oniguruma-devel unixODBC-devel freetds-devel libpq-devel aspell-devel libedit-devel net-snmp-devel libsodium-devel libargon2-devel libtidy-devel libxslt-devel libzip-devel ImageMagick-devel
+    else
+        if ! $debian_package_manager -y --no-install-recommends install libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-2-dev libffi-dev libpng-dev libgd-dev libwebp-dev libjpeg-dev libxpm-dev libfreetype6-dev libgmp-dev libc-client2007e-dev libicu-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt1-dev libzip-dev libmagickwand-dev && ! $debian_package_manager -y --no-install-recommends install libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-dev libffi-dev libpng-dev libgd-dev libwebp-dev libjpeg-dev libxpm-dev libfreetype6-dev libgmp-dev libc-client2007e-dev libicu-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt1-dev libzip-dev libmagickwand-dev; then
+            $debian_package_manager update
+            $debian_package_manager -y -f install
+            if ! $debian_package_manager -y --no-install-recommends install libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-2-dev libffi-dev libpng-dev libgd-dev libwebp-dev libjpeg-dev libxpm-dev libfreetype6-dev libgmp-dev libc-client2007e-dev libicu-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt1-dev libzip-dev libmagickwand-dev && ! $debian_package_manager -y --no-install-recommends install libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-dev libffi-dev libpng-dev libgd-dev libwebp-dev libjpeg-dev libxpm-dev libfreetype6-dev libgmp-dev libc-client2007e-dev libicu-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt1-dev libzip-dev libmagickwand-dev; then
+                yellow "依赖安装失败！！"
+                green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
+                yellow "按回车键继续或者Ctrl+c退出"
+                read -s
+            fi
+        fi
     fi
 }
 install_acme_dependence()
@@ -1651,30 +1686,28 @@ install_acme_dependence()
         install_dependence curl openssl cron
     fi
 }
-install_nginx_dependence()
+install_web_dependence()
 {
-    green "正在安装Nginx编译/运行依赖。。。"
-    if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        install_dependence perl-IPC-Cmd perl-Getopt-Long perl-Data-Dumper pcre-devel zlib-devel libxml2-devel libxslt-devel gd-devel geoip-devel perl-ExtUtils-Embed gperftools-devel libatomic_ops-devel perl-devel
-    else
-        install_dependence libpcre3-dev zlib1g-dev libxml2-dev libxslt1-dev libgd-dev libgeoip-dev libgoogle-perftools-dev libatomic-ops-dev libperl-dev
-    fi
-}
-install_php_dependence()
-{
-    green "正在安装php编译/运行依赖。。。"
-    if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        install_dependence pkgconf-pkg-config libxml2-devel sqlite-devel systemd-devel libacl-devel openssl-devel krb5-devel pcre2-devel zlib-devel bzip2-devel libcurl-devel gdbm-devel libdb-devel tokyocabinet-devel lmdb-devel enchant-devel libffi-devel libpng-devel gd-devel libwebp-devel libjpeg-turbo-devel libXpm-devel freetype-devel gmp-devel libc-client-devel libicu-devel openldap-devel oniguruma-devel unixODBC-devel freetds-devel libpq-devel aspell-devel libedit-devel net-snmp-devel libsodium-devel libargon2-devel libtidy-devel libxslt-devel libzip-devel autoconf git ImageMagick-devel
-    else
-        if ! $debian_package_manager -y --no-install-recommends install pkg-config libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-2-dev libffi-dev libpng-dev libgd-dev libwebp-dev libjpeg-dev libxpm-dev libfreetype6-dev libgmp-dev libc-client2007e-dev libicu-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt1-dev libzip-dev autoconf git libmagickwand-dev && ! $debian_package_manager -y --no-install-recommends install pkg-config libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-dev libffi-dev libpng-dev libgd-dev libwebp-dev libjpeg-dev libxpm-dev libfreetype6-dev libgmp-dev libc-client2007e-dev libicu-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt1-dev libzip-dev autoconf git libmagickwand-dev; then
-            $debian_package_manager update
-            $debian_package_manager -y -f install
-            if ! $debian_package_manager -y --no-install-recommends install pkg-config libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-2-dev libffi-dev libpng-dev libgd-dev libwebp-dev libjpeg-dev libxpm-dev libfreetype6-dev libgmp-dev libc-client2007e-dev libicu-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt1-dev libzip-dev autoconf git libmagickwand-dev && ! $debian_package_manager -y --no-install-recommends install pkg-config libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-dev libffi-dev libpng-dev libgd-dev libwebp-dev libjpeg-dev libxpm-dev libfreetype6-dev libgmp-dev libc-client2007e-dev libicu-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt1-dev libzip-dev autoconf git libmagickwand-dev; then
-                yellow "依赖安装失败！！"
-                green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
-                yellow "按回车键继续或者Ctrl+c退出"
-                read -s
+    if [ "$1" == "" ]; then
+        for i in "${pretend_list[@]}"
+        do
+            if [ "$i" == "1" ]; then
+                install_dependence ca-certificates wget tar gzip
+                break
             fi
+        done
+        for i in "${pretend_list[@]}"
+        do
+            if [ "$i" == "2" ]; then
+                install_dependence ca-certificates wget unzip
+                break
+            fi
+        done
+    else
+        if [ "$1" == "1" ]; then
+            install_dependence ca-certificates wget tar gzip
+        elif [ "$1" == "2" ]; then
+            install_dependence ca-certificates wget unzip
         fi
     fi
 }
@@ -2870,17 +2903,14 @@ install_update_xray_tls_web()
         sleep 3s
     fi
 
-    for i in "${pretend_list[@]}"
-    do
-        if [ "$i" == "2" ]; then
-            check_important_dependence_installed unzip unzip
-            break
-        fi
-    done
-    install_base_dependence
-    install_acme_dependence
+    [ $use_existed_nginx -eq 0 ] && install_nginx_compile_toolchains
     install_nginx_dependence
-    [ $install_php -eq 1 ] && install_php_dependence
+    if [ $install_php -eq 1 ]; then
+        [ $use_existed_php -eq 0 ] && install_php_compile_toolchains
+        install_php_dependence
+    fi
+    install_acme_dependence
+    [ $update -eq 0 ] && install_web_dependence ""
     $debian_package_manager clean
     $redhat_package_manager clean all
 
@@ -2954,7 +2984,7 @@ full_install_php()
 {
     green "开始安装/更新php。。。"
     sleep 3s
-    install_base_dependence
+    install_php_compile_toolchains
     install_php_dependence
     enter_temp_dir
     compile_php
@@ -3056,7 +3086,7 @@ check_update_update_nginx()
     local xray_status=0
     systemctl -q is-active nginx && nginx_status=1
     systemctl -q is-active xray && xray_status=1
-    install_base_dependence
+    install_nginx_compile_toolchains
     install_nginx_dependence
     enter_temp_dir
     compile_nginx
@@ -3120,17 +3150,14 @@ reinit_domain()
         check_SELinux
         check_important_dependence_installed "procps" "procps-ng"
         check_centos8_epel
-        check_important_dependence_installed unzip unzip
+        install_web_dependence "${pretend_list[-1]}"
         in_install_update_xray_tls_web=1
         check_ssh_timeout
         in_install_update_xray_tls_web=0
         full_install_php
-    elif [ "${pretend_list[-1]}" == "1" ]; then
-        check_SELinux
-        check_important_dependence_installed tar tar
-        check_important_dependence_installed gzip gzip
-    elif [ "${pretend_list[-1]}" == "2" ]; then
-        check_important_dependence_installed unzip unzip
+    else
+        [ "${pretend_list[-1]}" == "1" ] && check_SELinux
+        install_web_dependence "${pretend_list[-1]}"
     fi
     green "重置域名中。。。"
     local temp_domain="${domain_list[-1]}"
@@ -3203,17 +3230,14 @@ add_domain()
         check_SELinux
         check_important_dependence_installed "procps" "procps-ng"
         check_centos8_epel
-        check_important_dependence_installed unzip unzip
+        install_web_dependence "${pretend_list[-1]}"
         in_install_update_xray_tls_web=1
         check_ssh_timeout
         in_install_update_xray_tls_web=0
         full_install_php
-    elif [ "${pretend_list[-1]}" == "1" ]; then
-        check_SELinux
-        check_important_dependence_installed tar tar
-        check_important_dependence_installed gzip gzip
-    elif [ "${pretend_list[-1]}" == "2" ]; then
-        check_important_dependence_installed unzip unzip
+    else
+        [ "${pretend_list[-1]}" == "1" ] && check_SELinux
+        install_web_dependence "${pretend_list[-1]}"
     fi
     if ! get_cert "-1"; then
         sleep 2s
@@ -3333,17 +3357,14 @@ change_pretend()
         check_SELinux
         check_important_dependence_installed "procps" "procps-ng"
         check_centos8_epel
-        check_important_dependence_installed unzip unzip
+        install_web_dependence "$pretend"
         in_install_update_xray_tls_web=1
         check_ssh_timeout
         in_install_update_xray_tls_web=0
         full_install_php
-    elif [ "$pretend" == "1" ]; then
-        check_SELinux
-        check_important_dependence_installed tar tar
-        check_important_dependence_installed gzip gzip
-    elif [ "$pretend" == "2" ]; then
-        check_important_dependence_installed unzip unzip
+    else
+        [ "$pretend" == "1" ] && check_SELinux
+        install_web_dependence "$pretend"
     fi
     config_nginx
     systemctl stop php-fpm cloudreve
@@ -3355,10 +3376,7 @@ reinstall_cloudreve()
 {
     [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
     check_SELinux
-    check_important_dependence_installed ca-certificates ca-certificates
-    check_important_dependence_installed wget wget
-    check_important_dependence_installed tar tar
-    check_important_dependence_installed gzip gzip
+    install_web_dependence "1"
     ask_update_script
     get_config_info
     ! check_need_cloudreve && red "Cloudreve目前没有绑定域名" && return 1
@@ -3535,7 +3553,7 @@ simplify_system()
         local isc_dhcp_client_installed=0
         LANG="en_US.UTF-8" LANGUAGE="en_US:en" dpkg -s apt-utils 2>/dev/null | grep -qi 'status[ '$'\t]*:[ '$'\t]*install[ '$'\t]*ok[ '$'\t]*installed[ '$'\t]*$' && apt_utils_installed=1
         LANG="en_US.UTF-8" LANGUAGE="en_US:en" dpkg -s isc-dhcp-client 2>/dev/null | grep -qi 'status[ '$'\t]*:[ '$'\t]*install[ '$'\t]*ok[ '$'\t]*installed[ '$'\t]*$' && isc_dhcp_client_installed=1
-        local temp_remove_list=('cron' 'anacron' 'openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^libpython' 'dbus' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' 'thermald' '^libdbus' '^libevdev' '^libupower' 'usb.ids' 'readline-common' '^libreadline' 'xz-utils' 'selinux-utils' 'wget' 'zip' 'unzip' 'bzip2' 'finalrd' '^cryptsetup' '^libplymouth' '^lib.*-dev$' 'perl' '^perl-modules' '^x11' '^libx11' '^qemu' '^xdg-' '^libglib' '^libicu' '^libxml' '^liburing' '^libisc' '^libdns' '^isc-' 'apt-utils')
+        local temp_remove_list=('cron' 'anacron' 'openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^libpython' 'dbus' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' 'thermald' '^libdbus' '^libevdev' '^libupower' 'usb.ids' 'readline-common' '^libreadline' 'xz-utils' 'selinux-utils' 'wget' 'zip' 'unzip' 'bzip2' 'finalrd' '^cryptsetup' '^libplymouth' '^lib.*-dev$' 'perl' '^perl-modules' '^x11' '^libx11' '^qemu' '^xdg-' '^libglib' '^libicu' '^libxml' '^liburing' '^libisc' '^libdns' '^isc-' 'net-tools' 'apt-utils')
         if ! $debian_package_manager -y --auto-remove purge "${temp_remove_list[@]}"; then
             $debian_package_manager -y -f install
             $debian_package_manager -y --auto-remove purge cron anacron || $debian_package_manager -y -f install
@@ -3729,10 +3747,7 @@ start_menu()
         fi
         [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
         check_SELinux
-        check_important_dependence_installed ca-certificates ca-certificates
-        check_important_dependence_installed wget wget
-        check_important_dependence_installed tar tar
-        check_important_dependence_installed gzip gzip
+        install_web_dependence "1"
         ask_update_script_force
         enter_temp_dir
         update_cloudreve
