@@ -576,9 +576,9 @@ elif [[ "$(type -P dnf)" ]]; then
     redhat_package_manager="dnf"
     debian_package_manager="true"
     if $redhat_package_manager --help | grep -q "\\-\\-setopt="; then
-        redhat_package_manager_enhanced="$redhat_package_manager -y --setopt=install_weak_deps=False install"
+        redhat_package_manager_enhanced="$redhat_package_manager -y --setopt=install_weak_deps=False"
     else
-        redhat_package_manager_enhanced="$redhat_package_manager -y --setopt install_weak_deps=False install"
+        redhat_package_manager_enhanced="$redhat_package_manager -y --setopt install_weak_deps=False"
     fi
 elif [[ "$(type -P yum)" ]]; then
     release="other-redhat"
