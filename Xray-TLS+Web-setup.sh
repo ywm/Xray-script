@@ -3381,12 +3381,14 @@ reinstall_cloudreve()
 {
     [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
     check_SELinux
-    install_web_dependence "1"
+    check_important_dependence_installed ca-certificates ca-certificates
+    check_important_dependence_installed wget wget
     ask_update_script
     get_config_info
     ! check_need_cloudreve && red "Cloudreve目前没有绑定域名" && return 1
     red "重新安装Cloudreve将删除所有的网盘文件以及帐户信息，并重置管理员密码"
     ! ask_if "确定要继续吗？(y/n)" && return 0
+    install_web_dependence "1"
     enter_temp_dir
     local i
     for i in "${!pretend_list[@]}"
