@@ -243,20 +243,20 @@ install_dependence()
             local temp_redhat_install="$redhat_package_manager -y --setopt install_weak_deps=False"
         fi
         if $redhat_package_manager --help | grep -q "\\-\\-enablerepo="; then
-            temp_redhat_install="$temp_redhat_install --enablerepo="
+            local temp_redhat_install2="$temp_redhat_install --enablerepo="
         else
-            temp_redhat_install="$temp_redhat_install --enablerepo "
+            local temp_redhat_install2="$temp_redhat_install --enablerepo "
         fi
-        if ! $redhat_package_manager -y install "$@"; then
-            if $temp_redhat_install'epel' install "$@"; then
+        if ! $temp_redhat_install install "$@"; then
+            if $temp_redhat_install2'epel' install "$@"; then
                 return 0
             fi
             if [ $release == "centos" ] && version_ge "$systemVersion" 8;then
-                if $temp_redhat_install"epel,powertools" install "$@" || $temp_redhat_install"epel,PowerTools" install "$@"; then
+                if $temp_redhat_install2"epel,powertools" install "$@" || $temp_redhat_install2"epel,PowerTools" install "$@"; then
                     return 0
                 fi
             fi
-            if $temp_redhat_install'*' install "$@"; then
+            if $temp_redhat_install2'*' install "$@"; then
                 return 0
             fi
             yellow "依赖安装失败！！"
