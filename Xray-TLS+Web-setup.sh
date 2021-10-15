@@ -197,8 +197,15 @@ test_important_dependence_installed()
             else
                 yumdb set reason user "$2" && temp_exit_code=0
             fi
-        elif $redhat_package_manager -y install "$2"; then
-            temp_exit_code=0
+        else
+            if $redhat_package_manager --help | grep -q "\\-\\-setopt="; then
+                local temp_redhat_install="$redhat_package_manager -y --setopt=install_weak_deps=False install"
+            else
+                local temp_redhat_install="$redhat_package_manager -y --setopt install_weak_deps=False install"
+            fi
+            if $temp_redhat_install "$2"; then
+                temp_exit_code=0
+            fi
         fi
     fi
     return $temp_exit_code
@@ -230,10 +237,15 @@ install_dependence()
             fi
         fi
     else
-        if $redhat_package_manager --help | grep -q "\\-\\-enablerepo="; then
-            local temp_redhat_install="$redhat_package_manager -y --enablerepo="
+        if $redhat_package_manager --help | grep -q "\\-\\-setopt="; then
+            local temp_redhat_install="$redhat_package_manager -y --setopt=install_weak_deps=False"
         else
-            local temp_redhat_install="$redhat_package_manager -y --enablerepo "
+            local temp_redhat_install="$redhat_package_manager -y --setopt install_weak_deps=False"
+        fi
+        if $redhat_package_manager --help | grep -q "\\-\\-enablerepo="; then
+            temp_redhat_install="$temp_redhat_install --enablerepo="
+        else
+            temp_redhat_install="$temp_redhat_install --enablerepo "
         fi
         if ! $redhat_package_manager -y install "$@"; then
             if $temp_redhat_install'epel' install "$@"; then
@@ -519,6 +531,9 @@ get_config_info()
 gen_cflags()
 {
     cflags="-g0 -O3"
+    if gcc -v --help 2>&1 | grep -qw "\\-fasynchronous\\-unwind\\-tables"; then
+        cflags="${cflags} -fno-asynchronous-unwind-tables"
+    fi
     if gcc -v --help 2>&1 | grep -qw "\\-fcf\\-protection"; then
         cflags="${cflags} -fcf-protection=none"
     fi
@@ -1856,6 +1871,8 @@ compile_nginx()
     rm -f "${openssl_version}.tar.gz"
     cd ${nginx_version}
     sed -i "s/OPTIMIZE[ \\t]*=>[ \\t]*'-O'/OPTIMIZE          => '-O3'/g" src/http/modules/perl/Makefile.PL
+    sed -i 's/NGX_PERL_CFLAGS="$CFLAGS `$NGX_PERL -MExtUtils::Embed -e ccopts`"/NGX_PERL_CFLAGS="`$NGX_PERL -MExtUtils::Embed -e ccopts` $CFLAGS"/g' auto/lib/perl/conf
+    sed -i 's/NGX_PM_CFLAGS=`$NGX_PERL -MExtUtils::Embed -e ccopts`/NGX_PM_CFLAGS="`$NGX_PERL -MExtUtils::Embed -e ccopts` $CFLAGS"/g' auto/lib/perl/conf
     ./configure --prefix=/usr/local/nginx --with-openssl=../$openssl_version --with-mail=dynamic --with-mail_ssl_module --with-stream=dynamic --with-stream_ssl_module --with-stream_realip_module --with-stream_geoip_module=dynamic --with-stream_ssl_preread_module --with-http_ssl_module --with-http_v2_module --with-http_realip_module --with-http_addition_module --with-http_xslt_module=dynamic --with-http_image_filter_module=dynamic --with-http_geoip_module=dynamic --with-http_sub_module --with-http_dav_module --with-http_flv_module --with-http_mp4_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_auth_request_module --with-http_random_index_module --with-http_secure_link_module --with-http_degradation_module --with-http_slice_module --with-http_stub_status_module --with-http_perl_module=dynamic --with-pcre --with-libatomic --with-compat --with-cpp_test_module --with-google_perftools_module --with-file-aio --with-threads --with-poll_module --with-select_module --with-cc-opt="-Wno-error ${cflags}"
     swap_on 480
     if ! make -j$cpu_thread_num; then
@@ -3554,7 +3571,8 @@ simplify_system()
     fi
     uninstall_firewall
     if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        $redhat_package_manager -y remove openssl "perl*" xz libselinux-utils zip unzip bzip2 wget procps-ng procps iproute
+        $redhat_package_manager -y remove openssl "perl*" xz libselinux-utils zip unzip bzip2 wget procps-ng procps iproute dbus-glib "udisk*" "libudisk*" "gdisk*" "libblock*" "*-devel"
+        #libxmlb
     else
         local apt_utils_installed=0
         local isc_dhcp_client_installed=0
