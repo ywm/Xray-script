@@ -9,6 +9,7 @@ release=""
 systemVersion=""
 debian_package_manager=""
 redhat_package_manager=""
+redhat_package_manager_enhanced=""
 #CPU线程数
 cpu_thread_num=""
 #现在有没有通过脚本启动swap
@@ -197,15 +198,8 @@ test_important_dependence_installed()
             else
                 yumdb set reason user "$2" && temp_exit_code=0
             fi
-        else
-            if $redhat_package_manager --help | grep -q "\\-\\-setopt="; then
-                local temp_redhat_install="$redhat_package_manager -y --setopt=install_weak_deps=False install"
-            else
-                local temp_redhat_install="$redhat_package_manager -y --setopt install_weak_deps=False install"
-            fi
-            if $temp_redhat_install "$2"; then
-                temp_exit_code=0
-            fi
+        elif $redhat_package_manager_enhanced install "$2"; then
+            temp_exit_code=0
         fi
     fi
     return $temp_exit_code
@@ -237,26 +231,21 @@ install_dependence()
             fi
         fi
     else
-        if $redhat_package_manager --help | grep -q "\\-\\-setopt="; then
-            local temp_redhat_install="$redhat_package_manager -y --setopt=install_weak_deps=False"
-        else
-            local temp_redhat_install="$redhat_package_manager -y --setopt install_weak_deps=False"
-        fi
         if $redhat_package_manager --help | grep -q "\\-\\-enablerepo="; then
-            local temp_redhat_install2="$temp_redhat_install --enablerepo="
+            local temp_redhat_install="$redhat_package_manager_enhanced --enablerepo="
         else
-            local temp_redhat_install2="$temp_redhat_install --enablerepo "
+            local temp_redhat_install="$redhat_package_manager_enhanced --enablerepo "
         fi
-        if ! $temp_redhat_install install "$@"; then
-            if $temp_redhat_install2'epel' install "$@"; then
+        if ! $redhat_package_manager_enhanced install "$@"; then
+            if $temp_redhat_install'epel' install "$@"; then
                 return 0
             fi
             if [ $release == "centos" ] && version_ge "$systemVersion" 8;then
-                if $temp_redhat_install2"epel,powertools" install "$@" || $temp_redhat_install2"epel,PowerTools" install "$@"; then
+                if $temp_redhat_install"epel,powertools" install "$@" || $temp_redhat_install"epel,PowerTools" install "$@"; then
                     return 0
                 fi
             fi
-            if $temp_redhat_install2'*' install "$@"; then
+            if $temp_redhat_install'*' install "$@"; then
                 return 0
             fi
             yellow "依赖安装失败！！"
@@ -581,14 +570,25 @@ if [[ "$(type -P apt)" ]]; then
     release="other-debian"
     debian_package_manager="apt"
     redhat_package_manager="true"
+    redhat_package_manager_enhanced="true"
 elif [[ "$(type -P dnf)" ]]; then
     release="other-redhat"
     redhat_package_manager="dnf"
     debian_package_manager="true"
+    if $redhat_package_manager --help | grep -q "\\-\\-setopt="; then
+        redhat_package_manager_enhanced="$redhat_package_manager -y --setopt=install_weak_deps=False install"
+    else
+        redhat_package_manager_enhanced="$redhat_package_manager -y --setopt install_weak_deps=False install"
+    fi
 elif [[ "$(type -P yum)" ]]; then
     release="other-redhat"
     redhat_package_manager="yum"
     debian_package_manager="true"
+    if $redhat_package_manager --help | grep -q "\\-\\-setopt="; then
+        redhat_package_manager_enhanced="$redhat_package_manager -y --setopt=install_weak_deps=False"
+    else
+        redhat_package_manager_enhanced="$redhat_package_manager -y --setopt install_weak_deps=False"
+    fi
 else
     red "apt yum dnf命令均不存在"
     red "不支持的系统"
@@ -968,7 +968,7 @@ doupdate()
         $debian_package_manager -y --purge autoremove
         $debian_package_manager clean
         $redhat_package_manager -y autoremove
-        $redhat_package_manager -y update
+        $redhat_package_manager_enhanced upgrade
         $redhat_package_manager -y autoremove
         $redhat_package_manager clean all
     fi
@@ -3571,8 +3571,14 @@ simplify_system()
     fi
     uninstall_firewall
     if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        $redhat_package_manager -y remove openssl "perl*" xz libselinux-utils zip unzip bzip2 wget procps-ng procps iproute dbus-glib "udisk*" "libudisk*" "gdisk*" "libblock*" "*-devel"
+        local temp_remove_list=('openssl' 'perl*' 'xz' 'libselinux-utils' 'zip' 'unzip' 'bzip2' 'wget' 'procps-ng' 'procps' 'iproute' 'dbus-glib' 'udisk*' 'libudisk*' 'gdisk*' 'libblock*' '*-devel')
         #libxmlb
+        if ! $redhat_package_manager -y remove "${temp_remove_list[@]}"; then
+            for i in "${temp_remove_list[@]}"
+            do
+                $redhat_package_manager -y remove "$i"
+            done
+        fi
     else
         local apt_utils_installed=0
         local isc_dhcp_client_installed=0
