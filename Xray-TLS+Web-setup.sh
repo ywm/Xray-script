@@ -1688,6 +1688,7 @@ install_acme_dependence()
 }
 install_web_dependence()
 {
+    green "正在安装伪装网站依赖。。。"
     if [ "$1" == "" ]; then
         for i in "${pretend_list[@]}"
         do
@@ -2910,7 +2911,11 @@ install_update_xray_tls_web()
         install_php_dependence
     fi
     install_acme_dependence
-    [ $update -eq 0 ] && install_web_dependence ""
+    if [ $update -eq 0 ]; then
+        install_web_dependence ""
+    else
+        [ $cloudreve_is_installed -eq 1 ] && install_web_dependence "1"
+    fi
     $debian_package_manager clean
     $redhat_package_manager clean all
 
