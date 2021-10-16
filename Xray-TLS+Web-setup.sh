@@ -3552,8 +3552,9 @@ simplify_system()
     check_important_dependence_installed lsb-release redhat-lsb-core
     get_system_info
     check_important_dependence_installed "procps" "procps-ng"
-    yellow "警告：此功能可能导致某些VPS无法开机，请谨慎使用"
-    tyblue "建议在纯净系统下使用此功能"
+    yellow "警告："
+    tyblue " 1. 此功能可能导致某些VPS无法开机，请谨慎使用"
+    tyblue " 2. 如果VPS上部署了 Xray-TLS+Web 以外的东西，可能被误删"
     ! ask_if "是否要继续?(y/n)" && return 0
     echo
     yellow "提示：在精简系统前请先设置apt/yum/dnf的软件源为http/ftp而非https/ftps"
@@ -3571,6 +3572,8 @@ simplify_system()
     fi
     uninstall_firewall
     if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+        local initscripts_installed=0
+        rpm -q initscripts > /dev/null 2>&1 && initscripts_installed=1
         local temp_remove_list=('openssl' 'perl*' 'xz' 'libselinux-utils' 'zip' 'unzip' 'bzip2' 'wget' 'procps-ng' 'procps' 'iproute' 'dbus-glib' 'udisk*' 'libudisk*' 'gdisk*' 'libblock*' '*-devel')
         #libxmlb
         if ! $redhat_package_manager -y remove "${temp_remove_list[@]}"; then
@@ -3579,6 +3582,7 @@ simplify_system()
                 $redhat_package_manager -y remove "$i"
             done
         fi
+        [ $initscripts_installed -eq 1 ] && check_important_dependence_installed "" initscripts
     else
         local apt_utils_installed=0
         local isc_dhcp_client_installed=0
@@ -3716,7 +3720,7 @@ start_menu()
     echo
     tyblue " ----------------其它----------------"
     tyblue "  25. 精简系统"
-    purple "         删除不必要的系统组件"
+    purple "         删除不必要的系统组件，即使已经安装 Xray-TLS+Web 仍然可以使用此功能"
     tyblue "  26. 尝试修复退格键无法使用的问题"
     purple "         部分ssh工具(如Xshell)可能有这类问题"
     tyblue "  27. 修改dns"
