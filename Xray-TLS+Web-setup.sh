@@ -557,10 +557,6 @@ if [[ ! -d /dev/shm ]]; then
     red "/dev/shm不存在，不支持的系统"
     exit 1
 fi
-if [[ ! -L /etc/localtime ]]; then
-    red "/etc/localtime不是链接，不支持的系统"
-    exit 1
-fi
 if [[ "$(type -P apt)" ]]; then
     if [[ "$(type -P dnf)" ]] || [[ "$(type -P yum)" ]]; then
         red "同时存在apt和yum/dnf"
@@ -613,7 +609,6 @@ fi
 [ -e ${cloudreve_prefix}/cloudreve.db ] && cloudreve_is_installed=1 || cloudreve_is_installed=0
 [ -e /usr/local/bin/xray ] && xray_is_installed=1 || xray_is_installed=0
 ([ $xray_is_installed -eq 1 ] && [ $nginx_is_installed -eq 1 ]) && is_installed=1 || is_installed=0
-timezone="$(ls -l /etc/localtime | awk -F zoneinfo/ '{print $NF}')"
 cpu_thread_num="$(grep '^processor[ '$'\t]*:' /proc/cpuinfo | uniq | wc -l)"
 if [ -z "$cpu_thread_num" ] || [ $cpu_thread_num -lt 1 ]; then
     red "获取CPU线程数失败！"
@@ -637,6 +632,13 @@ esac
 #获取系统版本信息
 get_system_info()
 {
+    timezone="$(ls -l /etc/localtime | awk -F zoneinfo/ '{print $NF}')"
+    if [[ ! -L /etc/localtime ]] || [ "$timezone" == "" ]; then
+        yellow "获取时区失败！"
+        green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
+        yellow "按回车键继续或者Ctrl+c退出"
+        read -s
+    fi
     local temp_release
     temp_release="$(lsb_release -i -s | tr "[:upper:]" "[:lower:]")"
     if [[ "$temp_release" =~ ubuntu ]]; then
@@ -653,6 +655,12 @@ get_system_info()
         release="fedora"
     fi
     systemVersion="$(lsb_release -r -s)"
+    if [ "$temp_release" == "" ] || [ "$systemVersion" == "" ]; then
+        yellow "获取系统版本失败！"
+        green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
+        yellow "按回车键继续或者Ctrl+c退出"
+        read -s
+    fi
 }
 
 #检查TCP 80端口和443端口是否被占用
@@ -2823,6 +2831,7 @@ install_update_xray_tls_web()
     check_important_dependence_installed iproute2 iproute
     check_port
     check_important_dependence_installed lsb-release redhat-lsb-core
+    check_important_dependence_installed tzdata tzdata
     get_system_info
     check_important_dependence_installed ca-certificates ca-certificates
     check_important_dependence_installed wget wget
@@ -3022,6 +3031,7 @@ install_check_update_update_php()
     [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
     check_SELinux
     check_important_dependence_installed lsb-release redhat-lsb-core
+    check_important_dependence_installed tzdata tzdata
     get_system_info
     if ([ $release == "centos" ] && ! version_ge "$systemVersion" "8" ) || ([ $release == "rhel" ] && ! version_ge "$systemVersion" "8") || ([ $release == "fedora" ] && ! version_ge "$systemVersion" "30") || ([ $release == "ubuntu" ] && ! version_ge "$systemVersion" "20.04") || ([ $release == "debian" ] && ! version_ge "$systemVersion" "10") || ([ $release == "deepin" ] && ! version_ge "$systemVersion" "20"); then
         red "系统版本过低！"
@@ -3089,6 +3099,7 @@ check_update_update_nginx()
     [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
     check_SELinux
     check_important_dependence_installed lsb-release redhat-lsb-core
+    check_important_dependence_installed tzdata tzdata
     get_system_info
     check_important_dependence_installed ca-certificates ca-certificates
     check_important_dependence_installed wget wget
@@ -3159,6 +3170,7 @@ reinit_domain()
     check_important_dependence_installed iproute2 iproute
     check_port
     check_important_dependence_installed lsb-release redhat-lsb-core
+    check_important_dependence_installed tzdata tzdata
     get_system_info
     check_important_dependence_installed ca-certificates ca-certificates
     check_important_dependence_installed wget wget
@@ -3226,6 +3238,7 @@ add_domain()
     check_important_dependence_installed iproute2 iproute
     check_port
     check_important_dependence_installed lsb-release redhat-lsb-core
+    check_important_dependence_installed tzdata tzdata
     get_system_info
     check_important_dependence_installed ca-certificates ca-certificates
     check_important_dependence_installed wget wget
@@ -3330,6 +3343,7 @@ change_pretend()
 {
     [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
     check_important_dependence_installed lsb-release redhat-lsb-core
+    check_important_dependence_installed tzdata tzdata
     get_system_info
     check_important_dependence_installed ca-certificates ca-certificates
     check_important_dependence_installed wget wget
@@ -3550,6 +3564,7 @@ simplify_system()
     fi
     [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
     check_important_dependence_installed lsb-release redhat-lsb-core
+    check_important_dependence_installed tzdata tzdata
     get_system_info
     check_important_dependence_installed "procps" "procps-ng"
     yellow "警告："
@@ -3592,15 +3607,19 @@ simplify_system()
             LANG="en_US.UTF-8" LANGUAGE="en_US:en" dpkg -s "$i" 2>/dev/null | grep -qi 'status[ '$'\t]*:[ '$'\t]*install[ '$'\t]*ok[ '$'\t]*installed[ '$'\t]*$' && temp_backup+=("$i")
         done
         temp_backup+=($(dpkg --list 'grub*' | grep '^[ '$'\t]*ii[ '$'\t]' | awk '{print $2}'))
-        local temp_remove_list=('cron' 'anacron' 'openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^libpython' 'dbus' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' 'thermald' '^libdbus' '^libevdev' '^libupower' 'usb.ids' 'readline-common' '^libreadline' 'xz-utils' 'selinux-utils' 'wget' 'zip' 'unzip' 'bzip2' 'finalrd' '^cryptsetup' '^libplymouth' '^lib.*-dev$' 'perl' '^perl-modules' '^x11' '^libx11' '^qemu' '^xdg-' '^libglib' '^libicu' '^libxml' '^liburing' '^libisc' '^libdns' '^isc-' 'net-tools' 'xxd' 'xkb-data' 'lsof' '^task' '^usb' '^libusb' '^doc' '^libwrap' '^libtext' '^libmagic' '^libpci' '^liblocale' '^keyboard' '^libuni[^s]' '^libpipe' 'man-db' '^manpages' '^liblock' '^liblog' '^libxapian' '^libslang' '^libpsl' 'apt-utils')
+        local temp_remove_list=('cron' 'anacron' '^cups' '^foomatic' 'openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^libpython' 'dbus' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' 'thermald' '^libdbus' '^libevdev' '^libupower' 'readline-common' '^libreadline' 'xz-utils' 'selinux-utils' 'wget' 'zip' 'unzip' 'bzip2' 'finalrd' '^cryptsetup' '^libplymouth' '^lib.*-dev$' 'perl' '^perl-modules' '^x11' '^libx11' '^qemu' '^xdg-' '^libglib' '^libicu' '^libxml' '^liburing' '^libisc' '^libdns' '^isc-' 'net-tools' 'xxd' 'xkb-data' 'lsof' '^task' '^usb' '^libusb' '^doc' '^libwrap' '^libtext' '^libmagic' '^libpci' '^liblocale' '^keyboard' '^libuni[^s]' '^libpipe' 'man-db' '^manpages' '^liblock' '^liblog' '^libxapian' '^libpsl' '^libpap' '^libgs[0-9]' '^libpaper')
         if ! $debian_package_manager -y --auto-remove purge "${temp_remove_list[@]}"; then
             $debian_package_manager -y -f install
             $debian_package_manager -y --auto-remove purge cron anacron || $debian_package_manager -y -f install
+            $debian_package_manager -y --auto-remove purge '^cups' '^foomatic' || $debian_package_manager -y -f install
             for i in "${temp_remove_list[@]}"
             do
                 $debian_package_manager -y --auto-remove purge "$i" || $debian_package_manager -y -f install
             done
         fi
+        $debian_package_manager -y --auto-remove purge '^libpop' || $debian_package_manager -y -f install
+        $debian_package_manager -y --auto-remove purge '^libslang' || $debian_package_manager -y -f install
+        $debian_package_manager -y --auto-remove purge apt-utils || $debian_package_manager -y -f install
         for i in "${temp_backup[@]}"
         do
             check_important_dependence_installed "$i" ""
@@ -3760,6 +3779,7 @@ start_menu()
     elif [ $choice -eq 4 ]; then
         [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
         check_important_dependence_installed lsb-release redhat-lsb-core
+        check_important_dependence_installed tzdata tzdata
         get_system_info
         check_ssh_timeout
         check_important_dependence_installed "procps" "procps-ng"
