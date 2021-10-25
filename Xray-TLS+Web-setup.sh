@@ -25,7 +25,7 @@ nginx_config="${nginx_prefix}/conf.d/xray.conf"
 nginx_service="/etc/systemd/system/nginx.service"
 nginx_is_installed=""
 
-php_version="php-8.0.11"
+php_version="php-8.0.12"
 php_prefix="/usr/local/php"
 php_service="/etc/systemd/system/php-fpm.service"
 php_is_installed=""
@@ -2066,8 +2066,8 @@ get_cert()
     echo "{}" > $xray_config
     local temp=""
     [ ${domain_config_list[$1]} -eq 1 ] && temp="-d ${domain_list[$1]}"
-    if ! $HOME/.acme.sh/acme.sh --issue -d ${true_domain_list[$1]} $temp -w ${nginx_prefix}/html/issue_certs -k ec-256 -ak ec-256 --pre-hook "mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak && cp ${nginx_prefix}/conf/issue_certs.conf ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --post-hook "mv ${nginx_prefix}/conf/nginx.conf.bak ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --ocsp; then
-        $HOME/.acme.sh/acme.sh --issue -d ${true_domain_list[$1]} $temp -w ${nginx_prefix}/html/issue_certs -k ec-256 -ak ec-256 --pre-hook "mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak && cp ${nginx_prefix}/conf/issue_certs.conf ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --post-hook "mv ${nginx_prefix}/conf/nginx.conf.bak ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --ocsp --debug
+    if ! $HOME/.acme.sh/acme.sh --issue -d ${true_domain_list[$1]} $temp -w ${nginx_prefix}/html/issue_certs -k ec-256 -ak ec-256 --server letsencrypt --pre-hook "mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak && cp ${nginx_prefix}/conf/issue_certs.conf ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --post-hook "mv ${nginx_prefix}/conf/nginx.conf.bak ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --ocsp; then
+        $HOME/.acme.sh/acme.sh --issue -d ${true_domain_list[$1]} $temp -w ${nginx_prefix}/html/issue_certs -k ec-256 -ak ec-256 --server letsencrypt --pre-hook "mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak && cp ${nginx_prefix}/conf/issue_certs.conf ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --post-hook "mv ${nginx_prefix}/conf/nginx.conf.bak ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --ocsp --debug
     fi
     if ! $HOME/.acme.sh/acme.sh --installcert -d ${true_domain_list[$1]} --key-file ${nginx_prefix}/certs/${true_domain_list[$1]}.key --fullchain-file ${nginx_prefix}/certs/${true_domain_list[$1]}.cer --reloadcmd "sleep 2s && systemctl restart xray" --ecc; then
         $HOME/.acme.sh/acme.sh --remove --domain ${true_domain_list[$1]} --ecc
@@ -2271,10 +2271,25 @@ server {
     listen unix:/dev/shm/nginx_unixsocket/h2.sock http2;
     server_name ${domain_list[$i]};
     add_header Strict-Transport-Security "max-age=63072000; includeSubdomains; preload" always;
+    #client_header_timeout 24h;
+    #ignore_invalid_headers off;
 EOF
         if [ $protocol_2 -ne 0 ]; then
 cat >> $nginx_config<<EOF
     location = /$serviceName/TunMulti {
+        client_max_body_size 0;
+        client_body_timeout 24h;
+        #keepalive_requests 1000;
+        #keepalive_time 24h;
+        keepalive_timeout 24h;
+        send_timeout 24h;
+        #grpc_buffer_size 0;
+        grpc_read_timeout 24h;
+        grpc_send_timeout 24h;
+        #grpc_socket_keepalive off;
+        lingering_close always;
+        lingering_time 24h;
+        lingering_timeout 24h;
         grpc_pass grpc://unix:/dev/shm/xray_unixsocket/grpc.sock;
     }
 EOF
@@ -3608,6 +3623,7 @@ simplify_system()
         done
         temp_backup+=($(dpkg --list 'grub*' | grep '^[ '$'\t]*ii[ '$'\t]' | awk '{print $2}'))
         local temp_remove_list=('cron' 'anacron' '^cups' '^foomatic' 'openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^libpython' 'dbus' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' 'thermald' '^libdbus' '^libevdev' '^libupower' 'readline-common' '^libreadline' 'xz-utils' 'selinux-utils' 'wget' 'zip' 'unzip' 'bzip2' 'finalrd' '^cryptsetup' '^libplymouth' '^lib.*-dev$' 'perl' '^perl-modules' '^x11' '^libx11' '^qemu' '^xdg-' '^libglib' '^libicu' '^libxml' '^liburing' '^libisc' '^libdns' '^isc-' 'net-tools' 'xxd' 'xkb-data' 'lsof' '^task' '^usb' '^libusb' '^doc' '^libwrap' '^libtext' '^libmagic' '^libpci' '^liblocale' '^keyboard' '^libuni[^s]' '^libpipe' 'man-db' '^manpages' '^liblock' '^liblog' '^libxapian' '^libpsl' '^libpap' '^libgs[0-9]' '^libpaper')
+        #'^libp11' '^libtasn' '^libkey' '^libnet'
         if ! $debian_package_manager -y --auto-remove purge "${temp_remove_list[@]}"; then
             $debian_package_manager -y -f install
             $debian_package_manager -y --auto-remove purge cron anacron || $debian_package_manager -y -f install
