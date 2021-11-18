@@ -98,8 +98,9 @@ blue()                             #蓝色
 #检查基本命令
 check_base_command()
 {
+    hash -r
     local i
-    local temp_command_list=('bash' 'sh' 'install' 'true' 'false' 'exit' 'echo' 'test' 'sort' 'sed' 'awk' 'grep' 'cut' 'cd' 'rm' 'cp' 'mv' 'head' 'tail' 'uname' 'tr' 'md5sum' 'cat' 'find' 'type' 'command' 'wc' 'ls' 'mktemp' 'swapon' 'swapoff' 'mkswap' 'chmod' 'chown' 'chgrp' 'export')
+    local temp_command_list=('bash' 'sh' 'command' 'type' 'hash' 'install' 'true' 'false' 'exit' 'echo' 'test' 'sort' 'sed' 'awk' 'grep' 'cut' 'cd' 'rm' 'cp' 'mv' 'head' 'tail' 'uname' 'tr' 'md5sum' 'cat' 'find' 'wc' 'ls' 'mktemp' 'swapon' 'swapoff' 'mkswap' 'chmod' 'chown' 'chgrp' 'export' 'tar' 'gzip')
     for i in "${temp_command_list[@]}"
     do
         if ! command -V "${i}" > /dev/null; then
@@ -874,8 +875,8 @@ doupdate()
         check_important_dependence_installed "ubuntu-release-upgrader-core"
         echo -e "\\n\\n\\n"
         tyblue "------------------请选择升级系统版本--------------------"
-        tyblue " 1. beta版(测试版)          当前版本号：21.10"
-        tyblue " 2. release版(稳定版)       当前版本号：21.04"
+        tyblue " 1. beta版(测试版)          当前版本号：22.04"
+        tyblue " 2. release版(稳定版)       当前版本号：21.10"
         tyblue " 3. LTS版(长期支持版)       当前版本号：20.04"
         tyblue " 0. 不升级系统"
         tyblue "-------------------------注意事项-------------------------"
@@ -1670,18 +1671,18 @@ install_nginx_compile_toolchains()
 {
     green "正在安装Nginx编译工具链。。。"
     if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        install_dependence ca-certificates wget tar gzip gcc gcc-c++ make perl-IPC-Cmd perl-Getopt-Long perl-Data-Dumper
+        install_dependence ca-certificates wget gcc gcc-c++ make perl-IPC-Cmd perl-Getopt-Long perl-Data-Dumper
     else
-        install_dependence ca-certificates wget tar gzip gcc g++ make perl-base perl
+        install_dependence ca-certificates wget gcc g++ make perl-base perl
     fi
 }
 install_php_compile_toolchains()
 {
     green "正在安装php编译工具链。。。"
     if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        install_dependence ca-certificates wget tar xz gcc gcc-c++ make pkgconf-pkg-config autoconf git
+        install_dependence ca-certificates wget xz gcc gcc-c++ make pkgconf-pkg-config autoconf git
     else
-        install_dependence ca-certificates wget tar xz-utils gcc g++ make pkg-config autoconf git
+        install_dependence ca-certificates wget xz-utils gcc g++ make pkg-config autoconf git
     fi
 }
 install_nginx_dependence()
@@ -1727,7 +1728,7 @@ install_web_dependence()
         for i in "${pretend_list[@]}"
         do
             if [ "$i" == "1" ]; then
-                install_dependence ca-certificates wget tar gzip
+                install_dependence ca-certificates wget
                 break
             fi
         done
@@ -1740,7 +1741,7 @@ install_web_dependence()
         done
     else
         if [ "$1" == "1" ]; then
-            install_dependence ca-certificates wget tar gzip
+            install_dependence ca-certificates wget
         elif [ "$1" == "2" ]; then
             install_dependence ca-certificates wget unzip
         fi
