@@ -19,23 +19,23 @@ timezone=""
 
 #安装信息
 nginx_version="nginx-1.21.4"
-openssl_version="openssl-openssl-3.0.0"
+openssl_version="openssl-openssl-3.0.1"
 nginx_prefix="/usr/local/nginx"
 nginx_config="${nginx_prefix}/conf.d/xray.conf"
 nginx_service="/etc/systemd/system/nginx.service"
 nginx_is_installed=""
 
-php_version="php-8.0.13"
+php_version="php-8.1.0"
 php_prefix="/usr/local/php"
 php_service="/etc/systemd/system/php-fpm.service"
 php_is_installed=""
 
-cloudreve_version="3.4.1"
+cloudreve_version="3.4.2"
 cloudreve_prefix="/usr/local/cloudreve"
 cloudreve_service="/etc/systemd/system/cloudreve.service"
 cloudreve_is_installed=""
 
-nextcloud_url="https://download.nextcloud.com/server/releases/nextcloud-22.2.3.zip"
+nextcloud_url="https://download.nextcloud.com/server/daily/latest-master.zip"
 
 xray_config="/usr/local/etc/xray/config.json"
 xray_is_installed=""
@@ -520,35 +520,57 @@ get_config_info()
 }
 gen_cflags()
 {
-    cflags="-g0 -O3"
+    cflags=('-g0' '-O3')
     if gcc -v --help 2>&1 | grep -qw "\\-fexceptions"; then
-        cflags="${cflags} -fno-exceptions"
+        cflags+=('-fno-exceptions')
     elif gcc -v --help 2>&1 | grep -qw "\\-fhandle\\-exceptions"; then
-        cflags="${cflags} -fno-handle-exceptions"
+        cflags+=('-fno-handle-exceptions')
     fi
     if gcc -v --help 2>&1 | grep -qw "\\-fasynchronous\\-unwind\\-tables"; then
-        cflags="${cflags} -fno-asynchronous-unwind-tables"
+        cflags+=('-fno-asynchronous-unwind-tables')
     fi
     if gcc -v --help 2>&1 | grep -qw "\\-fstack\\-check"; then
-        cflags="${cflags} -fno-stack-check"
+        cflags+=('-fno-stack-check')
     fi
     if gcc -v --help 2>&1 | grep -qw "\\-fstack\\-clash\\-protection"; then
-        cflags="${cflags} -fno-stack-clash-protection"
+        cflags+=('-fno-stack-clash-protection')
     fi
     if gcc -v --help 2>&1 | grep -qw "\\-fstack\\-protector"; then
-        cflags="${cflags} -fno-stack-protector"
+        cflags+=('-fno-stack-protector')
     fi
     if gcc -v --help 2>&1 | grep -qw "\\-funwind\\-tables"; then
-        cflags="${cflags} -fno-unwind-tables"
+        cflags+=('-fno-unwind-tables')
     fi
     if gcc -v --help 2>&1 | grep -qw "\\-fcf\\-protection="; then
-        cflags="${cflags} -fcf-protection=none"
-    fi
-    if gcc -v --help 2>&1 | grep -qw "\\-fdwarf2\\-cfi\\-asm"; then
-        cflags="${cflags} -fno-dwarf2-cfi-asm"
+        cflags+=('-fcf-protection=none')
     fi
     if gcc -v --help 2>&1 | grep -qw "\\-fsplit\\-stack"; then
-        cflags="${cflags} -fno-split-stack"
+        cflags+=('-fno-split-stack')
+    fi
+}
+gen_cxxflags()
+{
+    cxxflags=('-g0' '-O3')
+    if g++ -v --help 2>&1 | grep -qw "\\-fasynchronous\\-unwind\\-tables"; then
+        cxxflags+=('-fno-asynchronous-unwind-tables')
+    fi
+    if g++ -v --help 2>&1 | grep -qw "\\-fstack\\-check"; then
+        cxxflags+=('-fno-stack-check')
+    fi
+    if g++ -v --help 2>&1 | grep -qw "\\-fstack\\-clash\\-protection"; then
+        cxxflags+=('-fno-stack-clash-protection')
+    fi
+    if g++ -v --help 2>&1 | grep -qw "\\-fstack\\-protector"; then
+        cxxflags+=('-fno-stack-protector')
+    fi
+    if g++ -v --help 2>&1 | grep -qw "\\-funwind\\-tables"; then
+        cxxflags+=('-fno-unwind-tables')
+    fi
+    if g++ -v --help 2>&1 | grep -qw "\\-fcf\\-protection="; then
+        cxxflags+=('-fcf-protection=none')
+    fi
+    if g++ -v --help 2>&1 | grep -qw "\\-fsplit\\-stack"; then
+        cxxflags+=('-fno-split-stack')
     fi
 }
 
@@ -865,6 +887,12 @@ uninstall_firewall()
     else
         crontab -l | sed "/qcloud/d" | crontab -
     fi
+
+    # Huawei Cloud
+    rm -rf /CloudResetPwdUpdateAgent
+    rm -rf /etc/init.d/HSSInstall
+    rm -rf /usr/local/uniagent
+    pkill -9 uniagent
 }
 
 #升级系统组件
@@ -919,26 +947,26 @@ doupdate()
             echo 'Prompt=normal' >> /etc/update-manager/release-upgrades
             case "$choice" in
                 1)
-                    do-release-upgrade -d
-                    do-release-upgrade -d
+                    do-release-upgrade -d -m server
+                    do-release-upgrade -d -m server
                     sed -i 's/Prompt=normal/Prompt=lts/' /etc/update-manager/release-upgrades
-                    do-release-upgrade -d
-                    do-release-upgrade -d
+                    do-release-upgrade -d -m server
+                    do-release-upgrade -d -m server
                     sed -i 's/Prompt=lts/Prompt=normal/' /etc/update-manager/release-upgrades
-                    do-release-upgrade
-                    do-release-upgrade
+                    do-release-upgrade -p -m server
+                    do-release-upgrade -p -m server
                     sed -i 's/Prompt=normal/Prompt=lts/' /etc/update-manager/release-upgrades
-                    do-release-upgrade
-                    do-release-upgrade
+                    do-release-upgrade -p -m server
+                    do-release-upgrade -p -m server
                     ;;
                 2)
-                    do-release-upgrade
-                    do-release-upgrade
+                    do-release-upgrade -m server
+                    do-release-upgrade -m server
                     ;;
                 3)
                     sed -i 's/Prompt=normal/Prompt=lts/' /etc/update-manager/release-upgrades
-                    do-release-upgrade
-                    do-release-upgrade
+                    do-release-upgrade -m server
+                    do-release-upgrade -m server
                     ;;
             esac
             $debian_package_manager -y --purge autoremove
@@ -1753,7 +1781,9 @@ compile_php()
 {
     green "正在编译php。。。。"
     local cflags
+    local cxxflags
     gen_cflags
+    gen_cxxflags
     if ! wget -O "${php_version}.tar.xz" "https://www.php.net/distributions/${php_version}.tar.xz"; then
         red    "获取php失败"
         yellow "按回车键继续或者按Ctrl+c终止"
@@ -1766,9 +1796,9 @@ compile_php()
     if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
         sed -i 's#if test -f $THIS_PREFIX/$PHP_LIBDIR/lib$LIB\.a || test -f $THIS_PREFIX/$PHP_LIBDIR/lib$LIB\.$SHLIB_SUFFIX_NAME#& || true#' configure
         sed -i 's#if test ! -r "$PDO_FREETDS_INSTALLATION_DIR/$PHP_LIBDIR/libsybdb\.a" && test ! -r "$PDO_FREETDS_INSTALLATION_DIR/$PHP_LIBDIR/libsybdb\.so"#& \&\& false#' configure
-        ./configure --prefix=${php_prefix} --enable-embed=shared --enable-fpm --with-fpm-user=www-data --with-fpm-group=www-data --with-fpm-systemd --with-fpm-acl --with-fpm-apparmor --disable-phpdbg --with-layout=GNU --with-openssl --with-kerberos --with-external-pcre --with-pcre-jit --with-zlib --enable-bcmath --with-bz2 --enable-calendar --with-curl --enable-dba --with-qdbm --with-db4 --with-db1 --with-tcadb --with-lmdb --with-enchant --enable-exif --with-ffi --enable-ftp --enable-gd --with-external-gd --with-webp --with-jpeg --with-xpm --with-freetype --enable-gd-jis-conv --with-gettext --with-gmp --with-mhash --with-imap --with-imap-ssl --enable-intl --with-ldap --with-ldap-sasl --enable-mbstring --with-mysqli --with-mysql-sock --with-unixODBC --enable-pcntl --with-pdo-dblib --with-pdo-mysql --with-zlib-dir --with-pdo-odbc=unixODBC,/usr --with-pdo-pgsql --with-pgsql --with-pspell --with-libedit --with-mm --enable-shmop --with-snmp --enable-soap --enable-sockets --with-sodium --with-password-argon2 --enable-sysvmsg --enable-sysvsem --enable-sysvshm --with-tidy --with-xsl --with-zip --enable-mysqlnd --with-pear CFLAGS="${cflags}" CXXFLAGS="${cflags}"
+        ./configure --prefix=${php_prefix} --enable-embed=shared --enable-fpm --with-fpm-user=www-data --with-fpm-group=www-data --with-fpm-systemd --with-fpm-acl --with-fpm-apparmor --disable-phpdbg --with-layout=GNU --with-openssl --with-kerberos --with-external-pcre --with-zlib --enable-bcmath --with-bz2 --enable-calendar --with-curl --enable-dba --with-qdbm --with-db4 --with-db1 --with-tcadb --with-lmdb --with-enchant --enable-exif --with-ffi --enable-ftp --enable-gd --with-external-gd --with-avif --with-webp --with-jpeg --with-xpm --with-freetype --enable-gd-jis-conv --with-gettext --with-gmp --with-mhash --with-imap --with-imap-ssl --enable-intl --with-ldap --with-ldap-sasl --enable-mbstring --with-mysqli --with-mysql-sock --with-unixODBC --enable-pcntl --with-pdo-dblib --with-pdo-mysql --with-zlib-dir --with-pdo-odbc=unixODBC,/usr --with-pdo-pgsql --with-pgsql --with-pspell --with-libedit --with-mm --enable-shmop --with-snmp --enable-soap --enable-sockets --with-sodium --with-external-libcrypt --with-password-argon2 --enable-sysvmsg --enable-sysvsem --enable-sysvshm --with-tidy --with-xsl --with-zip --enable-mysqlnd --with-pear CFLAGS="${cflags[*]}" CXXFLAGS="${cxxflags[*]}"
     else
-        ./configure --prefix=${php_prefix} --with-libdir=lib64 --enable-embed=shared --enable-fpm --with-fpm-user=www-data --with-fpm-group=www-data --with-fpm-systemd --with-fpm-acl --disable-phpdbg --with-layout=GNU --with-openssl --with-kerberos --with-external-pcre --with-pcre-jit --with-zlib --enable-bcmath --with-bz2 --enable-calendar --with-curl --enable-dba --with-gdbm --with-db4 --with-db1 --with-tcadb --with-lmdb --with-enchant --enable-exif --with-ffi --enable-ftp --enable-gd --with-external-gd --with-webp --with-jpeg --with-xpm --with-freetype --enable-gd-jis-conv --with-gettext --with-gmp --with-mhash --with-imap --with-imap-ssl --enable-intl --with-ldap --with-ldap-sasl --enable-mbstring --with-mysqli --with-mysql-sock --with-unixODBC --enable-pcntl --with-pdo-dblib --with-pdo-mysql --with-zlib-dir --with-pdo-odbc=unixODBC,/usr --with-pdo-pgsql --with-pgsql --with-pspell --with-libedit --enable-shmop --with-snmp --enable-soap --enable-sockets --with-sodium --with-password-argon2 --enable-sysvmsg --enable-sysvsem --enable-sysvshm --with-tidy --with-xsl --with-zip --enable-mysqlnd --with-pear CFLAGS="${cflags}" CXXFLAGS="${cflags}"
+        ./configure --prefix=${php_prefix} --with-libdir=lib64 --enable-embed=shared --enable-fpm --with-fpm-user=www-data --with-fpm-group=www-data --with-fpm-systemd --with-fpm-acl --disable-phpdbg --with-layout=GNU --with-openssl --with-kerberos --with-external-pcre --with-zlib --enable-bcmath --with-bz2 --enable-calendar --with-curl --enable-dba --with-gdbm --with-db4 --with-db1 --with-tcadb --with-lmdb --with-enchant --enable-exif --with-ffi --enable-ftp --enable-gd --with-external-gd --with-avif --with-webp --with-jpeg --with-xpm --with-freetype --enable-gd-jis-conv --with-gettext --with-gmp --with-mhash --with-imap --with-imap-ssl --enable-intl --with-ldap --with-ldap-sasl --enable-mbstring --with-mysqli --with-mysql-sock --with-unixODBC --enable-pcntl --with-pdo-dblib --with-pdo-mysql --with-zlib-dir --with-pdo-odbc=unixODBC,/usr --with-pdo-pgsql --with-pgsql --with-pspell --with-libedit --enable-shmop --with-snmp --enable-soap --enable-sockets --with-sodium --with-external-libcrypt --with-password-argon2 --enable-sysvmsg --enable-sysvsem --enable-sysvshm --with-tidy --with-xsl --with-zip --enable-mysqlnd --with-pear CFLAGS="${cflags[*]}" CXXFLAGS="${cxxflags[*]}"
     fi
     swap_on 2048
     if ! make -j$cpu_thread_num; then
@@ -1792,7 +1822,7 @@ instal_php_imagick()
     fi
     cd imagick
     ${php_prefix}/bin/phpize
-    ./configure --with-php-config=${php_prefix}/bin/php-config CFLAGS="${cflags}"
+    ./configure --with-php-config=${php_prefix}/bin/php-config CFLAGS="${cflags[*]}"
     swap_on 380
     if ! make -j$cpu_thread_num; then
         swap_off
@@ -1898,7 +1928,7 @@ compile_nginx()
     sed -i "s/OPTIMIZE[ \\t]*=>[ \\t]*'-O'/OPTIMIZE          => '-O3'/g" src/http/modules/perl/Makefile.PL
     sed -i 's/NGX_PERL_CFLAGS="$CFLAGS `$NGX_PERL -MExtUtils::Embed -e ccopts`"/NGX_PERL_CFLAGS="`$NGX_PERL -MExtUtils::Embed -e ccopts` $CFLAGS"/g' auto/lib/perl/conf
     sed -i 's/NGX_PM_CFLAGS=`$NGX_PERL -MExtUtils::Embed -e ccopts`/NGX_PM_CFLAGS="`$NGX_PERL -MExtUtils::Embed -e ccopts` $CFLAGS"/g' auto/lib/perl/conf
-    ./configure --prefix=/usr/local/nginx --with-openssl=../$openssl_version --with-mail=dynamic --with-mail_ssl_module --with-stream=dynamic --with-stream_ssl_module --with-stream_realip_module --with-stream_geoip_module=dynamic --with-stream_ssl_preread_module --with-http_ssl_module --with-http_v2_module --with-http_realip_module --with-http_addition_module --with-http_xslt_module=dynamic --with-http_image_filter_module=dynamic --with-http_geoip_module=dynamic --with-http_sub_module --with-http_dav_module --with-http_flv_module --with-http_mp4_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_auth_request_module --with-http_random_index_module --with-http_secure_link_module --with-http_degradation_module --with-http_slice_module --with-http_stub_status_module --with-http_perl_module=dynamic --with-pcre --with-libatomic --with-compat --with-cpp_test_module --with-google_perftools_module --with-file-aio --with-threads --with-poll_module --with-select_module --with-cc-opt="-Wno-error ${cflags}"
+    ./configure --prefix=/usr/local/nginx --with-openssl=../$openssl_version --with-mail=dynamic --with-mail_ssl_module --with-stream=dynamic --with-stream_ssl_module --with-stream_realip_module --with-stream_geoip_module=dynamic --with-stream_ssl_preread_module --with-http_ssl_module --with-http_v2_module --with-http_realip_module --with-http_addition_module --with-http_xslt_module=dynamic --with-http_image_filter_module=dynamic --with-http_geoip_module=dynamic --with-http_sub_module --with-http_dav_module --with-http_flv_module --with-http_mp4_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_auth_request_module --with-http_random_index_module --with-http_secure_link_module --with-http_degradation_module --with-http_slice_module --with-http_stub_status_module --with-http_perl_module=dynamic --with-pcre --with-libatomic --with-compat --with-cpp_test_module --with-google_perftools_module --with-file-aio --with-threads --with-poll_module --with-select_module --with-cc-opt="-Wno-error ${cflags[*]}"
     swap_on 480
     if ! make -j$cpu_thread_num; then
         swap_off
@@ -3639,7 +3669,7 @@ simplify_system()
         check_important_dependence_installed "" openssh-server
     else
         local temp_backup=()
-        local temp_important=('apt-utils' 'whiptail' 'initramfs-tools' 'isc-dhcp-client' 'netplan.io' 'openssh-server')
+        local temp_important=('apt-utils' 'whiptail' 'initramfs-tools' 'isc-dhcp-client' 'netplan.io' 'openssh-server' 'network-manager')
         for i in "${temp_important[@]}"
         do
             LANG="en_US.UTF-8" LANGUAGE="en_US:en" dpkg -s "$i" 2>/dev/null | grep -qi 'status[ '$'\t]*:[ '$'\t]*install[ '$'\t]*ok[ '$'\t]*installed[ '$'\t]*$' && temp_backup+=("$i")
