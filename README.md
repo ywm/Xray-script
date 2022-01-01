@@ -235,7 +235,6 @@ Xray默认使用的是GO语言官方提供的TLS库，这也是几乎所有GO语
 |--with-google_perftools_module|libgoogle-perftools-dev|gperftools-devel|
 |--with-http_geoip_module|libgeoip-dev|geoip-devel|
 |--with-http_perl_module||perl-ExtUtils-Embed|
-|--with-libatomic|libatomic-ops-dev|libatomic_ops-devel|
 ||libperl-dev|perl-devel|
 |**编译php：**|||
 ||pkg-config|pkgconf-pkg-config|
