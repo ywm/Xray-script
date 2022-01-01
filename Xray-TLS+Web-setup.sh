@@ -3650,8 +3650,12 @@ simplify_system()
     fi
     uninstall_firewall
     if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        local initscripts_installed=0
-        rpm -q initscripts > /dev/null 2>&1 && initscripts_installed=1
+        local temp_backup=()
+        local temp_important=('openssh-server' 'initscripts' 'tar')
+        for i in "${temp_important[@]}"
+        do
+            rpm -q "$i" > /dev/null 2>&1 && temp_backup+=("$i")
+        done
         local temp_remove_list=('openssl' 'perl*' 'xz' 'libselinux-utils' 'zip' 'unzip' 'bzip2' 'wget' 'procps-ng' 'procps' 'iproute' 'dbus-glib' 'udisk*' 'libudisk*' 'gdisk*' 'libblock*' '*-devel')
         #libxmlb
         if ! $redhat_package_manager -y remove "${temp_remove_list[@]}"; then
@@ -3660,8 +3664,10 @@ simplify_system()
                 $redhat_package_manager -y remove "$i"
             done
         fi
-        [ $initscripts_installed -eq 1 ] && check_important_dependence_installed "" initscripts
-        check_important_dependence_installed "" openssh-server
+        for i in "${temp_backup[@]}"
+        do
+            check_important_dependence_installed "" "$i"
+        done
     else
         local temp_backup=()
         local temp_important=('apt-utils' 'whiptail' 'initramfs-tools' 'isc-dhcp-client' 'netplan.io' 'openssh-server' 'network-manager' 'nginx*')
