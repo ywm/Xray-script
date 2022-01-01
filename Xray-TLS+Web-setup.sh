@@ -673,24 +673,24 @@ get_system_info()
         yellow "按回车键继续或者Ctrl+c退出"
         read -s
     fi
-    local temp_release
-    temp_release="$(lsb_release -i -s | tr "[:upper:]" "[:lower:]")"
-    if [[ "$temp_release" =~ ubuntu ]]; then
+    if bash -c "echo $(grep '^[ '$'\t]*ID[ '$'\t]*=' /etc/os-release | cut -d = -f 2-)" | grep -qiw ubuntu; then
         release="ubuntu"
-    elif [[ "$temp_release" =~ debian ]]; then
+    elif bash -c "echo $(grep '^[ '$'\t]*ID[ '$'\t]*=' /etc/os-release | cut -d = -f 2-)" | grep -qiw debian; then
         release="debian"
-    elif [[ "$temp_release" =~ deepin ]]; then
+    elif bash -c "echo $(grep '^[ '$'\t]*ID[ '$'\t]*=' /etc/os-release | cut -d = -f 2-)" | grep -qiw deepin; then
         release="deepin"
-    elif [[ "$temp_release" =~ centos ]]; then
+    elif bash -c "echo $(grep '^[ '$'\t]*ID[ '$'\t]*=' /etc/os-release | cut -d = -f 2-)" | grep -qiw centos; then
         release="centos"
-    elif [[ "$temp_release" =~ (redhatenterprise|rhel) ]]; then
-        release="rhel"
-    elif [[ "$temp_release" =~ fedora ]]; then
+    elif bash -c "echo $(grep '^[ '$'\t]*ID[ '$'\t]*=' /etc/os-release | cut -d = -f 2-)" | grep -qiw fedora; then
         release="fedora"
+    elif bash -c "echo $(grep '^[ '$'\t]*ID[ '$'\t]*=' /etc/os-release | cut -d = -f 2-)" | grep -qiw rhel; then
+        release="rhel"
+    elif bash -c "echo $(grep '^[ '$'\t]*ID[ '$'\t]*=' /etc/os-release | cut -d = -f 2-)" | grep -qiw redhatenterprise; then
+        release="rhel"
     fi
-    systemVersion="$(lsb_release -r -s)"
-    if [ "$temp_release" == "" ] || [ "$systemVersion" == "" ]; then
-        yellow "获取系统版本失败！"
+    systemVersion="$(bash -c "echo $(grep '^[ '$'\t]*VERSION_ID[ '$'\t]*=' /etc/os-release | cut -d = -f 2-)")"
+    if [ "$(bash -c "echo $(grep '^[ '$'\t]*ID[ '$'\t]*=' /etc/os-release | cut -d = -f 2-)")" == "" ] || [ "$systemVersion" == "" ]; then
+        yellow "获取系统信息失败！"
         green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
         yellow "按回车键继续或者Ctrl+c退出"
         read -s
@@ -2898,7 +2898,6 @@ install_update_xray_tls_web()
     check_SELinux
     check_important_dependence_installed iproute2 iproute
     check_port
-    check_important_dependence_installed lsb-release redhat-lsb-core
     check_important_dependence_installed tzdata tzdata
     get_system_info
     check_important_dependence_installed ca-certificates ca-certificates
@@ -3099,7 +3098,6 @@ install_check_update_update_php()
 {
     [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
     check_SELinux
-    check_important_dependence_installed lsb-release redhat-lsb-core
     check_important_dependence_installed tzdata tzdata
     get_system_info
     if ([ $release == "centos" ] && ! version_ge "$systemVersion" "8" ) || ([ $release == "rhel" ] && ! version_ge "$systemVersion" "8") || ([ $release == "fedora" ] && ! version_ge "$systemVersion" "30") || ([ $release == "ubuntu" ] && ! version_ge "$systemVersion" "20.04") || ([ $release == "debian" ] && ! version_ge "$systemVersion" "10") || ([ $release == "deepin" ] && ! version_ge "$systemVersion" "20"); then
@@ -3167,7 +3165,6 @@ check_update_update_nginx()
     check_nginx_installed_system
     [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
     check_SELinux
-    check_important_dependence_installed lsb-release redhat-lsb-core
     check_important_dependence_installed tzdata tzdata
     get_system_info
     check_important_dependence_installed ca-certificates ca-certificates
@@ -3238,7 +3235,6 @@ reinit_domain()
     [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
     check_important_dependence_installed iproute2 iproute
     check_port
-    check_important_dependence_installed lsb-release redhat-lsb-core
     check_important_dependence_installed tzdata tzdata
     get_system_info
     check_important_dependence_installed ca-certificates ca-certificates
@@ -3307,7 +3303,6 @@ add_domain()
     [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
     check_important_dependence_installed iproute2 iproute
     check_port
-    check_important_dependence_installed lsb-release redhat-lsb-core
     check_important_dependence_installed tzdata tzdata
     get_system_info
     check_important_dependence_installed ca-certificates ca-certificates
@@ -3412,7 +3407,6 @@ delete_domain()
 change_pretend()
 {
     [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
-    check_important_dependence_installed lsb-release redhat-lsb-core
     check_important_dependence_installed tzdata tzdata
     get_system_info
     check_important_dependence_installed ca-certificates ca-certificates
@@ -3633,7 +3627,6 @@ simplify_system()
         return 1
     fi
     [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
-    check_important_dependence_installed lsb-release redhat-lsb-core
     check_important_dependence_installed tzdata tzdata
     get_system_info
     check_important_dependence_installed "procps" "procps-ng"
@@ -3849,7 +3842,6 @@ start_menu()
         ask_update_script
     elif [ $choice -eq 4 ]; then
         [ "$redhat_package_manager" == "yum" ] && check_important_dependence_installed "" "yum-utils"
-        check_important_dependence_installed lsb-release redhat-lsb-core
         check_important_dependence_installed tzdata tzdata
         get_system_info
         check_ssh_timeout
