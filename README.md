@@ -227,7 +227,7 @@ Xray默认使用的是GO语言官方提供的TLS库，这也是几乎所有GO语
 ||perl-modules-5.32(within libperl-dev)|perl-Getopt-Long|
 ||libperl5.32(within libperl-dev)|perl-Data-Dumper|
 |**编译Nginx：**|||
-||libpcre3-dev|pcre-devel|
+||libpcre2-dev|pcre2-devel|
 ||zlib1g-dev|zlib-devel|
 |--with-http_xslt_module|libxml2-dev|libxml2-devel|
 |--with-http_xslt_module|libxslt1-dev|libxslt-devel|
