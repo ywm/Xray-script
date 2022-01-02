@@ -198,6 +198,7 @@ Xray默认使用的是GO语言官方提供的TLS库，这也是几乎所有GO语
 |用途|Debian基系统|Red Hat基系统|
 |-|-|-|
 |yumdb set(标记包手动安装)||yum-utils|
+|dnf config-manager||dnf-plugins-core|
 |setenforce/getenforce(关闭SELinux)|selinux-utils|libselinux-utils|
 |ss(检查端口占用)|iproute2|iproute|
 |lsb_release(查看系统版本)|lsb-release|redhat-lsb-core|
@@ -223,9 +224,10 @@ Xray默认使用的是GO语言官方提供的TLS库，这也是几乎所有GO语
 ||openssl|openssl|
 ||cron|crontabs|
 |**编译openssl：**|||
-||perl-base(within libperl-dev)|perl-IPC-Cmd|
-||perl-modules-5.32(within libperl-dev)|perl-Getopt-Long|
-||libperl5.32(within libperl-dev)|perl-Data-Dumper|
+||perl-base(包含于libperl-dev)|perl-IPC-Cmd|
+||perl-modules-5.32(包含于libperl-dev)|perl-Getopt-Long|
+||libperl5.32(包含于libperl-dev)|perl-Data-Dumper|
+|||perl-FindBin|
 |**编译Nginx：**|||
 ||libpcre2-dev|pcre2-devel|
 ||zlib1g-dev|zlib-devel|
