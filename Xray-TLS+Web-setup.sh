@@ -245,6 +245,14 @@ install_dependence()
             fi
             if [ $release == centos-stream ]; then
                 local epel_repo="epel,epel-next"
+            elif [ $release == oracle ]; then
+                if version_ge "$systemVersion" 8; then
+                    local epel_repo="ol8_developer_EPEL"
+                elif version_ge "$systemVersion" 7; then
+                    local epel_repo="ol7_developer_EPEL"
+                else
+                    local epel_repo="epel"
+                fi
             else
                 local epel_repo="epel"
             fi
