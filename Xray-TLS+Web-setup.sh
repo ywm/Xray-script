@@ -1685,8 +1685,9 @@ readPretend()
                 queren=0
             fi
         elif [ $pretend -eq 2 ]; then
-            if (([ $release == "centos" ] || [ $release == centos-stream ]) && ! version_ge "$systemVersion" "8" ) || ([ $release == "rhel" ] && ! version_ge "$systemVersion" "8") || ([ $release == "fedora" ] && ! version_ge "$systemVersion" "30") || ([ $release == "ubuntu" ] && ! version_ge "$systemVersion" "20.04") || ([ $release == "debian" ] && ! version_ge "$systemVersion" "10") || ([ $release == "deepin" ] && ! version_ge "$systemVersion" "20"); then
-                red "系统版本过低！"
+            if (([ $release == "centos" ] || [ $release == centos-stream ] || [ $release == oracle ]) && ! version_ge "$systemVersion" "8" ) || ([ $release == "rhel" ] && ! version_ge "$systemVersion" "8") || ([ $release == "fedora" ] && ! version_ge "$systemVersion" "30") || ([ $release == "ubuntu" ] && ! version_ge "$systemVersion" "20.04") || ([ $release == "debian" ] && ! version_ge "$systemVersion" "10") || ([ $release == "deepin" ] && ! version_ge "$systemVersion" "20"); then
+                red "系统版本过低，无法安装php！"
+                echo
                 tyblue "安装Nextcloud需要安装php"
                 yellow "仅支持在以下版本系统下安装php："
                 yellow " 1. Ubuntu 20.04+"
@@ -1696,12 +1697,14 @@ readPretend()
                 yellow " 5. Red Hat Enterprise Linux 8+"
                 yellow " 6. CentOS 8+"
                 yellow " 7. Fedora 30+"
-                yellow " 8. 其他以 Red Hat 8+ 为基的系统"
+                yellow " 8. Oracle Linux 8+"
+                yellow " 9. 其他以 Red Hat 8+ 为基的系统"
                 sleep 3s
                 queren=0
                 continue
             elif [ $release == "other-debian" ] || [ $release == "other-redhat" ]; then
-                yellow "未知的系统！"
+                yellow "未知的系统，可能导致php安装失败！"
+                echo
                 tyblue "安装Nextcloud需要安装php"
                 yellow "仅支持在以下版本系统下安装php："
                 yellow " 1. Ubuntu 20.04+"
@@ -1711,7 +1714,8 @@ readPretend()
                 yellow " 5. Red Hat Enterprise Linux 8+"
                 yellow " 6. CentOS 8+"
                 yellow " 7. Fedora 30+"
-                yellow " 8. 其他以 Red Hat 8+ 为基的系统"
+                yellow " 8. Oracle Linux 8+"
+                yellow " 9. 其他以 Red Hat 8+ 为基的系统"
                 ! ask_if "确定选择吗？(y/n)" && queren=0 && continue
             fi
             if [ $php_is_installed -eq 0 ]; then
@@ -3204,8 +3208,9 @@ install_check_update_update_php()
     check_SELinux
     check_important_dependence_installed tzdata tzdata
     get_system_info
-    if (([ $release == "centos" ] || [ $release == centos-stream ]) && ! version_ge "$systemVersion" "8" ) || ([ $release == "rhel" ] && ! version_ge "$systemVersion" "8") || ([ $release == "fedora" ] && ! version_ge "$systemVersion" "30") || ([ $release == "ubuntu" ] && ! version_ge "$systemVersion" "20.04") || ([ $release == "debian" ] && ! version_ge "$systemVersion" "10") || ([ $release == "deepin" ] && ! version_ge "$systemVersion" "20"); then
-        red "系统版本过低！"
+    if (([ $release == "centos" ] || [ $release == centos-stream ] || [ $release == oracle ]) && ! version_ge "$systemVersion" "8" ) || ([ $release == "rhel" ] && ! version_ge "$systemVersion" "8") || ([ $release == "fedora" ] && ! version_ge "$systemVersion" "30") || ([ $release == "ubuntu" ] && ! version_ge "$systemVersion" "20.04") || ([ $release == "debian" ] && ! version_ge "$systemVersion" "10") || ([ $release == "deepin" ] && ! version_ge "$systemVersion" "20"); then
+        red "系统版本过低，无法安装php！"
+        echo
         tyblue "安装Nextcloud需要安装php"
         yellow "仅支持在以下版本系统下安装php："
         yellow " 1. Ubuntu 20.04+"
@@ -3215,10 +3220,12 @@ install_check_update_update_php()
         yellow " 5. Red Hat Enterprise Linux 8+"
         yellow " 6. CentOS 8+"
         yellow " 7. Fedora 30+"
-        yellow " 8. 其他以 Red Hat 8+ 为基的系统"
+        yellow " 8. Oracle Linux 8+"
+        yellow " 9. 其他以 Red Hat 8+ 为基的系统"
         return 1
     elif [ $release == "other-debian" ] || [ $release == "other-redhat" ]; then
-        yellow "未知的系统！"
+        yellow "未知的系统，可能导致php安装失败！"
+        echo
         tyblue "安装Nextcloud需要安装php"
         yellow "仅支持在以下版本系统下安装php："
         yellow " 1. Ubuntu 20.04+"
@@ -3228,7 +3235,8 @@ install_check_update_update_php()
         yellow " 5. Red Hat Enterprise Linux 8+"
         yellow " 6. CentOS 8+"
         yellow " 7. Fedora 30+"
-        yellow " 8. 其他以 Red Hat 8+ 为基的系统"
+        yellow " 8. Oracle Linux 8+"
+        yellow " 9. 其他以 Red Hat 8+ 为基的系统"
         ! ask_if "确定选择吗？(y/n)" && return 0
     fi
     check_important_dependence_installed ca-certificates ca-certificates
