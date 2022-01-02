@@ -320,7 +320,26 @@ install_epel()
         fi
     fi
     if [ $ret -ne 0 ]; then
-        yellow "epel源安装失败！！"
+        if [ $release == other_redhat ]; then
+            if $redhat_package_manager --help | grep -qw "\\-\\-all"; then
+                local temp_command="$redhat_package_manager --all repolist"
+            else
+                local temp_command="$redhat_package_manager repolist all"
+            fi
+            if $temp_command | awk '{print $1}' | grep -qw epel; then
+                return
+            fi
+            if $redhat_package_manager_enhanced install "*-epel-release"; then
+                return
+            fi
+            yellow "epel源安装失败，这可能导致之后的安装失败，也可能没有影响(取决于你的系统的repo包含软件是否丰富)"
+            echo
+            tyblue "除了安装epel源过程出错，也有可能是因为你使用的系统比较冷门导致安装失败"
+            tyblue "这种情况下可以手动安装epel源，之后重新运行脚本"
+        else
+            yellow "epel源安装失败！！"
+        fi
+        echo
         green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
         yellow "按回车键继续或者Ctrl+c退出"
         read -s
