@@ -271,13 +271,6 @@ install_dependence()
 #安装epel源
 install_epel()
 {
-    #if $redhat_package_manager --help | grep -qw "\\-\\-all"; then
-    #    local temp_command="$redhat_package_manager --all repolist"
-    #else
-    #    local temp_command="$redhat_package_manager repolist all"
-    #fi
-    #if ! $temp_command | awk '{print $1}' | grep -q epel; then
-    #fi
     if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
         return
     fi
@@ -296,6 +289,14 @@ install_epel()
         else
             ret=-1
         fi
+    elif [ $release == oracle ]; then
+        if version_ge "$systemVersion" 8; then
+            $redhat_package_manager_enhanced install oracle-epel-release-el8 || ret=-1
+        elif version_ge "$systemVersion" 7; then
+            $redhat_package_manager_enhanced install oracle-epel-release-el7 || ret=-1
+        else
+            ret=-1
+        fi
     elif [ $release == rhel ]; then
         if version_ge "$systemVersion" 8; then
             subscription-manager repos --enable "codeready-builder-for-rhel-8-$(arch)-rpms" || ret=-1
@@ -311,7 +312,7 @@ install_epel()
             ret=-1
         elif version_ge "$systemVersion" 8; then
             check_important_dependence_installed "" dnf-plugins-core
-            dnf config-manager --set-enabled powertools || dnf config-manager --set-enabled PowerTools || ret=-1
+            dnf config-manager --set-enabled powertools || dnf config-manager --set-enabled PowerTools
             $redhat_package_manager_enhanced install epel-release || ret=-1
         elif version_ge "$systemVersion" 7; then
             $redhat_package_manager_enhanced install epel-release || ret=-1
@@ -321,15 +322,7 @@ install_epel()
     fi
     if [ $ret -ne 0 ]; then
         if [ $release == other-redhat ]; then
-            if $redhat_package_manager --help | grep -qw "\\-\\-all"; then
-                local temp_command="$redhat_package_manager --all repolist"
-            else
-                local temp_command="$redhat_package_manager repolist all"
-            fi
-            if $temp_command | awk '{print $1}' | grep -qw epel; then
-                return
-            fi
-            if $redhat_package_manager_enhanced install "*-epel-release" && $temp_command | awk '{print $1}' | grep -qw epel; then
+            if $redhat_package_manager repolist epel | grep -q epel; then
                 return
             fi
             yellow "epel源安装失败，这可能导致之后的安装失败，也可能没有影响(取决于你的系统的repo包含软件是否丰富)"
@@ -762,6 +755,8 @@ get_system_info()
         fi
     elif bash -c "echo $(grep '^[ '$'\t]*ID[ '$'\t]*=' /etc/os-release | cut -d = -f 2-)" | grep -qiw fedora; then
         release="fedora"
+    elif bash -c "echo $(grep '^[ '$'\t]*NAME[ '$'\t]*=' /etc/os-release | cut -d = -f 2-)" | grep -qiw oracle; then
+        release="oracle"
     elif bash -c "echo $(grep '^[ '$'\t]*ID[ '$'\t]*=' /etc/os-release | cut -d = -f 2-)" | grep -qiw rhel; then
         release="rhel"
     elif bash -c "echo $(grep '^[ '$'\t]*ID[ '$'\t]*=' /etc/os-release | cut -d = -f 2-)" | grep -qiw redhatenterprise; then
@@ -1405,7 +1400,7 @@ install_bbr()
             if (( choice==1 || choice==4 )) && ([ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]) && ! dpkg-deb --help | grep -qw "zstd"; then
                 red    "当前系统dpkg不支持解压zst包，不支持安装此内核！"
                 green  "请更新系统，或选择使用其他系统，或选择安装xanmod内核"
-            elif (( choice==2 || choice==3 )) && ([ $release == "centos" ] || [ $release == centos-stream ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]); then
+            elif (( choice==2 || choice==3 )) && ([ $release == "centos" ] || [ $release == centos-stream ] || [ $release == oracle ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]); then
                 red "xanmod内核仅支持Debian系的系统，如Ubuntu、Debian、deepin、UOS"
             else
                 if (( choice==1 || choice==4 )) && ([ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]); then
@@ -1777,7 +1772,7 @@ readDomain()
 install_nginx_compile_toolchains()
 {
     green "正在安装Nginx编译工具链。。。"
-    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == oracle ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         install_dependence ca-certificates wget gcc gcc-c++ make perl-IPC-Cmd perl-Getopt-Long perl-Data-Dumper
         if ! perl -e "use FindBin" > /dev/null 2>&1; then
             install_dependence perl-FindBin
@@ -1789,7 +1784,7 @@ install_nginx_compile_toolchains()
 install_php_compile_toolchains()
 {
     green "正在安装php编译工具链。。。"
-    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == oracle ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         install_dependence ca-certificates wget xz gcc gcc-c++ make pkgconf-pkg-config autoconf git
     else
         install_dependence ca-certificates wget xz-utils gcc g++ make pkg-config autoconf git
@@ -1798,7 +1793,7 @@ install_php_compile_toolchains()
 install_nginx_dependence()
 {
     green "正在安装Nginx依赖。。。"
-    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == oracle ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         install_dependence pcre2-devel zlib-devel libxml2-devel libxslt-devel gd-devel geoip-devel perl-ExtUtils-Embed gperftools-devel perl-devel
     else
         install_dependence libpcre2-dev zlib1g-dev libxml2-dev libxslt1-dev libgd-dev libgeoip-dev libgoogle-perftools-dev libperl-dev
@@ -1807,7 +1802,7 @@ install_nginx_dependence()
 install_php_dependence()
 {
     green "正在安装php依赖。。。"
-    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == oracle ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         install_dependence libxml2-devel sqlite-devel systemd-devel libacl-devel openssl-devel krb5-devel pcre2-devel zlib-devel bzip2-devel libcurl-devel gdbm-devel libdb-devel tokyocabinet-devel lmdb-devel enchant-devel libffi-devel libpng-devel gd-devel libwebp-devel libjpeg-turbo-devel libXpm-devel freetype-devel gmp-devel libc-client-devel libicu-devel openldap-devel oniguruma-devel unixODBC-devel freetds-devel libpq-devel aspell-devel libedit-devel net-snmp-devel libsodium-devel libargon2-devel libtidy-devel libxslt-devel libzip-devel ImageMagick-devel
     else
         if ! $debian_package_manager -y --no-install-recommends install libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-2-dev libffi-dev libpng-dev libgd-dev libwebp-dev libjpeg-dev libxpm-dev libfreetype6-dev libgmp-dev libc-client2007e-dev libicu-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt1-dev libzip-dev libmagickwand-dev && ! $debian_package_manager -y --no-install-recommends install libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-dev libffi-dev libpng-dev libgd-dev libwebp-dev libjpeg-dev libxpm-dev libfreetype6-dev libgmp-dev libc-client2007e-dev libicu-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt1-dev libzip-dev libmagickwand-dev; then
@@ -1825,7 +1820,7 @@ install_php_dependence()
 install_acme_dependence()
 {
     green "正在安装acme.sh依赖。。。"
-    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == oracle ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         install_dependence curl openssl crontabs
     else
         install_dependence curl openssl cron
@@ -3731,7 +3726,7 @@ simplify_system()
         cp /etc/ssh/sshd_config sshd_config
     fi
     uninstall_firewall
-    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == oracle ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         local temp_backup=()
         local temp_important=('openssh-server' 'initscripts' 'tar')
         for i in "${temp_important[@]}"
