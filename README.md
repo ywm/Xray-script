@@ -207,6 +207,7 @@ Xray默认使用的是GO语言官方提供的TLS库，这也是几乎所有GO语
 |kill/pkill/ps/sysctl/free|procps|procps-ng|
 |epel源||epel-release|
 |epel源||epel-next-release|
+|remi源||remi-release|
 |do-release-upgrade(升级系统)|ubuntu-release-upgrader-core||
 |unzip|unzip|unzip|
 |curl|curl|curl|
@@ -265,7 +266,7 @@ Xray默认使用的是GO语言官方提供的TLS库，这也是几乎所有GO语
 |--with-xpm|libxpm-dev|libXpm-devel|
 |--with-freetype|libfreetype6-dev|freetype-devel|
 |--with-gmp|libgmp-dev|gmp-devel|
-|--with-imap|libc-client2007e-dev|libc-client-devel|
+|--with-imap|libc-client2007e-dev|uw-imap-devel|
 |--enable-intl|libicu-dev|libicu-devel|
 |--with-ldap|libldap2-dev|openldap-devel|
 |--with-ldap-sasl|libsasl2-dev|openldap-devel|
