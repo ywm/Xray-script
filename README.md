@@ -201,12 +201,12 @@ Xray默认使用的是GO语言官方提供的TLS库，这也是几乎所有GO语
 |dnf config-manager||dnf-plugins-core|
 |setenforce/getenforce(关闭SELinux)|selinux-utils|libselinux-utils|
 |ss(检查端口占用)|iproute2|iproute|
-|lsb_release(查看系统版本)|lsb-release|redhat-lsb-core|
-|wget/curl https|ca-certificates|ca-certificates|
 |wget|wget|wget|
 |curl|curl|curl|
+|wget/curl https|ca-certificates|ca-certificates|
 |kill/pkill/ps/sysctl/free|procps|procps-ng|
 |epel源||epel-release|
+|epel源||epel-next-release|
 |do-release-upgrade(升级系统)|ubuntu-release-upgrader-core||
 |unzip|unzip|unzip|
 |curl|curl|curl|
