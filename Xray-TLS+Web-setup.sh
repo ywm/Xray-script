@@ -100,7 +100,7 @@ check_base_command()
 {
     hash -r
     local i
-    local temp_command_list=('bash' 'sh' 'command' 'type' 'hash' 'install' 'true' 'false' 'exit' 'echo' 'test' 'sort' 'sed' 'awk' 'grep' 'cut' 'cd' 'rm' 'cp' 'mv' 'head' 'tail' 'uname' 'tr' 'md5sum' 'cat' 'find' 'wc' 'ls' 'mktemp' 'swapon' 'swapoff' 'mkswap' 'chmod' 'chown' 'chgrp' 'export' 'tar' 'gzip')
+    local temp_command_list=('bash' 'sh' 'command' 'type' 'hash' 'install' 'true' 'false' 'exit' 'echo' 'test' 'sort' 'sed' 'awk' 'grep' 'cut' 'cd' 'rm' 'cp' 'mv' 'head' 'tail' 'uname' 'tr' 'md5sum' 'cat' 'find' 'wc' 'ls' 'mktemp' 'swapon' 'swapoff' 'mkswap' 'chmod' 'chown' 'chgrp' 'export' 'tar' 'gzip' 'mkdir' 'arch')
     for i in "${temp_command_list[@]}"
     do
         if ! command -V "${i}" > /dev/null; then
@@ -232,21 +232,33 @@ install_dependence()
             fi
         fi
     else
-        if $redhat_package_manager --help | grep -q "\\-\\-enablerepo="; then
-            local temp_redhat_install="$redhat_package_manager_enhanced --enablerepo="
-        else
-            local temp_redhat_install="$redhat_package_manager_enhanced --enablerepo "
-        fi
         if ! $redhat_package_manager_enhanced install "$@"; then
-            if $temp_redhat_install'epel' install "$@"; then
+            if $redhat_package_manager --help | grep -q "\\-\\-enablerepo="; then
+                local enable_repo="--enablerepo="
+            else
+                local enable_repo="--enablerepo "
+            fi
+            if $redhat_package_manager --help | grep -q "\\-\\-disablerepo="; then
+                local disable_repo="--disablerepo="
+            else
+                local disable_repo="--disablerepo "
+            fi
+            if [ $release == centos-stream ]; then
+                local epel_repo="epel,epel-next"
+            else
+                local epel_repo="epel"
+            fi
+
+            if $redhat_package_manager_enhanced ${enable_repo}"${epel_repo}" install "$@"; then
                 return 0
             fi
-            if [ $release == "centos" ] && version_ge "$systemVersion" 8;then
-                if $temp_redhat_install"epel,powertools" install "$@" || $temp_redhat_install"epel,PowerTools" install "$@"; then
-                    return 0
-                fi
+            if $redhat_package_manager_enhanced ${enable_repo}"${epel_repo},powertools" install "$@" || $redhat_package_manager_enhanced ${enable_repo}"${epel_repo},PowerTools" install "$@"; then
+                return 0
             fi
-            if $temp_redhat_install'*' install "$@"; then
+            if $redhat_package_manager_enhanced ${enable_repo}"*" ${disable_repo}"*-debug,*-debuginfo,*-source" install "$@"; then
+                return 0
+            fi
+            if $redhat_package_manager_enhanced ${enable_repo}"*" install "$@"; then
                 return 0
             fi
             yellow "依赖安装失败！！"
@@ -256,18 +268,58 @@ install_dependence()
         fi
     fi
 }
-#检查CentOS8 epel源是否安装
-check_centos8_epel()
+#安装epel源
+install_epel()
 {
-    if [ $release == "centos" ] && version_ge "$systemVersion" "8"; then
-        if $redhat_package_manager --help | grep -qw "\\-\\-all"; then
-            local temp_command="$redhat_package_manager --all repolist"
+    #if $redhat_package_manager --help | grep -qw "\\-\\-all"; then
+    #    local temp_command="$redhat_package_manager --all repolist"
+    #else
+    #    local temp_command="$redhat_package_manager repolist all"
+    #fi
+    #if ! $temp_command | awk '{print $1}' | grep -q epel; then
+    #fi
+    if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
+        return
+    fi
+    local ret=0
+    if [ $release == fedora ]; then
+        return
+    elif [ $release == centos-stream ]; then
+        if version_ge "$systemVersion" 9; then
+            dnf config-manager --set-enabled crb || ret=-1
+            dnf -y install "https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm" "https://dl.fedoraproject.org/pub/epel/epel-next-release-latest-9.noarch.rpm" || ret=-1
+        elif version_ge "$systemVersion" 8; then
+            dnf config-manager --set-enabled powertools || dnf config-manager --set-enabled PowerTools || ret=-1
+            dnf -y install epel-release epel-next-release || ret=-1
         else
-            local temp_command="$redhat_package_manager repolist all"
+            ret=-1
         fi
-        if ! $temp_command | awk '{print $1}' | grep -q epel; then
-            check_important_dependence_installed "" "epel-release"
+    elif [ $release == rhel ]; then
+        if version_ge "$systemVersion" 8; then
+            subscription-manager repos --enable "codeready-builder-for-rhel-8-$(arch)-rpms" || ret=-1
+            dnf -y install "https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm" || ret=-1
+        elif version_ge "$systemVersion" 7; then
+            subscription-manager repos --enable "rhel-*-optional-rpms" --enable "rhel-*-extras-rpms" --enable "rhel-ha-for-rhel-*-server-rpms" || ret=-1
+            yum -y install "https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm" || ret=-1
+        else
+            ret=-1
         fi
+    else
+        if version_ge "$systemVersion" 9; then
+            ret=-1
+        elif version_ge "$systemVersion" 8; then
+            dnf config-manager --set-enabled powertools || dnf config-manager --set-enabled PowerTools || ret=-1
+            dnf -y install epel-release || ret=-1
+        elif version_ge "$systemVersion" 7; then
+            yum -y install epel-release || ret=-1
+        else
+            ret=-1
+        fi
+    fi
+    if [ $ret -ne 0 ]; then
+        yellow "epel源安装失败！！"
+        green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
+        yellow "按回车键继续或者Ctrl+c退出"
     fi
 }
 #进入工作目录
@@ -680,7 +732,11 @@ get_system_info()
     elif bash -c "echo $(grep '^[ '$'\t]*ID[ '$'\t]*=' /etc/os-release | cut -d = -f 2-)" | grep -qiw deepin; then
         release="deepin"
     elif bash -c "echo $(grep '^[ '$'\t]*ID[ '$'\t]*=' /etc/os-release | cut -d = -f 2-)" | grep -qiw centos; then
-        release="centos"
+        if bash -c "echo $(grep '^[ '$'\t]*NAME[ '$'\t]*=' /etc/os-release | cut -d = -f 2-)" | grep -qiw stream; then
+            release="centos-stream"
+        else
+            release="centos"
+        fi
     elif bash -c "echo $(grep '^[ '$'\t]*ID[ '$'\t]*=' /etc/os-release | cut -d = -f 2-)" | grep -qiw fedora; then
         release="fedora"
     elif bash -c "echo $(grep '^[ '$'\t]*ID[ '$'\t]*=' /etc/os-release | cut -d = -f 2-)" | grep -qiw rhel; then
@@ -1326,7 +1382,7 @@ install_bbr()
             if (( choice==1 || choice==4 )) && ([ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]) && ! dpkg-deb --help | grep -qw "zstd"; then
                 red    "当前系统dpkg不支持解压zst包，不支持安装此内核！"
                 green  "请更新系统，或选择使用其他系统，或选择安装xanmod内核"
-            elif (( choice==2 || choice==3 )) && ([ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]); then
+            elif (( choice==2 || choice==3 )) && ([ $release == "centos" ] || [ $release == centos-stream ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]); then
                 red "xanmod内核仅支持Debian系的系统，如Ubuntu、Debian、deepin、UOS"
             else
                 if (( choice==1 || choice==4 )) && ([ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]); then
@@ -1585,7 +1641,7 @@ readPretend()
                 queren=0
             fi
         elif [ $pretend -eq 2 ]; then
-            if ([ $release == "centos" ] && ! version_ge "$systemVersion" "8" ) || ([ $release == "rhel" ] && ! version_ge "$systemVersion" "8") || ([ $release == "fedora" ] && ! version_ge "$systemVersion" "30") || ([ $release == "ubuntu" ] && ! version_ge "$systemVersion" "20.04") || ([ $release == "debian" ] && ! version_ge "$systemVersion" "10") || ([ $release == "deepin" ] && ! version_ge "$systemVersion" "20"); then
+            if (([ $release == "centos" ] || [ $release == centos-stream ]) && ! version_ge "$systemVersion" "8" ) || ([ $release == "rhel" ] && ! version_ge "$systemVersion" "8") || ([ $release == "fedora" ] && ! version_ge "$systemVersion" "30") || ([ $release == "ubuntu" ] && ! version_ge "$systemVersion" "20.04") || ([ $release == "debian" ] && ! version_ge "$systemVersion" "10") || ([ $release == "deepin" ] && ! version_ge "$systemVersion" "20"); then
                 red "系统版本过低！"
                 tyblue "安装Nextcloud需要安装php"
                 yellow "仅支持在以下版本系统下安装php："
@@ -1698,7 +1754,7 @@ readDomain()
 install_nginx_compile_toolchains()
 {
     green "正在安装Nginx编译工具链。。。"
-    if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         install_dependence ca-certificates wget gcc gcc-c++ make perl-IPC-Cmd perl-Getopt-Long perl-Data-Dumper
     else
         install_dependence ca-certificates wget gcc g++ make perl-base perl
@@ -1707,7 +1763,7 @@ install_nginx_compile_toolchains()
 install_php_compile_toolchains()
 {
     green "正在安装php编译工具链。。。"
-    if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         install_dependence ca-certificates wget xz gcc gcc-c++ make pkgconf-pkg-config autoconf git
     else
         install_dependence ca-certificates wget xz-utils gcc g++ make pkg-config autoconf git
@@ -1716,7 +1772,7 @@ install_php_compile_toolchains()
 install_nginx_dependence()
 {
     green "正在安装Nginx依赖。。。"
-    if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         install_dependence pcre2-devel zlib-devel libxml2-devel libxslt-devel gd-devel geoip-devel perl-ExtUtils-Embed gperftools-devel perl-devel
     else
         install_dependence libpcre2-dev zlib1g-dev libxml2-dev libxslt1-dev libgd-dev libgeoip-dev libgoogle-perftools-dev libperl-dev
@@ -1725,7 +1781,7 @@ install_nginx_dependence()
 install_php_dependence()
 {
     green "正在安装php依赖。。。"
-    if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         install_dependence libxml2-devel sqlite-devel systemd-devel libacl-devel openssl-devel krb5-devel pcre2-devel zlib-devel bzip2-devel libcurl-devel gdbm-devel libdb-devel tokyocabinet-devel lmdb-devel enchant-devel libffi-devel libpng-devel gd-devel libwebp-devel libjpeg-turbo-devel libXpm-devel freetype-devel gmp-devel libc-client-devel libicu-devel openldap-devel oniguruma-devel unixODBC-devel freetds-devel libpq-devel aspell-devel libedit-devel net-snmp-devel libsodium-devel libargon2-devel libtidy-devel libxslt-devel libzip-devel ImageMagick-devel
     else
         if ! $debian_package_manager -y --no-install-recommends install libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-2-dev libffi-dev libpng-dev libgd-dev libwebp-dev libjpeg-dev libxpm-dev libfreetype6-dev libgmp-dev libc-client2007e-dev libicu-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt1-dev libzip-dev libmagickwand-dev && ! $debian_package_manager -y --no-install-recommends install libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-dev libffi-dev libpng-dev libgd-dev libwebp-dev libjpeg-dev libxpm-dev libfreetype6-dev libgmp-dev libc-client2007e-dev libicu-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt1-dev libzip-dev libmagickwand-dev; then
@@ -1743,7 +1799,7 @@ install_php_dependence()
 install_acme_dependence()
 {
     green "正在安装acme.sh依赖。。。"
-    if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         install_dependence curl openssl crontabs
     else
         install_dependence curl openssl cron
@@ -2903,7 +2959,7 @@ install_update_xray_tls_web()
     check_important_dependence_installed ca-certificates ca-certificates
     check_important_dependence_installed wget wget
     check_important_dependence_installed "procps" "procps-ng"
-    check_centos8_epel
+    install_epel
     ask_update_script
     check_ssh_timeout
     uninstall_firewall
@@ -3100,7 +3156,7 @@ install_check_update_update_php()
     check_SELinux
     check_important_dependence_installed tzdata tzdata
     get_system_info
-    if ([ $release == "centos" ] && ! version_ge "$systemVersion" "8" ) || ([ $release == "rhel" ] && ! version_ge "$systemVersion" "8") || ([ $release == "fedora" ] && ! version_ge "$systemVersion" "30") || ([ $release == "ubuntu" ] && ! version_ge "$systemVersion" "20.04") || ([ $release == "debian" ] && ! version_ge "$systemVersion" "10") || ([ $release == "deepin" ] && ! version_ge "$systemVersion" "20"); then
+    if (([ $release == "centos" ] || [ $release == centos-stream ]) && ! version_ge "$systemVersion" "8" ) || ([ $release == "rhel" ] && ! version_ge "$systemVersion" "8") || ([ $release == "fedora" ] && ! version_ge "$systemVersion" "30") || ([ $release == "ubuntu" ] && ! version_ge "$systemVersion" "20.04") || ([ $release == "debian" ] && ! version_ge "$systemVersion" "10") || ([ $release == "deepin" ] && ! version_ge "$systemVersion" "20"); then
         red "系统版本过低！"
         tyblue "安装Nextcloud需要安装php"
         yellow "仅支持在以下版本系统下安装php："
@@ -3130,7 +3186,7 @@ install_check_update_update_php()
     check_important_dependence_installed ca-certificates ca-certificates
     check_important_dependence_installed wget wget
     check_important_dependence_installed "procps" "procps-ng"
-    check_centos8_epel
+    install_epel
     local php_status=0
     if [ $php_is_installed -eq 1 ]; then
         ask_update_script_force
@@ -3170,7 +3226,7 @@ check_update_update_nginx()
     check_important_dependence_installed ca-certificates ca-certificates
     check_important_dependence_installed wget wget
     check_important_dependence_installed "procps" "procps-ng"
-    check_centos8_epel
+    install_epel
     ask_update_script_force
     if check_nginx_update; then
         green "Nginx有新版本"
@@ -3248,7 +3304,7 @@ reinit_domain()
     if [ "${pretend_list[-1]}" == "2" ] && [ $php_is_installed -eq 0 ]; then
         check_SELinux
         check_important_dependence_installed "procps" "procps-ng"
-        check_centos8_epel
+        install_epel
         install_web_dependence "${pretend_list[-1]}"
         in_install_update_xray_tls_web=1
         check_ssh_timeout
@@ -3329,7 +3385,7 @@ add_domain()
     if [ "${pretend_list[-1]}" == "2" ] && [ $php_is_installed -eq 0 ]; then
         check_SELinux
         check_important_dependence_installed "procps" "procps-ng"
-        check_centos8_epel
+        install_epel
         install_web_dependence "${pretend_list[-1]}"
         in_install_update_xray_tls_web=1
         check_ssh_timeout
@@ -3456,7 +3512,7 @@ change_pretend()
     if [ "$pretend" == "2" ] && [ $php_is_installed -eq 0 ]; then
         check_SELinux
         check_important_dependence_installed "procps" "procps-ng"
-        check_centos8_epel
+        install_epel
         install_web_dependence "$pretend"
         in_install_update_xray_tls_web=1
         check_ssh_timeout
@@ -3649,7 +3705,7 @@ simplify_system()
         cp /etc/ssh/sshd_config sshd_config
     fi
     uninstall_firewall
-    if [ $release == "centos" ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         local temp_backup=()
         local temp_important=('openssh-server' 'initscripts' 'tar')
         for i in "${temp_important[@]}"
@@ -3695,7 +3751,7 @@ simplify_system()
             check_important_dependence_installed "$i" ""
         done
     fi
-    ([ $nginx_is_installed -eq 1 ] || [ $php_is_installed -eq 1 ] || [ $is_installed -eq 1 ]) && check_centos8_epel
+    ([ $nginx_is_installed -eq 1 ] || [ $php_is_installed -eq 1 ] || [ $is_installed -eq 1 ]) && install_epel
     [ $nginx_is_installed -eq 1 ] && install_nginx_dependence
     [ $php_is_installed -eq 1 ] && install_php_dependence
     [ $is_installed -eq 1 ] && install_acme_dependence
