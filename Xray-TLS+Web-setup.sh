@@ -286,21 +286,23 @@ install_epel()
         return
     elif [ $release == centos-stream ]; then
         if version_ge "$systemVersion" 9; then
+            check_important_dependence_installed "" dnf-plugins-core
             dnf config-manager --set-enabled crb || ret=-1
-            dnf -y install "https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm" "https://dl.fedoraproject.org/pub/epel/epel-next-release-latest-9.noarch.rpm" || ret=-1
+            $redhat_package_manager_enhanced install "https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm" "https://dl.fedoraproject.org/pub/epel/epel-next-release-latest-9.noarch.rpm" || ret=-1
         elif version_ge "$systemVersion" 8; then
+            check_important_dependence_installed "" dnf-plugins-core
             dnf config-manager --set-enabled powertools || dnf config-manager --set-enabled PowerTools || ret=-1
-            dnf -y install epel-release epel-next-release || ret=-1
+            $redhat_package_manager_enhanced install epel-release epel-next-release || ret=-1
         else
             ret=-1
         fi
     elif [ $release == rhel ]; then
         if version_ge "$systemVersion" 8; then
             subscription-manager repos --enable "codeready-builder-for-rhel-8-$(arch)-rpms" || ret=-1
-            dnf -y install "https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm" || ret=-1
+            $redhat_package_manager_enhanced install "https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm" || ret=-1
         elif version_ge "$systemVersion" 7; then
             subscription-manager repos --enable "rhel-*-optional-rpms" --enable "rhel-*-extras-rpms" --enable "rhel-ha-for-rhel-*-server-rpms" || ret=-1
-            yum -y install "https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm" || ret=-1
+            $redhat_package_manager_enhanced install "https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm" || ret=-1
         else
             ret=-1
         fi
@@ -308,10 +310,11 @@ install_epel()
         if version_ge "$systemVersion" 9; then
             ret=-1
         elif version_ge "$systemVersion" 8; then
+            check_important_dependence_installed "" dnf-plugins-core
             dnf config-manager --set-enabled powertools || dnf config-manager --set-enabled PowerTools || ret=-1
-            dnf -y install epel-release || ret=-1
+            $redhat_package_manager_enhanced install epel-release || ret=-1
         elif version_ge "$systemVersion" 7; then
-            yum -y install epel-release || ret=-1
+            $redhat_package_manager_enhanced install epel-release || ret=-1
         else
             ret=-1
         fi
@@ -320,6 +323,7 @@ install_epel()
         yellow "epel源安装失败！！"
         green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
         yellow "按回车键继续或者Ctrl+c退出"
+        read -s
     fi
 }
 #进入工作目录
