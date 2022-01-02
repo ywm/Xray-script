@@ -320,7 +320,7 @@ install_epel()
         fi
     fi
     if [ $ret -ne 0 ]; then
-        if [ $release == other_redhat ]; then
+        if [ $release == other-redhat ]; then
             if $redhat_package_manager --help | grep -qw "\\-\\-all"; then
                 local temp_command="$redhat_package_manager --all repolist"
             else
