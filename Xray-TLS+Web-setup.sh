@@ -329,7 +329,7 @@ install_epel()
             if $temp_command | awk '{print $1}' | grep -qw epel; then
                 return
             fi
-            if $redhat_package_manager_enhanced install "*-epel-release"; then
+            if $redhat_package_manager_enhanced install "*-epel-release" && $temp_command | awk '{print $1}' | grep -qw epel; then
                 return
             fi
             yellow "epel源安装失败，这可能导致之后的安装失败，也可能没有影响(取决于你的系统的repo包含软件是否丰富)"
