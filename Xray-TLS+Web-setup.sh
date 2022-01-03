@@ -385,7 +385,7 @@ fedora_install_remi()
     if [ $release != fedora ]; then
         return
     fi
-    if ! $redhat_package_manager_enhanced install "https://rpms.remirepo.net/fedora/remi-release-$systemVersion.rpm"; then
+    if ! redhat_install "https://rpms.remirepo.net/fedora/remi-release-$systemVersion.rpm"; then
         yellow "remi源安装失败！！"
         green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
         yellow "按回车键继续或者Ctrl+c退出"
