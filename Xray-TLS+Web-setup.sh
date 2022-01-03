@@ -171,6 +171,60 @@ ask_update_script_force()
         green "脚本已经是最新版本"
     fi
 }
+redhat_install()
+{
+    if $redhat_package_manager_enhanced install "$@"; then
+        return 0
+    fi
+
+
+    if $redhat_package_manager --help | grep -q "\\-\\-enablerepo="; then
+        local enable_repo="--enablerepo="
+    else
+        local enable_repo="--enablerepo "
+    fi
+    if $redhat_package_manager --help | grep -q "\\-\\-disablerepo="; then
+        local disable_repo="--disablerepo="
+    else
+        local disable_repo="--disablerepo "
+    fi
+    if [ $release == centos-stream ]; then
+        local epel_repo="epel,epel-next"
+    elif [ $release == oracle ]; then
+        if version_ge "$systemVersion" 9; then
+            local epel_repo="ol9_developer_EPEL"
+        elif version_ge "$systemVersion" 8; then
+            local epel_repo="ol8_developer_EPEL"
+        elif version_ge "$systemVersion" 7; then
+            local epel_repo="ol7_developer_EPEL"
+        else
+            local epel_repo="epel"
+        fi
+    else
+        local epel_repo="epel"
+    fi
+
+
+    if [ $release == fedora ]; then
+        if $redhat_package_manager_enhanced ${enable_repo}"remi" install "$@"; then
+            return 0
+        fi
+    else
+        if $redhat_package_manager_enhanced ${enable_repo}"${epel_repo}" install "$@"; then
+            return 0
+        fi
+        if $redhat_package_manager_enhanced ${enable_repo}"${epel_repo},powertools" install "$@" || $redhat_package_manager_enhanced ${enable_repo}"${epel_repo},PowerTools" install "$@"; then
+            return 0
+        fi
+    fi
+    if $redhat_package_manager_enhanced ${enable_repo}"*" ${disable_repo}"*-debug,*-debuginfo,*-source" install "$@"; then
+        return 0
+    fi
+    if $redhat_package_manager_enhanced ${enable_repo}"*" install "$@"; then
+        return 0
+    fi
+    return 1
+}
 #安装单个重要依赖
 test_important_dependence_installed()
 {
@@ -199,7 +253,7 @@ test_important_dependence_installed()
             else
                 yumdb set reason user "$2" && temp_exit_code=0
             fi
-        elif $redhat_package_manager_enhanced install "$2"; then
+        elif redhat_install "$2"; then
             temp_exit_code=0
         fi
     fi
@@ -232,49 +286,7 @@ install_dependence()
             fi
         fi
     else
-        if ! $redhat_package_manager_enhanced install "$@"; then
-            if $redhat_package_manager --help | grep -q "\\-\\-enablerepo="; then
-                local enable_repo="--enablerepo="
-            else
-                local enable_repo="--enablerepo "
-            fi
-            if $redhat_package_manager --help | grep -q "\\-\\-disablerepo="; then
-                local disable_repo="--disablerepo="
-            else
-                local disable_repo="--disablerepo "
-            fi
-            if [ $release == centos-stream ]; then
-                local epel_repo="epel,epel-next"
-            elif [ $release == oracle ]; then
-                if version_ge "$systemVersion" 8; then
-                    local epel_repo="ol8_developer_EPEL"
-                elif version_ge "$systemVersion" 7; then
-                    local epel_repo="ol7_developer_EPEL"
-                else
-                    local epel_repo="epel"
-                fi
-            else
-                local epel_repo="epel"
-            fi
-
-            if [ $release == fedora ]; then
-                if $redhat_package_manager_enhanced ${enable_repo}"remi" install "$@"; then
-                    return 0
-                fi
-            else
-                if $redhat_package_manager_enhanced ${enable_repo}"${epel_repo}" install "$@"; then
-                    return 0
-                fi
-                if $redhat_package_manager_enhanced ${enable_repo}"${epel_repo},powertools" install "$@" || $redhat_package_manager_enhanced ${enable_repo}"${epel_repo},PowerTools" install "$@"; then
-                    return 0
-                fi
-            fi
-            if $redhat_package_manager_enhanced ${enable_repo}"*" ${disable_repo}"*-debug,*-debuginfo,*-source" install "$@"; then
-                return 0
-            fi
-            if $redhat_package_manager_enhanced ${enable_repo}"*" install "$@"; then
-                return 0
-            fi
+        if ! redhat_install "$@"; then
             yellow "依赖安装失败！！"
             green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
             yellow "按回车键继续或者Ctrl+c退出"
@@ -288,52 +300,68 @@ install_epel()
     if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
         return
     fi
+
     local ret=0
     if [ $release == fedora ]; then
         return
     elif [ $release == centos-stream ]; then
-        if version_ge "$systemVersion" 9; then
+        if version_ge "$systemVersion" 10; then
+            ret=-1
+        elif version_ge "$systemVersion" 9; then
             check_important_dependence_installed "" dnf-plugins-core
             dnf config-manager --set-enabled crb || ret=-1
-            $redhat_package_manager_enhanced install "https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm" "https://dl.fedoraproject.org/pub/epel/epel-next-release-latest-9.noarch.rpm" || ret=-1
+            redhat_install "https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm" "https://dl.fedoraproject.org/pub/epel/epel-next-release-latest-9.noarch.rpm" || ret=-1
         elif version_ge "$systemVersion" 8; then
             check_important_dependence_installed "" dnf-plugins-core
             dnf config-manager --set-enabled powertools || dnf config-manager --set-enabled PowerTools || ret=-1
-            $redhat_package_manager_enhanced install epel-release epel-next-release || ret=-1
+            redhat_install epel-release epel-next-release || ret=-1
+        else
+            ret=-1
+        fi
+    elif [ $release == centos ]; then
+        if version_ge "$systemVersion" 9; then
+            ret=-1
+        elif version_ge "$systemVersion" 8; then
+            check_important_dependence_installed "" dnf-plugins-core
+            dnf config-manager --set-enabled powertools || dnf config-manager --set-enabled PowerTools || ret=-1
+            redhat_install epel-release || ret=-1
+        elif version_ge "$systemVersion" 7; then
+            redhat_install epel-release || ret=-1
+        elif version_ge "$systemVersion" 6; then
+            redhat_install epel-release || ret=-1
         else
             ret=-1
         fi
     elif [ $release == oracle ]; then
-        if version_ge "$systemVersion" 8; then
-            $redhat_package_manager_enhanced install oracle-epel-release-el8 || ret=-1
+        if version_ge "$systemVersion" 9; then
+            ret=-1
+        elif version_ge "$systemVersion" 8; then
+            redhat_install oracle-epel-release-el8 || ret=-1
         elif version_ge "$systemVersion" 7; then
-            $redhat_package_manager_enhanced install oracle-epel-release-el7 || ret=-1
+            redhat_install oracle-epel-release-el7 || ret=-1
         else
             ret=-1
         fi
     elif [ $release == rhel ]; then
-        if version_ge "$systemVersion" 8; then
+        if version_ge "$systemVersion" 9; then
+            ret=-1
+        elif version_ge "$systemVersion" 8; then
             subscription-manager repos --enable "codeready-builder-for-rhel-8-$(arch)-rpms" || ret=-1
-            $redhat_package_manager_enhanced install "https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm" || ret=-1
+            redhat_install "https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm" || ret=-1
         elif version_ge "$systemVersion" 7; then
             subscription-manager repos --enable "rhel-*-optional-rpms" --enable "rhel-*-extras-rpms" --enable "rhel-ha-for-rhel-*-server-rpms" || ret=-1
-            $redhat_package_manager_enhanced install "https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm" || ret=-1
+            redhat_install "https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm" || ret=-1
         else
             ret=-1
         fi
     else
-        if version_ge "$systemVersion" 9; then
-            ret=-1
-        elif version_ge "$systemVersion" 8; then
+        if [ $redhat_package_manager == dnf ]; then
             check_important_dependence_installed "" dnf-plugins-core
             dnf config-manager --set-enabled powertools || dnf config-manager --set-enabled PowerTools
-            $redhat_package_manager_enhanced install epel-release || ret=-1
-        elif version_ge "$systemVersion" 7; then
-            $redhat_package_manager_enhanced install epel-release || ret=-1
-        else
-            ret=-1
         fi
+        redhat_install epel-release || ret=-1
     fi
+
     if [ $ret -ne 0 ]; then
         if [ $release == other-redhat ]; then
             if $redhat_package_manager repolist epel | grep -q epel; then
