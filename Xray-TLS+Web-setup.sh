@@ -765,7 +765,7 @@ fi
 [ -e ${cloudreve_prefix}/cloudreve.db ] && cloudreve_is_installed=1 || cloudreve_is_installed=0
 [ -e /usr/local/bin/xray ] && xray_is_installed=1 || xray_is_installed=0
 ([ $xray_is_installed -eq 1 ] && [ $nginx_is_installed -eq 1 ]) && is_installed=1 || is_installed=0
-cpu_thread_num="$(grep '^processor[ '$'\t]*:' /proc/cpuinfo | uniq | wc -l)"
+cpu_thread_num="$(grep '^processor' /proc/cpuinfo | uniq | wc -l)"
 if [ -z "$cpu_thread_num" ] || [ $cpu_thread_num -lt 1 ]; then
     red "获取CPU线程数失败！"
     exit 1
