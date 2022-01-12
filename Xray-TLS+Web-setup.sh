@@ -1997,7 +1997,7 @@ install_php_part2()
     sed -i 's/^[ \t]*env\[PATH\][ \t]*=/;&/g' ${php_prefix}/etc/php-fpm.d/www.conf
 cat >> ${php_prefix}/etc/php-fpm.d/www.conf << EOF
 
-listen = /dev/shm/php-fpm_unixsocket/php.sock
+listen = /dev/shm/php-fpm/php-fpm.sock
 pm = dynamic
 pm.max_children = $((16*cpu_thread_num))
 pm.start_servers = $cpu_thread_num
@@ -2032,10 +2032,11 @@ cat >> $php_service <<EOF
 
 [Service]
 ProtectSystem=false
-ExecStartPre=/bin/rm -rf /dev/shm/php-fpm_unixsocket
-ExecStartPre=/bin/mkdir /dev/shm/php-fpm_unixsocket
-ExecStartPre=/bin/chmod 711 /dev/shm/php-fpm_unixsocket
-ExecStopPost=/bin/rm -rf /dev/shm/php-fpm_unixsocket
+ExecStartPre=/bin/rm -rf /dev/shm/php-fpm
+ExecStartPre=/bin/mkdir /dev/shm/php-fpm
+ExecStartPre=/bin/chmod 711 /dev/shm/php-fpm
+ExecStartPre=/bin/chown www-data:www-data /dev/shm/php-fpm
+ExecStopPost=/bin/rm -rf /dev/shm/php-fpm
 EOF
     systemctl daemon-reload
 }
@@ -2090,16 +2091,14 @@ Wants=network-online.target
 [Service]
 Type=forking
 User=root
-ExecStartPre=/bin/rm -rf /dev/shm/nginx_unixsocket
-ExecStartPre=/bin/mkdir /dev/shm/nginx_unixsocket
-ExecStartPre=/bin/chmod 711 /dev/shm/nginx_unixsocket
-ExecStartPre=/bin/rm -rf /dev/shm/nginx_tcmalloc
-ExecStartPre=/bin/mkdir /dev/shm/nginx_tcmalloc
-ExecStartPre=/bin/chmod 0777 /dev/shm/nginx_tcmalloc
+ExecStartPre=/bin/rm -rf /dev/shm/nginx
+ExecStartPre=/bin/mkdir /dev/shm/nginx
+ExecStartPre=/bin/chmod 711 /dev/shm/nginx
+ExecStartPre=/bin/mkdir /dev/shm/nginx/tcmalloc
+ExecStartPre=/bin/chmod 0777 /dev/shm/nginx/tcmalloc
 ExecStart=${nginx_prefix}/sbin/nginx
 ExecStop=${nginx_prefix}/sbin/nginx -s stop
-ExecStopPost=/bin/rm -rf /dev/shm/nginx_tcmalloc
-ExecStopPost=/bin/rm -rf /dev/shm/nginx_unixsocket
+ExecStopPost=/bin/rm -rf /dev/shm/nginx
 PrivateTmp=true
 
 [Install]
@@ -2184,7 +2183,7 @@ cat > ${nginx_prefix}/conf.d/nextcloud.conf <<EOF
         fastcgi_param HTTPS on;
         fastcgi_param modHeadersAvailable true;
         fastcgi_param front_controller_active true;
-        fastcgi_pass unix:/dev/shm/php-fpm_unixsocket/php.sock;
+        fastcgi_pass unix:/dev/shm/php-fpm/php-fpm.sock;
         fastcgi_intercept_errors on;
         fastcgi_request_buffering off;
         fastcgi_read_timeout 24h;
@@ -2228,10 +2227,10 @@ cat >> /etc/systemd/system/xray.service <<EOF
 
 # This file has been edited by Xray-TLS-Web setup script
 [Service]
-ExecStartPre=/bin/rm -rf /dev/shm/xray_unixsocket
-ExecStartPre=/bin/mkdir /dev/shm/xray_unixsocket
-ExecStartPre=/bin/chmod 711 /dev/shm/xray_unixsocket
-ExecStopPost=/bin/rm -rf /dev/shm/xray_unixsocket
+ExecStartPre=/bin/rm -rf /dev/shm/xray
+ExecStartPre=/bin/mkdir /dev/shm/xray
+ExecStartPre=/bin/chmod 711 /dev/shm/xray
+ExecStopPost=/bin/rm -rf /dev/shm/xray
 EOF
         systemctl daemon-reload
         systemctl -q is-active xray && systemctl restart xray
@@ -2300,7 +2299,7 @@ worker_processes  auto;
 #error_log  logs/error.log  info;
 
 #pid        logs/nginx.pid;
-google_perftools_profiles /dev/shm/nginx_tcmalloc/tcmalloc;
+google_perftools_profiles /dev/shm/nginx/tcmalloc/tcmalloc;
 
 events {
     worker_connections  1024;
@@ -2438,8 +2437,8 @@ cat >> $nginx_config<<EOF
 server {
     listen 80;
     listen [::]:80;
-    listen unix:/dev/shm/nginx_unixsocket/default.sock;
-    listen unix:/dev/shm/nginx_unixsocket/h2.sock http2;
+    listen unix:/dev/shm/nginx/default.sock;
+    listen unix:/dev/shm/nginx/h2.sock http2;
     server_name ${temp_domain_list2[@]};
     return 301 https://www.\$host\$request_uri;
 }
@@ -2447,8 +2446,8 @@ EOF
     fi
 cat >> $nginx_config<<EOF
 server {
-    listen unix:/dev/shm/nginx_unixsocket/default.sock default_server;
-    listen unix:/dev/shm/nginx_unixsocket/h2.sock http2 default_server;
+    listen unix:/dev/shm/nginx/default.sock default_server;
+    listen unix:/dev/shm/nginx/h2.sock http2 default_server;
     return 301 https://${domain_list[0]};
 }
 EOF
@@ -2456,8 +2455,8 @@ EOF
     do
 cat >> $nginx_config<<EOF
 server {
-    listen unix:/dev/shm/nginx_unixsocket/default.sock;
-    listen unix:/dev/shm/nginx_unixsocket/h2.sock http2;
+    listen unix:/dev/shm/nginx/default.sock;
+    listen unix:/dev/shm/nginx/h2.sock http2;
     server_name ${domain_list[$i]};
     add_header Strict-Transport-Security "max-age=63072000; includeSubdomains; preload" always;
 EOF
@@ -2479,7 +2478,7 @@ cat >> $nginx_config<<EOF
         lingering_close always;
         lingering_time 24h;
         lingering_timeout 24h;
-        grpc_pass grpc://unix:/dev/shm/xray_unixsocket/grpc.sock;
+        grpc_pass grpc://unix:/dev/shm/xray/grpc.sock;
     }
 EOF
         fi
@@ -2489,7 +2488,7 @@ cat >> $nginx_config<<EOF
         proxy_set_header X-Forwarded-For 127.0.0.1;
         proxy_set_header Host \$http_host;
         proxy_redirect off;
-        proxy_pass http://unix:/dev/shm/cloudreve_unixsocket/cloudreve.sock;
+        proxy_pass http://unix:/dev/shm/cloudreve/cloudreve.sock;
         client_max_body_size 0;
     }
 EOF
@@ -2564,10 +2563,10 @@ EOF
 cat >> $xray_config <<EOF
                     {
                         "alpn": "h2",
-                        "dest": "/dev/shm/nginx_unixsocket/h2.sock"
+                        "dest": "/dev/shm/nginx/h2.sock"
                     },
                     {
-                        "dest": "/dev/shm/nginx_unixsocket/default.sock"
+                        "dest": "/dev/shm/nginx/default.sock"
                     }
                 ]
             },
@@ -2601,7 +2600,7 @@ EOF
     if [ $protocol_2 -ne 0 ]; then
         echo '        },' >> $xray_config
         echo '        {' >> $xray_config
-        echo '            "listen": "/dev/shm/xray_unixsocket/grpc.sock",' >> $xray_config
+        echo '            "listen": "/dev/shm/xray/grpc.sock",' >> $xray_config
         if [ $protocol_2 -eq 2 ]; then
             echo '            "protocol": "vmess",' >> $xray_config
         else
@@ -2728,7 +2727,7 @@ cat > $cloudreve_prefix/conf.ini << EOF
 Mode = master
 Debug = false
 [UnixSocket]
-Listen = /dev/shm/cloudreve_unixsocket/cloudreve.sock
+Listen = /dev/shm/cloudreve/cloudreve.sock
 EOF
     rm -rf $cloudreve_service
 cat > $cloudreve_service << EOF
@@ -2741,11 +2740,11 @@ Wants=network.target
 
 [Service]
 WorkingDirectory=$cloudreve_prefix
-ExecStartPre=/bin/rm -rf /dev/shm/cloudreve_unixsocket
-ExecStartPre=/bin/mkdir /dev/shm/cloudreve_unixsocket
-ExecStartPre=/bin/chmod 711 /dev/shm/cloudreve_unixsocket
+ExecStartPre=/bin/rm -rf /dev/shm/cloudreve
+ExecStartPre=/bin/mkdir /dev/shm/cloudreve
+ExecStartPre=/bin/chmod 711 /dev/shm/cloudreve
 ExecStart=$cloudreve_prefix/cloudreve
-ExecStopPost=/bin/rm -rf /dev/shm/cloudreve_unixsocket
+ExecStopPost=/bin/rm -rf /dev/shm/cloudreve
 Restart=on-abnormal
 RestartSec=5s
 KillMode=mixed
@@ -2763,8 +2762,9 @@ install_init_cloudreve()
 {
     remove_cloudreve
     mkdir -p $cloudreve_prefix
+    chmod 0700 $cloudreve_prefix
     update_cloudreve
-    rm -rf /dev/shm/cloudreve_unixsocket
+    rm -rf /dev/shm/cloudreve
     local temp
     temp="$("$cloudreve_prefix/cloudreve" | grep "初始管理员密码：" | awk '{print $4}')"
     sleep 1s
