@@ -18,14 +18,14 @@ using_swap_now=0
 timezone=""
 
 #安装信息
-nginx_version="nginx-1.21.5"
+nginx_version="nginx-1.21.6"
 openssl_version="openssl-openssl-3.0.1"
 nginx_prefix="/usr/local/nginx"
 nginx_config="${nginx_prefix}/conf.d/xray.conf"
 nginx_service="/etc/systemd/system/nginx.service"
 nginx_is_installed=""
 
-php_version="php-8.1.1"
+php_version="php-8.1.2"
 php_prefix="/usr/local/php"
 php_service="/etc/systemd/system/php-fpm.service"
 php_is_installed=""
@@ -2940,7 +2940,6 @@ print_config_info()
             tyblue " flow(流控)            ：\\033[33m空"
             tyblue " encryption(加密)      ：\\033[33mnone"
         else
-            tyblue " alterId(额外ID)       ：\\033[33m0"
             tyblue " security(加密方式)    ：使用CDN，推荐\\033[33mauto\\033[36m;不使用CDN，推荐\\033[33mnone"
             purple "  (Qv2ray:安全选项;Shadowrocket:算法)"
         fi
@@ -2985,7 +2984,6 @@ print_config_info()
             tyblue " flow(流控)            ：\\033[33m空"
             tyblue " encryption(加密)      ：\\033[33mnone"
         else
-            tyblue " alterId(额外ID)       ：\\033[33m0"
             tyblue " security(加密方式)    ：使用CDN，推荐\\033[33mauto\\033[36m;不使用CDN，推荐\\033[33mnone"
             purple "  (Qv2ray:安全选项;Shadowrocket:算法)"
         fi
