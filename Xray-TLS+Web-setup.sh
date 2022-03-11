@@ -643,10 +643,22 @@ get_config_info()
 gen_cflags()
 {
     cflags=('-g0' '-O3')
+    if gcc -v --help 2>&1 | grep -qw "\\-fstack\\-reuse"; then
+        cflags+=('-fstack-reuse=all')
+    fi
+    if gcc -v --help 2>&1 | grep -qw "\\-fdwarf2\\-cfi\\-asm"; then
+        cflags+=('-fdwarf2-cfi-asm')
+    fi
+    if gcc -v --help 2>&1 | grep -qw "\\-ftrapv"; then
+        cflags+=('-fno-trapv')
+    fi
     if gcc -v --help 2>&1 | grep -qw "\\-fexceptions"; then
         cflags+=('-fno-exceptions')
     elif gcc -v --help 2>&1 | grep -qw "\\-fhandle\\-exceptions"; then
         cflags+=('-fno-handle-exceptions')
+    fi
+    if gcc -v --help 2>&1 | grep -qw "\\-funwind\\-tables"; then
+        cflags+=('-fno-unwind-tables')
     fi
     if gcc -v --help 2>&1 | grep -qw "\\-fasynchronous\\-unwind\\-tables"; then
         cflags+=('-fno-asynchronous-unwind-tables')
@@ -660,21 +672,30 @@ gen_cflags()
     if gcc -v --help 2>&1 | grep -qw "\\-fstack\\-protector"; then
         cflags+=('-fno-stack-protector')
     fi
-    if gcc -v --help 2>&1 | grep -qw "\\-funwind\\-tables"; then
-        cflags+=('-fno-unwind-tables')
-    fi
     if gcc -v --help 2>&1 | grep -qw "\\-fcf\\-protection="; then
         cflags+=('-fcf-protection=none')
     fi
     if gcc -v --help 2>&1 | grep -qw "\\-fsplit\\-stack"; then
         cflags+=('-fno-split-stack')
     fi
+    if gcc -v --help 2>&1 | grep -qw "\\-fsanitize"; then
+        cflags+=('-fno-sanitize=all')
+    fi
+    if gcc -v --help 2>&1 | grep -qw "\\-finstrument\\-functions"; then
+        cflags+=('-fno-instrument-functions')
+    fi
 }
 gen_cxxflags()
 {
     cxxflags=('-g0' '-O3')
-    if g++ -v --help 2>&1 | grep -qw "\\-fasynchronous\\-unwind\\-tables"; then
-        cxxflags+=('-fno-asynchronous-unwind-tables')
+    if g++ -v --help 2>&1 | grep -qw "\\-fstack\\-reuse"; then
+        cxxflags+=('-fstack-reuse=all')
+    fi
+    if g++ -v --help 2>&1 | grep -qw "\\-fdwarf2\\-cfi\\-asm"; then
+        cxxflags+=('-fdwarf2-cfi-asm')
+    fi
+    if g++ -v --help 2>&1 | grep -qw "\\-ftrapv"; then
+        cxxflags+=('-fno-trapv')
     fi
     if g++ -v --help 2>&1 | grep -qw "\\-fstack\\-check"; then
         cxxflags+=('-fno-stack-check')
@@ -685,14 +706,20 @@ gen_cxxflags()
     if g++ -v --help 2>&1 | grep -qw "\\-fstack\\-protector"; then
         cxxflags+=('-fno-stack-protector')
     fi
-    if g++ -v --help 2>&1 | grep -qw "\\-funwind\\-tables"; then
-        cxxflags+=('-fno-unwind-tables')
-    fi
     if g++ -v --help 2>&1 | grep -qw "\\-fcf\\-protection="; then
         cxxflags+=('-fcf-protection=none')
     fi
     if g++ -v --help 2>&1 | grep -qw "\\-fsplit\\-stack"; then
         cxxflags+=('-fno-split-stack')
+    fi
+    if g++ -v --help 2>&1 | grep -qw "\\-fsanitize"; then
+        cxxflags+=('-fno-sanitize=all')
+    fi
+    if g++ -v --help 2>&1 | grep -qw "\\-finstrument\\-functions"; then
+        cxxflags+=('-fno-instrument-functions')
+    fi
+    if g++ -v --help 2>&1 | grep -qw "\\-fvtable\\-verify"; then
+        cxxflags+=('-fvtable-verify=none')
     fi
 }
 
@@ -1713,20 +1740,19 @@ readPretend()
                 queren=0
             fi
         elif [ $pretend -eq 2 ]; then
-            if (([ $release == "centos" ] || [ $release == centos-stream ] || [ $release == oracle ]) && ! version_ge "$systemVersion" "8" ) || ([ $release == "rhel" ] && ! version_ge "$systemVersion" "8") || ([ $release == "fedora" ] && ! version_ge "$systemVersion" "30") || ([ $release == "ubuntu" ] && ! version_ge "$systemVersion" "20.04") || ([ $release == "debian" ] && ! version_ge "$systemVersion" "10") || ([ $release == "deepin" ] && ! version_ge "$systemVersion" "20"); then
+            if (([ $release == "centos" ] || [ $release == centos-stream ] || [ $release == oracle ]) && ! version_ge "$systemVersion" "8" ) || ([ $release == "rhel" ] && ! version_ge "$systemVersion" "8") || ([ $release == "fedora" ] && ! version_ge "$systemVersion" "30") || ([ $release == "ubuntu" ] && ! version_ge "$systemVersion" "20.04") || ([ $release == "debian" ] && ! version_ge "$systemVersion" "11"); then
                 red "系统版本过低，无法安装php！"
                 echo
                 tyblue "安装Nextcloud需要安装php"
                 yellow "仅支持在以下版本系统下安装php："
                 yellow " 1. Ubuntu 20.04+"
-                yellow " 2. Debian 10+"
-                yellow " 3. Deepin 20+"
-                yellow " 4. 其他以 Debian 10+ 为基的系统"
-                yellow " 5. Red Hat Enterprise Linux 8+"
-                yellow " 6. CentOS 8+"
-                yellow " 7. Fedora 30+"
-                yellow " 8. Oracle Linux 8+"
-                yellow " 9. 其他以 Red Hat 8+ 为基的系统"
+                yellow " 2. Debian 11+"
+                yellow " 3. 其他以 Debian 11+ 为基的系统"
+                yellow " 4. Red Hat Enterprise Linux 8+"
+                yellow " 5. CentOS 8+"
+                yellow " 6. Fedora 30+"
+                yellow " 7. Oracle Linux 8+"
+                yellow " 8. 其他以 Red Hat 8+ 为基的系统"
                 sleep 3s
                 queren=0
                 continue
@@ -1736,15 +1762,19 @@ readPretend()
                 tyblue "安装Nextcloud需要安装php"
                 yellow "仅支持在以下版本系统下安装php："
                 yellow " 1. Ubuntu 20.04+"
-                yellow " 2. Debian 10+"
-                yellow " 3. Deepin 20+"
-                yellow " 4. 其他以 Debian 10+ 为基的系统"
-                yellow " 5. Red Hat Enterprise Linux 8+"
-                yellow " 6. CentOS 8+"
-                yellow " 7. Fedora 30+"
-                yellow " 8. Oracle Linux 8+"
-                yellow " 9. 其他以 Red Hat 8+ 为基的系统"
+                yellow " 2. Debian 11+"
+                yellow " 3. 其他以 Debian 11+ 为基的系统"
+                yellow " 4. Red Hat Enterprise Linux 8+"
+                yellow " 5. CentOS 8+"
+                yellow " 6. Fedora 30+"
+                yellow " 7. Oracle Linux 8+"
+                yellow " 8. 其他以 Red Hat 8+ 为基的系统"
                 ! ask_if "确定选择吗？(y/n)" && queren=0 && continue
+            elif [ $release == "deepin" ]; then
+                red "php暂不支持deepin，请更换其他系统"
+                sleep 3s
+                queren=0
+                continue
             fi
             if [ $php_is_installed -eq 0 ]; then
                 tyblue "安装Nextcloud需要安装php"
@@ -3050,8 +3080,8 @@ install_update_xray_tls_web()
     if [ $update -eq 0 ]; then
         readProtocolConfig
         readDomain
-        path="/$(head -c 8 /dev/urandom | md5sum | head -c 7)"
-        serviceName="$(head -c 8 /dev/urandom | md5sum | head -c 7)"
+        path="/$(head -c 20 /dev/urandom | md5sum | head -c 10)"
+        serviceName="$(head -c 20 /dev/urandom | md5sum | head -c 10)"
         xid_1="$(cat /proc/sys/kernel/random/uuid)"
         xid_2="$(cat /proc/sys/kernel/random/uuid)"
         xid_3="$(cat /proc/sys/kernel/random/uuid)"
@@ -3234,20 +3264,19 @@ install_check_update_update_php()
     check_SELinux
     check_important_dependence_installed tzdata tzdata
     get_system_info
-    if (([ $release == "centos" ] || [ $release == centos-stream ] || [ $release == oracle ]) && ! version_ge "$systemVersion" "8" ) || ([ $release == "rhel" ] && ! version_ge "$systemVersion" "8") || ([ $release == "fedora" ] && ! version_ge "$systemVersion" "30") || ([ $release == "ubuntu" ] && ! version_ge "$systemVersion" "20.04") || ([ $release == "debian" ] && ! version_ge "$systemVersion" "10") || ([ $release == "deepin" ] && ! version_ge "$systemVersion" "20"); then
+    if (([ $release == "centos" ] || [ $release == centos-stream ] || [ $release == oracle ]) && ! version_ge "$systemVersion" "8" ) || ([ $release == "rhel" ] && ! version_ge "$systemVersion" "8") || ([ $release == "fedora" ] && ! version_ge "$systemVersion" "30") || ([ $release == "ubuntu" ] && ! version_ge "$systemVersion" "20.04") || ([ $release == "debian" ] && ! version_ge "$systemVersion" "11"); then
         red "系统版本过低，无法安装php！"
         echo
         tyblue "安装Nextcloud需要安装php"
         yellow "仅支持在以下版本系统下安装php："
         yellow " 1. Ubuntu 20.04+"
-        yellow " 2. Debian 10+"
-        yellow " 3. Deepin 20+"
-        yellow " 4. 其他以 Debian 10+ 为基的系统"
-        yellow " 5. Red Hat Enterprise Linux 8+"
-        yellow " 6. CentOS 8+"
-        yellow " 7. Fedora 30+"
-        yellow " 8. Oracle Linux 8+"
-        yellow " 9. 其他以 Red Hat 8+ 为基的系统"
+        yellow " 2. Debian 11+"
+        yellow " 3. 其他以 Debian 11+ 为基的系统"
+        yellow " 4. Red Hat Enterprise Linux 8+"
+        yellow " 5. CentOS 8+"
+        yellow " 6. Fedora 30+"
+        yellow " 7. Oracle Linux 8+"
+        yellow " 8. 其他以 Red Hat 8+ 为基的系统"
         return 1
     elif [ $release == "other-debian" ] || [ $release == "other-redhat" ]; then
         yellow "未知的系统，可能导致php安装失败！"
@@ -3255,15 +3284,17 @@ install_check_update_update_php()
         tyblue "安装Nextcloud需要安装php"
         yellow "仅支持在以下版本系统下安装php："
         yellow " 1. Ubuntu 20.04+"
-        yellow " 2. Debian 10+"
-        yellow " 3. Deepin 20+"
-        yellow " 4. 其他以 Debian 10+ 为基的系统"
-        yellow " 5. Red Hat Enterprise Linux 8+"
-        yellow " 6. CentOS 8+"
-        yellow " 7. Fedora 30+"
-        yellow " 8. Oracle Linux 8+"
-        yellow " 9. 其他以 Red Hat 8+ 为基的系统"
+        yellow " 2. Debian 11+"
+        yellow " 3. 其他以 Debian 11+ 为基的系统"
+        yellow " 4. Red Hat Enterprise Linux 8+"
+        yellow " 5. CentOS 8+"
+        yellow " 6. Fedora 30+"
+        yellow " 7. Oracle Linux 8+"
+        yellow " 8. 其他以 Red Hat 8+ 为基的系统"
         ! ask_if "确定选择吗？(y/n)" && return 0
+    elif [ $release == "deepin" ]; then
+        red "php暂不支持deepin，请选择其他系统"
+        return 1
     fi
     check_important_dependence_installed ca-certificates ca-certificates
     check_important_dependence_installed wget wget
@@ -3648,11 +3679,11 @@ change_xray_protocol()
     fi
     [ $protocol_1_old -eq 0 ] && [ $protocol_1 -ne 0 ] && xid_1=$(cat /proc/sys/kernel/random/uuid)
     if [ $protocol_2_old -eq 0 ] && [ $protocol_2 -ne 0 ]; then
-        serviceName="$(head -c 8 /dev/urandom | md5sum | head -c 7)"
+        serviceName="$(head -c 20 /dev/urandom | md5sum | head -c 10)"
         xid_2=$(cat /proc/sys/kernel/random/uuid)
     fi
     if [ $protocol_3_old -eq 0 ] && [ $protocol_3 -ne 0 ]; then
-        path="/$(head -c 8 /dev/urandom | md5sum | head -c 7)"
+        path="/$(head -c 20 /dev/urandom | md5sum | head -c 10)"
         xid_3=$(cat /proc/sys/kernel/random/uuid)
     fi
     config_xray
