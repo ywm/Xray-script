@@ -679,7 +679,11 @@ gen_cflags()
         cflags+=('-fno-split-stack')
     fi
     if gcc -v --help 2>&1 | grep -qw "\\-fsanitize"; then
-        cflags+=('-fno-sanitize=all')
+        > temp.c
+        if gcc -E -fno-sanitize=all temp.c >/dev/null 2>&1; then
+            cflags+=('-fno-sanitize=all')
+        fi
+        rm temp.c
     fi
     if gcc -v --help 2>&1 | grep -qw "\\-finstrument\\-functions"; then
         cflags+=('-fno-instrument-functions')
@@ -713,7 +717,11 @@ gen_cxxflags()
         cxxflags+=('-fno-split-stack')
     fi
     if g++ -v --help 2>&1 | grep -qw "\\-fsanitize"; then
-        cxxflags+=('-fno-sanitize=all')
+        > temp.cpp
+        if g++ -E -fno-sanitize=all temp.cpp >/dev/null 2>&1; then
+            cxxflags+=('-fno-sanitize=all')
+        fi
+        rm temp.cpp
     fi
     if g++ -v --help 2>&1 | grep -qw "\\-finstrument\\-functions"; then
         cxxflags+=('-fno-instrument-functions')
