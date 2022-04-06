@@ -35,7 +35,7 @@ cloudreve_prefix="/usr/local/cloudreve"
 cloudreve_service="/etc/systemd/system/cloudreve.service"
 cloudreve_is_installed=""
 
-nextcloud_url="https://download.nextcloud.com/server/daily/latest-master.zip"
+nextcloud_url="https://download.nextcloud.com/server/prereleases/nextcloud-24.0.0beta2.zip"
 
 xray_config="/usr/local/etc/xray/config.json"
 xray_is_installed=""
@@ -2062,6 +2062,7 @@ post_max_size=0
 upload_max_filesize=9223372036854775807
 max_file_uploads=50000
 max_execution_time=0
+max_input_time=0
 output_buffering=4096
 session.auto_start=0
 EOF
