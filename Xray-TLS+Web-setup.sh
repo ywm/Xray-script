@@ -30,7 +30,7 @@ php_prefix="/usr/local/php"
 php_service="/etc/systemd/system/php-fpm.service"
 php_is_installed=""
 
-cloudreve_version="3.4.3"
+cloudreve_version="3.5.0"
 cloudreve_prefix="/usr/local/cloudreve"
 cloudreve_service="/etc/systemd/system/cloudreve.service"
 cloudreve_is_installed=""
@@ -649,6 +649,9 @@ gen_cflags()
     if gcc -v --help 2>&1 | grep -qw "\\-fdwarf2\\-cfi\\-asm"; then
         cflags+=('-fdwarf2-cfi-asm')
     fi
+    if gcc -v --help 2>&1 | grep -qw "\\-fplt"; then
+        cflags+=('-fplt')
+    fi
     if gcc -v --help 2>&1 | grep -qw "\\-ftrapv"; then
         cflags+=('-fno-trapv')
     fi
@@ -697,6 +700,9 @@ gen_cxxflags()
     fi
     if g++ -v --help 2>&1 | grep -qw "\\-fdwarf2\\-cfi\\-asm"; then
         cxxflags+=('-fdwarf2-cfi-asm')
+    fi
+    if g++ -v --help 2>&1 | grep -qw "\\-fplt"; then
+        cxxflags+=('-fplt')
     fi
     if g++ -v --help 2>&1 | grep -qw "\\-ftrapv"; then
         cxxflags+=('-fno-trapv')
@@ -1067,8 +1073,8 @@ doupdate()
         echo -e "\\n\\n\\n"
         tyblue "------------------请选择升级系统版本--------------------"
         tyblue " 1. beta版(测试版)          当前版本号：22.04"
-        tyblue " 2. release版(稳定版)       当前版本号：21.10"
-        tyblue " 3. LTS版(长期支持版)       当前版本号：20.04"
+        tyblue " 2. release版(稳定版)       当前版本号：22.04"
+        tyblue " 3. LTS版(长期支持版)       当前版本号：22.04"
         tyblue " 0. 不升级系统"
         tyblue "-------------------------注意事项-------------------------"
         yellow " 1.升级过程中遇到问话/对话框，如果不清楚，请选择yes/y/第一个选项"
@@ -2618,7 +2624,6 @@ cat >> $xray_config <<EOF
                         "http/1.1"
                     ],
                     "minVersion": "1.2",
-                    "cipherSuites": "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256:TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384:TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256",
                     "certificates": [
 EOF
     for ((i=0;i<${#true_domain_list[@]};i++))
