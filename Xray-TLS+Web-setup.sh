@@ -25,7 +25,7 @@ nginx_config="${nginx_prefix}/conf.d/xray.conf"
 nginx_service="/etc/systemd/system/nginx.service"
 nginx_is_installed=""
 
-php_version="php-8.1.6"
+php_version="php-8.1.7"
 php_prefix="/usr/local/php"
 php_service="/etc/systemd/system/php-fpm.service"
 php_is_installed=""
@@ -35,7 +35,7 @@ cloudreve_prefix="/usr/local/cloudreve"
 cloudreve_service="/etc/systemd/system/cloudreve.service"
 cloudreve_is_installed=""
 
-nextcloud_url="https://download.nextcloud.com/server/releases/nextcloud-24.0.0.zip"
+nextcloud_url="https://download.nextcloud.com/server/releases/nextcloud-24.0.1.zip"
 
 xray_config="/usr/local/etc/xray/config.json"
 xray_is_installed=""
@@ -243,7 +243,7 @@ test_important_dependence_installed()
             temp_exit_code=0
         else
             $debian_package_manager update
-            $debian_package_manager -y -f install
+            $debian_package_manager -y -f --no-install-recommends install
             $debian_package_manager -y --no-install-recommends install "$1" && temp_exit_code=0
         fi
     else
@@ -277,7 +277,7 @@ install_dependence()
     if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
         if ! $debian_package_manager -y --no-install-recommends install "$@"; then
             $debian_package_manager update
-            $debian_package_manager -y -f install
+            $debian_package_manager -y -f --no-install-recommends install
             if ! $debian_package_manager -y --no-install-recommends install "$@"; then
                 yellow "依赖安装失败！！"
                 green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
@@ -1300,7 +1300,7 @@ install_bbr()
                 return 0
             fi
             $debian_package_manager -y purge "${kernel_list_image[@]}" "${kernel_list_modules[@]}" && exit_code=0
-            [ $exit_code -eq 1 ] && $debian_package_manager -y -f install
+            [ $exit_code -eq 1 ] && $debian_package_manager -y -f --no-install-recommends install
             apt-mark manual "^grub"
         else
             rpm -qa > "temp_installed_list"
@@ -1910,7 +1910,7 @@ install_php_dependence()
     else
         if ! $debian_package_manager -y --no-install-recommends install libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-2-dev libffi-dev libpng-dev libgd-dev libwebp-dev libjpeg-dev libxpm-dev libfreetype6-dev libgmp-dev libc-client2007e-dev libicu-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt1-dev libzip-dev libmagickwand-dev && ! $debian_package_manager -y --no-install-recommends install libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-dev libffi-dev libpng-dev libgd-dev libwebp-dev libjpeg-dev libxpm-dev libfreetype6-dev libgmp-dev libc-client2007e-dev libicu-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt1-dev libzip-dev libmagickwand-dev; then
             $debian_package_manager update
-            $debian_package_manager -y -f install
+            $debian_package_manager -y -f --no-install-recommends install
             if ! $debian_package_manager -y --no-install-recommends install libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-2-dev libffi-dev libpng-dev libgd-dev libwebp-dev libjpeg-dev libxpm-dev libfreetype6-dev libgmp-dev libc-client2007e-dev libicu-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt1-dev libzip-dev libmagickwand-dev && ! $debian_package_manager -y --no-install-recommends install libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-dev libffi-dev libpng-dev libgd-dev libwebp-dev libjpeg-dev libxpm-dev libfreetype6-dev libgmp-dev libc-client2007e-dev libicu-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt1-dev libzip-dev libmagickwand-dev; then
                 yellow "依赖安装失败！！"
                 green  "欢迎进行Bug report(https://github.com/kirin10000/Xray-script/issues)，感谢您的支持"
@@ -3088,7 +3088,7 @@ install_update_xray_tls_web()
     doupdate
     enter_temp_dir
     install_bbr
-    $debian_package_manager -y -f install
+    $debian_package_manager -y -f --no-install-recommends install
 
     #读取信息
     if [ $update -eq 0 ]; then
@@ -3862,17 +3862,17 @@ simplify_system()
         local temp_remove_list=('cron' 'anacron' '^cups' '^foomatic' 'openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^libpython' 'dbus' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' '^thermald' '^libdbus' '^libevdev' '^libupower' 'readline-common' '^libreadline' 'xz-utils' 'selinux-utils' 'wget' 'zip' 'unzip' 'bzip2' 'finalrd' '^cryptsetup' '^libplymouth' '^lib.*-dev$' 'perl' '^perl-modules' '^x11' '^libx11' '^qemu' '^xdg-' '^libglib' '^libicu' '^libxml' '^liburing' '^libisc' '^libdns' '^isc-' 'net-tools' 'xxd' 'xkb-data' 'lsof' '^task' '^usb' '^libusb' '^doc' '^libwrap' '^libtext' '^libmagic' '^libpci' '^liblocale' '^keyboard' '^libuni[^s]' '^libpipe' 'man-db' '^manpages' '^liblock' '^liblog' '^libxapian' '^libpsl' '^libpap' '^libgs[0-9]' '^libpaper' '^postfix' '^nginx' '^libnginx')
         #'^libp11' '^libtasn' '^libkey' '^libnet'
         if ! $debian_package_manager -y --auto-remove purge "${temp_remove_list[@]}"; then
-            $debian_package_manager -y -f install
-            $debian_package_manager -y --auto-remove purge cron anacron || $debian_package_manager -y -f install
-            $debian_package_manager -y --auto-remove purge '^cups' '^foomatic' || $debian_package_manager -y -f install
+            $debian_package_manager -y -f --no-install-recommends install
+            $debian_package_manager -y --auto-remove purge cron anacron || $debian_package_manager -y -f --no-install-recommends install
+            $debian_package_manager -y --auto-remove purge '^cups' '^foomatic' || $debian_package_manager -y -f --no-install-recommends install
             for i in "${temp_remove_list[@]}"
             do
-                $debian_package_manager -y --auto-remove purge "$i" || $debian_package_manager -y -f install
+                $debian_package_manager -y --auto-remove purge "$i" || $debian_package_manager -y -f --no-install-recommends install
             done
         fi
-        $debian_package_manager -y --auto-remove purge '^libpop' || $debian_package_manager -y -f install
-        $debian_package_manager -y --auto-remove purge '^libslang' || $debian_package_manager -y -f install
-        $debian_package_manager -y --auto-remove purge apt-utils || $debian_package_manager -y -f install
+        $debian_package_manager -y --auto-remove purge '^libpop' || $debian_package_manager -y -f --no-install-recommends install
+        $debian_package_manager -y --auto-remove purge '^libslang' || $debian_package_manager -y -f --no-install-recommends install
+        $debian_package_manager -y --auto-remove purge apt-utils || $debian_package_manager -y -f --no-install-recommends install
         for i in "${temp_backup[@]}"
         do
             check_important_dependence_installed "$i" ""
@@ -4044,7 +4044,7 @@ start_menu()
         check_important_dependence_installed "procps" "procps-ng"
         enter_temp_dir
         install_bbr
-        $debian_package_manager -y -f install
+        $debian_package_manager -y -f --no-install-recommends install
         rm -rf "$temp_dir"
     elif [ $choice -eq 6 ]; then
         install_check_update_update_php
