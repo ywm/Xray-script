@@ -15,16 +15,18 @@ unset dnf_no_install_recommends
 unset cpu_thread_num
 # 系统时区
 unset timezone
+# ssh service name
+unset ssh_service
 
 #安装配置信息
-nginx_version="nginx-1.23.1"
+nginx_version="nginx-1.23.2"
 openssl_version="openssl-openssl-3.0.5"
 nginx_prefix="/usr/local/nginx"
 nginx_config="${nginx_prefix}/conf.d/xray.conf"
 nginx_service="/etc/systemd/system/nginx.service"
 nginx_is_installed=""
 
-php_version="php-8.1.11"
+php_version="php-8.1.12"
 php_prefix="/usr/local/php"
 php_service="/etc/systemd/system/php-fpm.service"
 unset php_is_installed
@@ -34,7 +36,7 @@ cloudreve_prefix="/usr/local/cloudreve"
 cloudreve_service="/etc/systemd/system/cloudreve.service"
 unset cloudreve_is_installed
 
-nextcloud_url="https://download.nextcloud.com/server/releases/nextcloud-24.0.5.zip"
+nextcloud_url="https://download.nextcloud.com/server/releases/nextcloud-25.0.0.zip"
 
 xray_config="/usr/local/etc/xray/config.json"
 unset xray_is_installed
@@ -105,7 +107,7 @@ check_base_command()
 {
     hash -r
     local i
-    local temp_command_list=('bash' 'sh' 'command' 'type' 'hash' 'install' 'true' 'false' 'exit' 'echo' 'test' 'sort' 'sed' 'awk' 'grep' 'cut' 'cd' 'rm' 'cp' 'mv' 'head' 'tail' 'uname' 'tr' 'md5sum' 'cat' 'find' 'wc' 'ls' 'mktemp' 'swapon' 'swapoff' 'mkswap' 'chmod' 'chown' 'chgrp' 'export' 'tar' 'gzip' 'mkdir' 'arch' 'uniq')
+    local temp_command_list=('bash' 'sh' 'command' 'type' 'hash' 'install' 'true' 'false' 'exit' 'echo' 'test' 'sort' 'sed' 'awk' 'grep' 'cut' 'cd' 'rm' 'cp' 'mv' 'head' 'tail' 'uname' 'tr' 'md5sum' 'cat' 'find' 'wc' 'ls' 'mktemp' 'swapon' 'swapoff' 'mkswap' 'chmod' 'chown' 'chgrp' 'export' 'tar' 'gzip' 'mkdir' 'arch' 'uniq' 'dd' 'env')
     for i in "${temp_command_list[@]}"
     do
         if ! command -V "${i}" > /dev/null; then
@@ -841,6 +843,11 @@ if ! check_sudo; then
     tyblue "详情请见：https://github.com/acmesh-official/acme.sh/wiki/sudo"
     exit 1
 fi
+if systemctl cat ssh > /dev/null; then
+    ssh_service="ssh"
+else
+    ssh_service="sshd"
+fi
 [ -e $nginx_config ] && nginx_is_installed=1 || nginx_is_installed=0
 [ -e ${php_prefix}/php-fpm.service.default ] && php_is_installed=1 || php_is_installed=0
 [ -e ${cloudreve_prefix}/cloudreve.db ] && cloudreve_is_installed=1 || cloudreve_is_installed=0
@@ -999,7 +1006,7 @@ check_ssh_timeout()
     echo "ClientAliveInterval 30" >> /etc/ssh/sshd_config
     echo "ClientAliveCountMax 60" >> /etc/ssh/sshd_config
     echo "#This file has been edited by Xray-TLS-Web-setup-script" >> /etc/ssh/sshd_config
-    systemctl restart sshd
+    systemctl restart $ssh_service
     green  "----------------------配置完成----------------------"
     tyblue " 请重新连接服务器以让配置生效"
     if [ $in_install_update_xray_tls_web -eq 1 ]; then
@@ -1112,8 +1119,8 @@ doupdate()
         check_important_dependence_installed "ubuntu-release-upgrader-core"
         echo -e "\\n\\n\\n"
         tyblue "------------------请选择升级系统版本--------------------"
-        tyblue " 1. beta版(测试版)          当前版本号：22.04"
-        tyblue " 2. release版(稳定版)       当前版本号：22.04"
+        tyblue " 1. beta版(测试版)          当前版本号：22.10"
+        tyblue " 2. release版(稳定版)       当前版本号：22.10"
         tyblue " 3. LTS版(长期支持版)       当前版本号：22.04"
         tyblue " 0. 不升级系统"
         tyblue "-------------------------注意事项-------------------------"
@@ -2994,7 +3001,7 @@ print_config_info()
         purple "                                           (此选项决定是否伪造浏览器指纹，空代表不伪造)"
         tyblue "  alpn                          ："
         tyblue "                                  伪造浏览器指纹  ：此参数不生效，可随意设置"
-        tyblue "                                  不伪造浏览器指纹：serverName填的域名对应的伪装网站为网盘则设置为\\033[33mhttp/1.1\\033[36m，否则设置为\\033[33m空\\033[36m或\\033[33mh2,http/1.1"
+        tyblue "                                  不伪造浏览器指纹：若serverName填的域名对应的伪装网站为网盘，建议设置为\\033[33mhttp/1.1\\033[36m；否则建议设置为或\\033[33mh2,http/1.1 \\033[35m(此选项为空/未配置时，默认值为\"h2,http/1.1\")"
         purple "   (Qv2ray:TLS设置-ALPN) (注意Qv2ray如果要设置alpn为h2,http/1.1，请填写\"h2|http/1.1\")"
         tyblue " ------------------------其他-----------------------"
         tyblue "  Mux(多路复用)                 ：使用XTLS必须关闭;不使用XTLS也建议关闭"
@@ -3038,7 +3045,9 @@ print_config_info()
         purple "   (V2RayN(G):SNI和伪装域名;Qv2ray:TLS设置-服务器地址;Shadowrocket:Peer 名称)"
         tyblue "  allowInsecure                 ：\\033[33mfalse"
         purple "   (Qv2ray:TLS设置-允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
-        tyblue "  alpn                          ：\\033[33m空\\033[36m或\\033[33mh2,http/1.1"
+        tyblue "  fingerprint                   ：\\033[33m空\\033[36m/\\033[33mchrome\\033[32m(推荐)\\033[36m/\\033[33mfirefox\\033[36m/\\033[33msafari"
+        purple "                                           (此选项决定是否伪造浏览器指纹，空代表不伪造)"
+        tyblue "  alpn                          ：建议设置为\\033[33mh2,http/1.1 \\033[35m(此选项为空/未配置时，默认值为\"h2,http/1.1\")"
         purple "   (Qv2ray:TLS设置-ALPN) (注意Qv2ray如果要设置alpn为h2,http/1.1，请填写\"h2|http/1.1\")"
         tyblue " ------------------------其他-----------------------"
         tyblue "  Mux(多路复用)                 ：强烈建议关闭"
@@ -3083,8 +3092,9 @@ print_config_info()
         purple "   (V2RayN(G):SNI和伪装域名;Qv2ray:TLS设置-服务器地址;Shadowrocket:Peer 名称)"
         tyblue "  allowInsecure                 ：\\033[33mfalse"
         purple "   (Qv2ray:TLS设置-允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
-        tyblue "  alpn                          ：此参数不生效，可随意设置"
-        purple "   (Qv2ray:TLS设置-ALPN) (注意Qv2ray如果要设置alpn为h2,http/1.1，请填写\"h2|http/1.1\")"
+        tyblue "  fingerprint                   ：\\033[33m空\\033[32m(推荐)\\033[36m/\\033[33mchrome\\033[36m/\\033[33mfirefox\\033[36m/\\033[33msafari"
+        purple "                                           (此选项决定是否伪造浏览器指纹，空代表不伪造)"
+        tyblue "  alpn                          ：此参数不生效，可随意设置 \\033[35m(Websocket模式下alpn将被固定为\"http/1.1\")"
         tyblue " ------------------------其他-----------------------"
         tyblue "  Mux(多路复用)                 ：建议关闭"
         purple "   (V2RayN:设置页面-开启Mux多路复用)"
@@ -3095,14 +3105,14 @@ print_config_info()
     echo
     yellow " 关于fingerprint与alpn，详见：https://github.com/kirin10000/Xray-script#关于tls握手tls指纹和alpn"
     echo
-    blue   " 若想实现Fullcone(NAT类型开放)，需要达成以下条件："
+    blue   " 若想实现Fullcone(NAT类型开放)，需要以下条件："
     blue   "   1. 确保客户端核心为 Xray v1.3.0+"
     blue   "   2. 若您正在使用Netch作为客户端，请不要使用模式 [1] 连接 (可使用模式 [3] Bypass LAN )"
     blue   "   3. 如果测试系统为Windows，并且正在使用透明代理或TUN/Bypass LAN，请确保当前网络设置为专用网络"
     echo
     blue   " 若想实现WebSocket 0-rtt，请将客户端核心升级至 Xray v1.4.0+"
     echo
-    tyblue " 脚本最后更新时间：2021.09.10"
+    tyblue " 脚本最后更新时间：2022.10.31"
     echo
     red    " 此脚本仅供交流学习使用，请勿使用此脚本行违法之事。网络非法外之地，行非法之事，必将接受法律制裁!!!!"
     tyblue " 2020.11"
@@ -3926,7 +3936,7 @@ simplify_system()
         cp sshd_config /etc/ssh/sshd_config
         cd /
         rm -rf "$temp_dir"
-        systemctl restart sshd
+        systemctl restart $ssh_service
     fi
     green "精简完成"
 }
