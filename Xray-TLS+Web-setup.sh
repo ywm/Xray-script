@@ -19,24 +19,24 @@ unset timezone
 unset ssh_service
 
 #安装配置信息
-nginx_version="nginx-1.23.2"
-openssl_version="openssl-openssl-3.0.5"
+nginx_version="nginx-1.23.3"
+openssl_version="openssl-openssl-3.0.7"
 nginx_prefix="/usr/local/nginx"
 nginx_config="${nginx_prefix}/conf.d/xray.conf"
 nginx_service="/etc/systemd/system/nginx.service"
 nginx_is_installed=""
 
-php_version="php-8.1.12"
+php_version="php-8.1.13"
 php_prefix="/usr/local/php"
 php_service="/etc/systemd/system/php-fpm.service"
 unset php_is_installed
 
-cloudreve_version="3.5.3"
+cloudreve_version="3.6.0"
 cloudreve_prefix="/usr/local/cloudreve"
 cloudreve_service="/etc/systemd/system/cloudreve.service"
 unset cloudreve_is_installed
 
-nextcloud_url="https://download.nextcloud.com/server/releases/nextcloud-25.0.0.zip"
+nextcloud_url="https://download.nextcloud.com/server/releases/nextcloud-25.0.2.zip"
 
 xray_config="/usr/local/etc/xray/config.json"
 unset xray_is_installed
@@ -3902,31 +3902,34 @@ simplify_system()
             check_important_dependence_installed "" "$i"
         done
     else
-        local temp_backup=()
-        local temp_important=('apt-utils' 'whiptail' 'initramfs-tools' 'isc-dhcp-client' 'netplan.io' 'openssh-server' 'network-manager')
-        for i in "${temp_important[@]}"
+        local debian_remove_packages=('^cron$' '^anacron$' '^cups' '^foomatic' '^openssl$' '^snapd$' '^kdump-tools$' '^flex$' '^make$' '^automake$' '^cloud-init' '^pkg-config$' '^gcc-[1-9][0-9]*$' '^cpp-[1-9][0-9]*$' '^curl$' '^python' '^libpython' '^dbus$' '^at$' '^open-iscsi$' '^rsyslog$' '^acpid$' '^libnetplan0$' '^glib-networking-common$' '^bcache-tools$' '^bind([0-9]|-|$)' '^lshw$' '^thermald' '^libdbus' '^libevdev' '^libupower' '^readline-common$' '^libreadline' '^xz-utils$' '^selinux-utils$' '^wget$' '^zip$' '^unzip$' '^bzip2$' '^finalrd$' '^cryptsetup' '^libplymouth' '^lib.*-dev$' '^perl$' '^perl-modules' '^x11' '^libx11' '^qemu' '^xdg-' '^libglib' '^libicu' '^libxml' '^liburing' '^libisc' '^libdns' '^isc-' '^net-tools$' '^xxd$' '^xkb-data$' '^lsof$' '^task' '^usb' '^libusb' '^doc' '^libwrap' '^libtext' '^libmagic' '^libpci' '^liblocale' '^keyboard' '^libuni[^s]' '^libpipe' '^man-db$' '^manpages' '^liblock' '^liblog' '^libxapian' '^libpsl' '^libpap' '^libgs[0-9]' '^libpaper' '^postfix' '^nginx' '^libnginx' '^libpop' '^libslang' '^apt-utils$' '^google')
+        local debian_keep_packages=('apt-utils' 'whiptail' 'initramfs-tools' 'isc-dhcp-client' 'netplan.io' 'openssh-server' 'network-manager' 'ifupdown' 'ifupdown-ng')
+        local remove_packages=()
+        local keep_packages=()
+        for i in "${debian_keep_packages[@]}"
         do
-            LANG="en_US.UTF-8" LANGUAGE="en_US:en" dpkg -s "$i" 2>/dev/null | grep -qi 'status[ '$'\t]*:[ '$'\t]*install[ '$'\t]*ok[ '$'\t]*installed[ '$'\t]*$' && temp_backup+=("$i")
+            LANG="en_US.UTF-8" LANGUAGE="en_US:en" dpkg -s "$i" 2>/dev/null | grep -qi 'status[ '$'\t]*:[ '$'\t]*install[ '$'\t]*ok[ '$'\t]*installed[ '$'\t]*$' && keep_packages+=("$i")
         done
-        temp_backup+=($(dpkg --list 'grub*' | grep '^[ '$'\t]*ii[ '$'\t]' | awk '{print $2}'))
-        local temp_remove_list=('cron' 'anacron' '^cups' '^foomatic' 'openssl' 'snapd' 'kdump-tools' 'flex' 'make' 'automake' '^cloud-init' 'pkg-config' '^gcc-[1-9][0-9]*$' '^cpp-[1-9][0-9]*$' 'curl' '^python' '^libpython' 'dbus' 'at' 'open-iscsi' 'rsyslog' 'acpid' 'libnetplan0' 'glib-networking-common' 'bcache-tools' '^bind([0-9]|-|$)' 'lshw' '^thermald' '^libdbus' '^libevdev' '^libupower' 'readline-common' '^libreadline' 'xz-utils' 'selinux-utils' 'wget' 'zip' 'unzip' 'bzip2' 'finalrd' '^cryptsetup' '^libplymouth' '^lib.*-dev$' 'perl' '^perl-modules' '^x11' '^libx11' '^qemu' '^xdg-' '^libglib' '^libicu' '^libxml' '^liburing' '^libisc' '^libdns' '^isc-' 'net-tools' 'xxd' 'xkb-data' 'lsof' '^task' '^usb' '^libusb' '^doc' '^libwrap' '^libtext' '^libmagic' '^libpci' '^liblocale' '^keyboard' '^libuni[^s]' '^libpipe' 'man-db' '^manpages' '^liblock' '^liblog' '^libxapian' '^libpsl' '^libpap' '^libgs[0-9]' '^libpaper' '^postfix' '^nginx' '^libnginx')
+        keep_packages+=($(dpkg --list 'grub*' | grep '^[ '$'\t]*ii[ '$'\t]' | awk '{print $2}'))
+        dpkg -l | grep '^[ '$'\t]*ii[ '$'\t]' | awk '{print $2}' | cut -d : -f 1 > temp
+        for package in "${debian_remove_packages[@]}"
+        do
+            if grep -q "$package" temp; then
+                tyblue "将删除软件包：$package"
+                remove_packages+=("$package")
+            fi
+        done
         #'^libp11' '^libtasn' '^libkey' '^libnet'
-        if ! apt_auto_remove_purge "${temp_remove_list[@]}"; then
+        if ! apt_auto_remove_purge "${remove_packages[@]}"; then
             $apt_no_install_recommends -y -f install
-            apt_auto_remove_purge cron anacron || $apt_no_install_recommends -y -f install
-            apt_auto_remove_purge '^cups' '^foomatic' || $apt_no_install_recommends -y -f install
-            for i in "${temp_remove_list[@]}"
-            do
-                apt_auto_remove_purge "$i" || $apt_no_install_recommends -y -f install
-            done
         fi
-        apt_auto_remove_purge '^libpop' || $apt_no_install_recommends -y -f install
-        apt_auto_remove_purge '^libslang' || $apt_no_install_recommends -y -f install
-        apt_auto_remove_purge apt-utils || $apt_no_install_recommends -y -f install
-        for i in "${temp_backup[@]}"
+        cp /etc/apt/sources.list sources.list.bak
+        sed -i 's#https://#http://#g' /etc/apt/sources.list
+        for i in "${keep_packages[@]}"
         do
             check_important_dependence_installed "$i" ""
         done
+        mv sources.list.bak /etc/apt/sources.list
     fi
     ([ $nginx_is_installed -eq 1 ] || [ $php_is_installed -eq 1 ] || [ $is_installed -eq 1 ]) && install_epel
     [ $nginx_is_installed -eq 1 ] && install_nginx_dependence
