@@ -312,7 +312,7 @@ apt_purge()
     local ret_code=0
     mv /etc/apt/sources.list /etc/apt/sources.list.bak
     mv /etc/apt/sources.list.d /etc/apt/sources.list.d.bak
-    $apt -y purge "$@" || ret_code=1
+    $apt -y --allow-change-held-packages purge "$@" || ret_code=1
     mv /etc/apt/sources.list.bak /etc/apt/sources.list
     mv /etc/apt/sources.list.d.bak /etc/apt/sources.list.d
     return $ret_code
@@ -322,7 +322,7 @@ apt_auto_remove_purge()
     local ret_code=0
     mv /etc/apt/sources.list /etc/apt/sources.list.bak
     mv /etc/apt/sources.list.d /etc/apt/sources.list.d.bak
-    $apt -y --auto-remove purge "$@" || ret_code=1
+    $apt -y --auto-remove --allow-change-held-packages purge "$@" || ret_code=1
     mv /etc/apt/sources.list.bak /etc/apt/sources.list
     mv /etc/apt/sources.list.d.bak /etc/apt/sources.list.d
     return $ret_code
@@ -2856,15 +2856,15 @@ install_init_cloudreve()
     chmod 0700 $cloudreve_prefix
     update_cloudreve
     rm -rf /dev/shm/cloudreve
-    local temp
-    temp="$("$cloudreve_prefix/cloudreve" | grep "初始管理员密码：" | awk '{print $4}')"
+    local password
+    password="$("$cloudreve_prefix/cloudreve" | grep "password" | awk '{print $6}')"
     sleep 1s
     systemctl start cloudreve
     systemctl enable cloudreve
     tyblue "-------- 请打开\"https://${domain_list[$1]}\"进行Cloudreve初始化 -------"
     tyblue "  1. 登陆帐号"
     purple "    初始管理员账号：admin@cloudreve.org"
-    purple "    $temp"
+    purple "    初始管理员密码：$password"
     tyblue "  2. 右上角头像 -> 管理面板"
     tyblue "  3. 这时会弹出对话框 \"确定站点URL设置\" 选择 \"更改\""
     tyblue "  4. 左侧参数设置 -> 注册与登陆 -> 不允许新用户注册 -> 往下拉点击保存"
@@ -2880,10 +2880,10 @@ install_init_cloudreve()
 let_init_nextcloud()
 {
     echo -e "\\n\\n"
-    yellow "请立即打开\"https://${domain_list[$1]}\"进行Nextcloud初始化设置："
-    tyblue " 1.自定义管理员的用户名和密码"
-    tyblue " 2.数据库类型选择SQLite"
-    tyblue " 3.建议不勾选\"安装推荐的应用\"，因为进去之后还能再安装"
+    yellow "请尽快打开\"https://${domain_list[$1]}\"进行Nextcloud初始化设置："
+    tyblue " 1. 初始化管理员用户名和密码"
+    tyblue " 2. 数据库类型选择SQLite"
+    tyblue " 3. 不建议勾选\"安装推荐的应用\"，初始化完成后还能安装"
     sleep 15s
     echo -e "\\n\\n"
     tyblue "按两次回车键以继续。。。"
@@ -3921,6 +3921,13 @@ simplify_system()
         done
         #'^libp11' '^libtasn' '^libkey' '^libnet'
         if ! apt_auto_remove_purge "${remove_packages[@]}"; then
+            red    "精简系统时有错误发生（某些软件包卸载失败）"
+            yellow "请尝试先更新系统软件包再精简系统"
+            tyblue "  更新系统软件包： 1. 运行脚本，选择更新系统/软件包"
+            tyblue "                   2. 选择仅更新软件包"
+            echo
+            tyblue "按回车键继续。。。"
+            read -p
             $apt_no_install_recommends -y -f install
         fi
         cp /etc/apt/sources.list sources.list.bak
