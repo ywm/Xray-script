@@ -665,9 +665,9 @@ get_config_info()
     [ $protocol_2 -ne 0 ] && ((temp++))
     [ $protocol_3 -ne 0 ] && ((temp++))
     if [ $(grep -c '"clients"' $xray_config) -eq $temp ]; then
-        if grep -q '"flow"[ '$'\t]*:[ '$'\t]*"xtls-rprx-vision"'; then
+        if grep -q '"flow"[ '$'\t]*:[ '$'\t]*"xtls-rprx-vision"' $xray_config; then
             protocol_1=1
-        elif ! grep -q '"flow"'; then
+        elif ! grep -q '"flow"' $xray_config; then
             protocol_1=2
         else
             protocol_1=3
@@ -2933,9 +2933,9 @@ print_share_link()
         for i in "${!domain_list[@]}"
         do
             if [ "${pretend_list[$i]}" == "1" ] || [ "${pretend_list[$i]}" == "2" ]; then
-                tyblue "vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&alpn=http%2F1.1&flow=xtls-rprx-vision"
+                tyblue "vless://${xid_1}@${ip}:443?security=tls&sni=${domain_list[$i]}&alpn=http%2F1.1&flow=xtls-rprx-vision"
             else
-                tyblue "vless://${xid_1}@${ip}:443?security=xtls&sni=${domain_list[$i]}&alpn=h2,http%2F1.1&flow=xtls-rprx-vision"
+                tyblue "vless://${xid_1}@${ip}:443?security=tls&sni=${domain_list[$i]}&alpn=h2,http%2F1.1&flow=xtls-rprx-vision"
             fi
         done
     fi
