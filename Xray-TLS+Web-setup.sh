@@ -2653,12 +2653,12 @@ EOF
         echo '                "clients": [' >> $xray_config
         echo '                    {' >> $xray_config
         if [ $protocol_1 -eq 1 ]; then
-            echo '                        "id": "$xid_1",' >> $xray_config
+            echo '                        "id": "'"$xid_1"'",' >> $xray_config
             echo '                        "flow": "xtls-rprx-vision"' >> $xray_config
         elif [ $protocol_1 -eq 2 ]; then
-            echo '                        "id": "$xid_1"' >> $xray_config
+            echo '                        "id": "'"$xid_1"'"' >> $xray_config
         else
-            echo '                        "id": "$xid_1",' >> $xray_config
+            echo '                        "id": "'"$xid_1"'",' >> $xray_config
             echo '                        "flow": "xtls-rprx-vision,none"' >> $xray_config
         fi
         echo '                    }' >> $xray_config
