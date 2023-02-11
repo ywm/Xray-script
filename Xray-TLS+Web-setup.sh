@@ -3957,15 +3957,17 @@ simplify_system()
                 tyblue "如果您是小白，建议选择n终止卸载，如果后续仍有出现错误，请重装系统"
                 echo
                 tyblue "否则，可以按照以下步骤尝试修复："
-                tyblue " 1. 阅读错误信息，找到导致卸载错误的软件包"
-                tyblue " 2. 运行 $apt update && $apt --no-install-recommends install 软件包名 && $apt purge 软件包名 ；手动升级并卸载该软件包"
-                tyblue " 3. 在完成上述步骤后，选择y继续卸载"
+                tyblue " 1. 阅读错误信息，找到导致卸载错误的软件包；手动运行这条命令可能可以帮助寻找错误包： $apt -f --no-install-recommends install (在终端中运行，参考2)"
+                tyblue " 2. 按ctrl+z将脚本挂在后台，也可尝试新建一个终端(不一定能新建成功)"
+                tyblue " 3. 如果能看出导致卸载错误的原因并解决是最好；如果不能，运行 '$apt update && $apt --no-install-recommends install 软件包名' 手动升级该软件包"
+                tyblue " 4. 运行fg命令返回脚本(对应ctrl+z命令)"
+                tyblue " 5. 在完成上述步骤后，选择y继续卸载"
                 echo
                 if ask_if "继续卸载?(y/n)"; then
                     if ! apt_auto_remove_purge "${remove_packages[@]}"; then
                         red "卸载失败！"
                         tyblue "按回车键继续，如果后续仍有出现错误，请重装系统"
-                        read -p
+                        read -s
                     fi
                 fi
             fi
