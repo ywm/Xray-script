@@ -3030,8 +3030,8 @@ print_config_info()
         purple "   (V2RayN(G):SNI;Qv2ray:TLS设置-服务器地址;Shadowrocket:Peer 名称)"
         tyblue "  allowInsecure                 ：\\033[33mfalse"
         purple "   (Qv2ray:TLS设置-允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
-        tyblue "  fingerprint                   ：\\033[33m空\\033[36m/\\033[33mchrome\\033[32m(推荐)\\033[36m/\\033[33mfirefox\\033[36m/\\033[33msafari"
-        purple "                                    (此选项决定是否伪造浏览器指纹，空代表不伪造，使用GO程序默认指纹)"
+        tyblue "  fingerprint                   ：\\033[33m空\\033[36m/\\033[33mchrome\\033[32m(推荐)\\033[36m/\\033[33mfirefox\\033[36m/\\033[33mios\\033[36m/\\033[33msafari\\033[36m/\\033[33mandroid\\033[36m/\\033[33medge\\033[36m/\\033[33m360\\033[36m/\\033[33mqq\\033[36m/\\033[33mrandom"
+        purple "                                    (此选项决定是否伪造浏览器指纹：空代表不伪造，使用GO程序默认指纹；random代表随机选择一种浏览器伪造指纹)"
         tyblue "  alpn                          ："
         tyblue "                                  伪造浏览器指纹  ：此参数不生效，可随意设置"
         tyblue "                                  不伪造浏览器指纹：若serverName填的域名对应的伪装网站为网盘，建议设置为\\033[33mhttp/1.1\\033[36m；否则建议设置为\\033[33mh2,http/1.1 \\033[35m(此选项为空/未配置时，默认值为\"h2,http/1.1\")"
@@ -3134,6 +3134,7 @@ print_config_info()
         tyblue "------------------------------------------------------------------------"
     fi
     echo
+    yellow "注：部分选项可能分享链接无法涉及，如果不怕麻烦，建议手动填写"
     ask_if "是否生成分享链接？(y/n)" && print_share_link
     echo
     yellow " 关于fingerprint与alpn，详见：https://github.com/kirin10000/Xray-script#关于tls握手tls指纹和alpn"
@@ -3893,12 +3894,8 @@ simplify_system()
     get_system_info
     check_important_dependence_installed "procps" "procps-ng"
     yellow "警告："
-    tyblue " 1. 此功能可能导致某些VPS无法开机，请谨慎使用"
+    tyblue " 1. 此功不能保证在所有系统运行成功 (特别是某些VPS定制系统)，如果运行失败，可能导致VPS无法开机"
     tyblue " 2. 如果VPS上部署了 Xray-TLS+Web 以外的东西，可能被误删"
-    ! ask_if "是否要继续?(y/n)" && return 0
-    echo
-    yellow "提示：在精简系统前请先设置apt/yum/dnf的软件源为http/ftp而非https/ftps"
-    purple "通常来说系统默认即是http/ftp"
     ! ask_if "是否要继续?(y/n)" && return 0
     echo
     local save_ssh=0
@@ -3932,7 +3929,7 @@ simplify_system()
         done
     else
         local debian_remove_packages=('^cron$' '^anacron$' '^cups' '^foomatic' '^openssl$' '^snapd$' '^kdump-tools$' '^flex$' '^make$' '^automake$' '^cloud-init' '^pkg-config$' '^gcc-[1-9][0-9]*$' '^cpp-[1-9][0-9]*$' '^curl$' '^python' '^libpython' '^dbus$' '^at$' '^open-iscsi$' '^rsyslog$' '^acpid$' '^libnetplan0$' '^glib-networking-common$' '^bcache-tools$' '^bind([0-9]|-|$)' '^lshw$' '^thermald' '^libdbus' '^libevdev' '^libupower' '^readline-common$' '^libreadline' '^xz-utils$' '^selinux-utils$' '^wget$' '^zip$' '^unzip$' '^bzip2$' '^finalrd$' '^cryptsetup' '^libplymouth' '^lib.*-dev$' '^perl$' '^perl-modules' '^x11' '^libx11' '^qemu' '^xdg-' '^libglib' '^libicu' '^libxml' '^liburing' '^libisc' '^libdns' '^isc-' '^net-tools$' '^xxd$' '^xkb-data$' '^lsof$' '^task' '^usb' '^libusb' '^doc' '^libwrap' '^libtext' '^libmagic' '^libpci' '^liblocale' '^keyboard' '^libuni[^s]' '^libpipe' '^man-db$' '^manpages' '^liblock' '^liblog' '^libxapian' '^libpsl' '^libpap' '^libgs[0-9]' '^libpaper' '^postfix' '^nginx' '^libnginx' '^libpop' '^libslang' '^apt-utils$' '^google')
-        local debian_keep_packages=('apt-utils' 'whiptail' 'initramfs-tools' 'isc-dhcp-client' 'netplan.io' 'openssh-server' 'network-manager' 'ifupdown' 'ifupdown-ng')
+        local debian_keep_packages=('apt-utils' 'whiptail' 'initramfs-tools' 'isc-dhcp-client' 'netplan.io' 'openssh-server' 'network-manager' 'ifupdown' 'ifupdown-ng' 'ca-certificates')
         local remove_packages=()
         local keep_packages=()
         for i in "${debian_keep_packages[@]}"
@@ -3948,19 +3945,31 @@ simplify_system()
                 remove_packages+=("$package")
             fi
         done
-        #'^libp11' '^libtasn' '^libkey' '^libnet'
-        if ! apt_auto_remove_purge "${remove_packages[@]}"; then
-            red    "精简系统时有错误发生（某些软件包卸载失败）"
-            yellow "请尝试先更新系统软件包再精简系统"
-            tyblue "  更新系统软件包： 1. 运行脚本，选择更新系统/软件包"
-            tyblue "                   2. 选择仅更新软件包"
-            echo
-            tyblue "按回车键继续。。。"
-            read -p
-            $apt_no_install_recommends -y -f install
-        fi
         cp /etc/apt/sources.list sources.list.bak
         sed -i 's#https://#http://#g' /etc/apt/sources.list
+        #'^libp11' '^libtasn' '^libkey' '^libnet'
+        if ! apt_auto_remove_purge "${remove_packages[@]}"; then
+            $apt update
+            $apt -y -f --no-install-recommends install
+            if ! apt_auto_remove_purge "${remove_packages[@]}"; then
+                red    "精简系统时有错误发生（某些软件包卸载失败）"
+                echo
+                tyblue "如果您是小白，建议选择n终止卸载，如果后续仍有出现错误，请重装系统"
+                echo
+                tyblue "否则，可以按照以下步骤尝试修复："
+                tyblue " 1. 阅读错误信息，找到导致卸载错误的软件包"
+                tyblue " 2. 运行 $apt update && $apt --no-install-recommends install 软件包名 && $apt purge 软件包名 ；手动升级并卸载该软件包"
+                tyblue " 3. 在完成上述步骤后，选择y继续卸载"
+                echo
+                if ask_if "继续卸载?(y/n)"; then
+                    if ! apt_auto_remove_purge "${remove_packages[@]}"; then
+                        red "卸载失败！"
+                        tyblue "按回车键继续，如果后续仍有出现错误，请重装系统"
+                        read -p
+                    fi
+                fi
+            fi
+        fi
         for i in "${keep_packages[@]}"
         do
             check_important_dependence_installed "$i" ""
