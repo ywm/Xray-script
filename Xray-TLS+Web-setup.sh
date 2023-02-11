@@ -20,23 +20,23 @@ unset ssh_service
 
 #安装配置信息
 nginx_version="nginx-1.23.3"
-openssl_version="openssl-openssl-3.0.7"
+openssl_version="openssl-openssl-3.0.8"
 nginx_prefix="/usr/local/nginx"
 nginx_config="${nginx_prefix}/conf.d/xray.conf"
 nginx_service="/etc/systemd/system/nginx.service"
 nginx_is_installed=""
 
-php_version="php-8.1.13"
+php_version="php-8.2.2"
 php_prefix="/usr/local/php"
 php_service="/etc/systemd/system/php-fpm.service"
 unset php_is_installed
 
-cloudreve_version="3.6.2"
+cloudreve_version="3.7.0"
 cloudreve_prefix="/usr/local/cloudreve"
 cloudreve_service="/etc/systemd/system/cloudreve.service"
 unset cloudreve_is_installed
 
-nextcloud_url="https://download.nextcloud.com/server/releases/nextcloud-25.0.2.zip"
+nextcloud_url="https://download.nextcloud.com/server/prereleases/nextcloud-26.0.0beta3.tar.bz2"
 
 xray_config="/usr/local/etc/xray/config.json"
 unset xray_is_installed
@@ -868,8 +868,14 @@ case "$(uname -m)" in
     'amd64' | 'x86_64')
         machine='amd64'
         ;;
-    'armv5tel' | 'armv6l' | 'armv7' | 'armv7l')
-        machine='arm'
+    'armv5tel')
+        machine='armv5'
+        ;;
+    'armv6l')
+        machine='armv6'
+        ;;
+    'armv7' | 'armv7l')
+        machine='armv7'
         ;;
     'armv8' | 'aarch64')
         machine='arm64'
@@ -1813,7 +1819,7 @@ readPretend()
         if [ $pretend -eq 1 ]; then
             if [ -z "$machine" ]; then
                 red "您的VPS指令集不支持Cloudreve！"
-                yellow "Cloudreve仅支持x86_64、arm64和arm指令集"
+                yellow "Cloudreve仅支持 x86_64, arm64, armv7, armv6, armv5 !"
                 sleep 3s
                 queren=0
             fi
@@ -2007,7 +2013,7 @@ install_web_dependence()
         for i in "${pretend_list[@]}"
         do
             if [ "$i" == "2" ]; then
-                install_dependence ca-certificates wget unzip
+                install_dependence ca-certificates curl bzip2
                 break
             fi
         done
@@ -2015,7 +2021,7 @@ install_web_dependence()
         if [ "$1" == "1" ]; then
             install_dependence ca-certificates wget
         elif [ "$1" == "2" ]; then
-            install_dependence ca-certificates wget unzip
+            install_dependence ca-certificates curl bzip2
         fi
     fi
 }
@@ -2796,14 +2802,19 @@ init_web()
         fi
         turn_on_off_php
     elif [ "${pretend_list[$1]}" == "2" ]; then
-        if ! wget -O "${nginx_prefix}/html/nextcloud.zip" "${nextcloud_url}"; then
+        if ! curl -o "${nginx_prefix}/html/nextcloud.tar.bz2" "${nextcloud_url}"; then
             red    "获取Nextcloud失败"
             yellow "按回车键继续或者按Ctrl+c终止"
             read -s
         fi
+        rm -rf "${nginx_prefix}/html/nextcloud"
+        if ! tar -xjf "${nginx_prefix}/html/nextcloud.tar.bz2" -C "${nginx_prefix}/html"; then
+            red    "解压 Nextcloud 失败"
+            yellow "按回车键继续或者按Ctrl+c终止"
+            read -s
+        fi
+        rm -f "${nginx_prefix}/html/nextcloud.tar.bz2"
         rm -rf "${nginx_prefix}/html/${true_domain_list[$1]}"
-        unzip -q -d "${nginx_prefix}/html" "${nginx_prefix}/html/nextcloud.zip"
-        rm -f "${nginx_prefix}/html/nextcloud.zip"
         mv "${nginx_prefix}/html/nextcloud" "${nginx_prefix}/html/${true_domain_list[$1]}"
         chown -R www-data:www-data "${nginx_prefix}/html/${true_domain_list[$1]}"
         systemctl start php-fpm
