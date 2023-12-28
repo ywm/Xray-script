@@ -19,14 +19,14 @@ unset timezone
 unset ssh_service
 
 #安装配置信息
-nginx_version="nginx-1.23.3"
-openssl_version="openssl-openssl-3.0.8"
+nginx_version="nginx-1.25.3"
+openssl_version="openssl-3.2.0"
 nginx_prefix="/usr/local/nginx"
 nginx_config="${nginx_prefix}/conf.d/xray.conf"
 nginx_service="/etc/systemd/system/nginx.service"
 nginx_is_installed=""
 
-php_version="php-8.2.3"
+php_version="php-8.3.1"
 php_prefix="/usr/local/php"
 php_service="/etc/systemd/system/php-fpm.service"
 unset php_is_installed
@@ -36,7 +36,7 @@ cloudreve_prefix="/usr/local/cloudreve"
 cloudreve_service="/etc/systemd/system/cloudreve.service"
 unset cloudreve_is_installed
 
-nextcloud_url="https://download.nextcloud.com/server/prereleases/nextcloud-26.0.0beta4.tar.bz2"
+nextcloud_url="https://download.nextcloud.com/server/prereleases/nextcloud-28.0.1.tar.bz2"
 
 xray_config="/usr/local/etc/xray/config.json"
 unset xray_is_installed
@@ -2169,7 +2169,7 @@ compile_nginx()
     fi
     tar -zxf ${nginx_version}.tar.gz
     rm -f "${nginx_version}.tar.gz"
-    if ! wget -O ${openssl_version}.tar.gz https://github.com/openssl/openssl/archive/${openssl_version#*-}.tar.gz; then
+    if ! wget -O ${openssl_version}.tar.gz https://github.com/openssl/openssl/releases/download/${openssl_version}/${openssl_version#*-}.tar.gz; then
         red    "获取openssl失败"
         yellow "按回车键继续或者按Ctrl+c终止"
         read -s
