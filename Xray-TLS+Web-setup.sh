@@ -36,7 +36,7 @@ cloudreve_prefix="/usr/local/cloudreve"
 cloudreve_service="/etc/systemd/system/cloudreve.service"
 unset cloudreve_is_installed
 
-nextcloud_url="https://download.nextcloud.com/server/prereleases/nextcloud-28.0.1.tar.bz2"
+nextcloud_url="https://download.nextcloud.com/server/releases/nextcloud-28.0.1.tar.bz2"
 
 xray_config="/usr/local/etc/xray/config.json"
 unset xray_is_installed
