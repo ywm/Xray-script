@@ -38,7 +38,7 @@ unset cloudreve_is_installed
 
 nextcloud_url="https://download.nextcloud.com/server/prereleases/nextcloud-28.0.1.tar.bz2"
 
-xray_config="/etc/xray/config.json"
+xray_config="/usr/local/etc/xray/config.json"
 unset xray_is_installed
 
 temp_dir="/temp_install_update_xray_tls_web"
