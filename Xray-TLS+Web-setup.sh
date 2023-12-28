@@ -2169,7 +2169,7 @@ compile_nginx()
     fi
     tar -zxf ${nginx_version}.tar.gz
     rm -f "${nginx_version}.tar.gz"
-    if ! wget -O ${openssl_version}.tar.gz https://github.com/openssl/openssl/releases/download/${openssl_version}/${openssl_version#*-}.tar.gz; then
+    if ! wget -O ${openssl_version}.tar.gz https://github.com/openssl/openssl/releases/download/${openssl_version}/${openssl_version}.tar.gz; then
         red    "获取openssl失败"
         yellow "按回车键继续或者按Ctrl+c终止"
         read -s
