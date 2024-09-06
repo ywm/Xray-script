@@ -634,7 +634,7 @@ get_config_info()
 {
     [ $is_installed -eq 0 ] && return
     local temp
-    if grep -q '"network"[ '$'\t]*:[ '$'\t]*"ws"' $xray_config; then
+    if grep -q '"network"[ '$'\t]*:[ '$'\t]*"httpupgrade"' $xray_config; then
         if [[ "$(grep -E '"protocol"[ '$'\t]*:[ '$'\t]*"(vmess|vless)"' $xray_config | tail -n 1)" =~ \"vmess\" ]]; then
             protocol_3=2
         else
@@ -2665,7 +2665,7 @@ EOF
             echo '                        "id": "'"$xid_1"'"' >> $xray_config
         else
             echo '                        "id": "'"$xid_1"'",' >> $xray_config
-            echo '                        "flow": "xtls-rprx-vision,none"' >> $xray_config
+            echo '                        "flow": "xtls-rprx-vision"' >> $xray_config
         fi
         echo '                    }' >> $xray_config
         echo '                ],' >> $xray_config
@@ -2714,6 +2714,14 @@ EOF
 cat >> $xray_config <<EOF
                     ]
                 }
+            },
+            "sniffing": {
+                "enabled": true,
+                "destOverride": [
+                    "http",
+                    "tls",
+                    "quic"
+                ]
             }
 EOF
     if [ $protocol_2 -ne 0 ]; then
@@ -2743,6 +2751,14 @@ cat >> $xray_config <<EOF
                 "grpcSettings": {
                     "serviceName": "$serviceName"
                 }
+            },
+            "sniffing": {
+                "enabled": true,
+                "destOverride": [
+                    "http",
+                    "tls",
+                    "quic"
+                ]
             }
 EOF
     fi
@@ -2769,10 +2785,18 @@ EOF
 cat >> $xray_config <<EOF
             },
             "streamSettings": {
-                "network": "ws",
-                "wsSettings": {
+                "network": "httpupgrade",
+                "httpupgradeSettings": {
                     "path": "$path"
                 }
+            },
+            "sniffing": {
+                "enabled": true,
+                "destOverride": [
+                    "http",
+                    "tls",
+                    "quic"
+                ]
             }
 EOF
     fi
@@ -2978,13 +3002,13 @@ print_share_link()
         green  "=========== VLESS-WebSocket-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m ==========="
         for i in "${domain_list[@]}"
         do
-            tyblue "vless://${xid_3}@${i}:443?type=ws&security=tls&path=%2F${path#/}%3Fed=2048"
+            tyblue "vless://${xid_3}@${i}:443?type=httpupgrade&security=tls&path=%2F${path#/}%3Fed=2560"
         done
     elif [ $protocol_3 -eq 2 ]; then
         green  "=========== VMess-WebSocket-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m ==========="
         for i in "${domain_list[@]}"
         do
-            tyblue "vmess://${xid_3}@${i}:443?type=ws&security=tls&path=%2F${path#/}%3Fed=2048"
+            tyblue "vmess://${xid_3}@${i}:443?type=httpupgrade&security=tls&path=%2F${path#/}%3Fed=2560"
         done
     fi
 }
