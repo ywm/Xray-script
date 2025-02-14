@@ -2553,7 +2553,8 @@ server {
     listen 80;
     listen [::]:80;
     listen unix:/dev/shm/nginx/default.sock;
-    listen unix:/dev/shm/nginx/h2.sock http2;
+    listen unix:/dev/shm/nginx/h2.sock ;
+    http2 on;
     server_name ${temp_domain_list2[@]};
     return 301 https://www.\$host\$request_uri;
 }
@@ -2562,7 +2563,8 @@ EOF
 cat >> $nginx_config<<EOF
 server {
     listen unix:/dev/shm/nginx/default.sock default_server;
-    listen unix:/dev/shm/nginx/h2.sock http2 default_server;
+    listen unix:/dev/shm/nginx/h2.sock default_server;
+    http2 on;
     return 301 https://${domain_list[0]};
 }
 EOF
@@ -2571,7 +2573,8 @@ EOF
 cat >> $nginx_config<<EOF
 server {
     listen unix:/dev/shm/nginx/default.sock;
-    listen unix:/dev/shm/nginx/h2.sock http2;
+    listen unix:/dev/shm/nginx/h2.sock ;
+    http2 on;
     server_name ${domain_list[$i]};
     add_header Strict-Transport-Security "max-age=63072000; includeSubdomains; preload" always;
 EOF
@@ -2579,7 +2582,7 @@ EOF
 cat >> $nginx_config<<EOF
     #client_header_timeout 24h;
     #ignore_invalid_headers off;
-    location = /$serviceName/TunMulti {
+    location ~ ^/$serviceName/(TunMulti|Tun)$  {
         client_max_body_size 0;
         client_body_timeout 24h;
         #keepalive_requests 1000;
