@@ -2235,6 +2235,15 @@ install_nginx_part2()
 {
     mkdir ${nginx_prefix}/conf.d
     touch $nginx_config
+    # 如果 custom.d 不存在则创建
+    if [ ! -d "${nginx_prefix}/custom.d" ]; then
+       mkdir -p "${nginx_prefix}/custom.d"
+    fi
+
+    # 如果 location.conf 不存在则创建
+    if [ ! -f "${nginx_prefix}/custom.d/location.conf" ]; then
+      touch "${nginx_prefix}/custom.d/location.conf"
+    fi
     mkdir ${nginx_prefix}/certs
     mkdir ${nginx_prefix}/html/issue_certs
 cat > ${nginx_prefix}/conf/issue_certs.conf << EOF
@@ -2577,6 +2586,7 @@ server {
     http2 on;
     server_name ${domain_list[$i]};
     add_header Strict-Transport-Security "max-age=63072000; includeSubdomains; preload" always;
+    include ${nginx_prefix}/custom.d/location.conf
 EOF
         if [ $protocol_2 -ne 0 ]; then
 cat >> $nginx_config<<EOF
