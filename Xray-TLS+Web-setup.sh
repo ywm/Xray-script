@@ -19,8 +19,8 @@ unset timezone
 unset ssh_service
 
 #安装配置信息
-nginx_version="nginx-1.26.3"
-openssl_version="openssl-3.4.1"
+nginx_version="nginx-1.27.5"
+openssl_version="openssl-3.5.0"
 nginx_prefix="/usr/local/nginx"
 nginx_config="${nginx_prefix}/conf.d/xray.conf"
 nginx_service="/etc/systemd/system/nginx.service"
