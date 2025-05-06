@@ -2586,7 +2586,7 @@ server {
     http2 on;
     server_name ${domain_list[$i]};
     add_header Strict-Transport-Security "max-age=63072000; includeSubdomains; preload" always;
-    include ${nginx_prefix}/custom.d/location.conf
+    include ${nginx_prefix}/custom.d/location.conf ;
 EOF
         if [ $protocol_2 -ne 0 ]; then
 cat >> $nginx_config<<EOF
