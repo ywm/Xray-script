@@ -593,7 +593,17 @@ remove_nginx()
     systemctl disable nginx
     rm -rf $nginx_service
     systemctl daemon-reload
-    rm -rf ${nginx_prefix}
+    if [ -d "${nginx_prefix}" ]; then
+        # 保留 custom.d，其余删除
+        mkdir -p /tmp/nginx_custom_backup
+        mv "${nginx_prefix}/custom.d" /tmp/nginx_custom_backup/ 2>/dev/null
+
+        rm -rf "${nginx_prefix}"
+
+        mkdir -p "${nginx_prefix}"
+        mv /tmp/nginx_custom_backup/custom.d "${nginx_prefix}/" 2>/dev/null
+        rm -rf /tmp/nginx_custom_backup
+    fi
     nginx_is_installed=0
     is_installed=0
 }
