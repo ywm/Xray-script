@@ -34,6 +34,14 @@ unset php_is_installed
 cloudreve_version="3.8.3"
 cloudreve_prefix="/usr/local/cloudreve"
 cloudreve_service="/etc/systemd/system/cloudreve.service"
+
+# 1. 新增Reality相关变量和函数
+reality_private_key=""
+reality_public_key=""
+reality_short_ids=""
+reality_server_names=""
+
+
 unset cloudreve_is_installed
 
 nextcloud_url="https://download.nextcloud.com/server/releases/nextcloud-31.0.8.tar.bz2"
@@ -2187,23 +2195,113 @@ compile_nginx()
     tar -zxf ${openssl_version}.tar.gz
     rm -f "${openssl_version}.tar.gz"
     cd ${nginx_version}
+    
+    local openssl_supports_quic=0
+    if version_ge "${openssl_version#openssl-}" "3.0.0"; then
+        openssl_supports_quic=1
+        tyblue "OpenSSL版本支持QUIC，启用HTTP/3编译选项"
+    else
+        yellow "OpenSSL版本不支持QUIC，将不启用HTTP/3"
+    fi
+
+
     sed -i "s/OPTIMIZE[ \\t]*=>[ \\t]*'-O'/OPTIMIZE          => '-O3'/g" src/http/modules/perl/Makefile.PL
     sed -i 's/NGX_PERL_CFLAGS="$CFLAGS `$NGX_PERL -MExtUtils::Embed -e ccopts`"/NGX_PERL_CFLAGS="`$NGX_PERL -MExtUtils::Embed -e ccopts` $CFLAGS"/g' auto/lib/perl/conf
     sed -i 's/NGX_PM_CFLAGS=`$NGX_PERL -MExtUtils::Embed -e ccopts`/NGX_PM_CFLAGS="`$NGX_PERL -MExtUtils::Embed -e ccopts` $CFLAGS"/g' auto/lib/perl/conf
-    ./configure --prefix="${nginx_prefix}" --user=root --group=root --with-threads --with-file-aio --with-http_ssl_module --with-http_v2_module --with-http_v3_module --with-http_realip_module --with-http_addition_module --with-http_xslt_module=dynamic --with-http_image_filter_module=dynamic --with-http_geoip_module=dynamic --with-http_sub_module --with-http_dav_module --with-http_flv_module --with-http_mp4_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_auth_request_module --with-http_random_index_module --with-http_secure_link_module --with-http_degradation_module --with-http_slice_module --with-http_stub_status_module --with-http_perl_module=dynamic --with-mail=dynamic --with-mail_ssl_module --with-stream=dynamic --with-stream_ssl_module --with-stream_realip_module --with-stream_geoip_module=dynamic --with-stream_ssl_preread_module --with-google_perftools_module --with-compat --with-cc-opt="${cflags[*]}" --with-openssl="../$openssl_version" --with-openssl-opt="${cflags[*]}"
+    ./configure --prefix="${nginx_prefix}" --user=root --group=root --with-threads --with-file-aio --with-http_ssl_module --with-http_v2_module --with-http_realip_module --with-http_addition_module --with-http_xslt_module=dynamic --with-http_image_filter_module=dynamic --with-http_geoip_module=dynamic --with-http_sub_module --with-http_dav_module --with-http_flv_module --with-http_mp4_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_auth_request_module --with-http_random_index_module --with-http_secure_link_module --with-http_degradation_module --with-http_slice_module --with-http_stub_status_module --with-http_perl_module=dynamic --with-mail=dynamic --with-mail_ssl_module --with-stream=dynamic --with-stream_ssl_module --with-stream_realip_module --with-stream_geoip_module=dynamic --with-stream_ssl_preread_module --with-google_perftools_module --with-compat --with-cc-opt="${cflags[*]}" --with-openssl="../$openssl_version" --with-openssl-opt="${cflags[*]}"
     #--with-select_module --with-poll_module --with-cpp_test_module --with-pcre --with-pcre-jit --with-libatomic
     #./configure --prefix=/usr/local/nginx --with-openssl=../$openssl_version --with-mail=dynamic --with-mail_ssl_module --with-stream=dynamic --with-stream_ssl_module --with-stream_realip_module --with-stream_geoip_module=dynamic --with-stream_ssl_preread_module --with-http_ssl_module --with-http_v2_module --with-http_realip_module --with-http_addition_module --with-http_xslt_module=dynamic --with-http_image_filter_module=dynamic --with-http_geoip_module=dynamic --with-http_sub_module --with-http_dav_module --with-http_flv_module --with-http_mp4_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_auth_request_module --with-http_random_index_module --with-http_secure_link_module --with-http_degradation_module --with-http_slice_module --with-http_stub_status_module --with-http_perl_module=dynamic --with-pcre --with-libatomic --with-compat --with-cpp_test_module --with-google_perftools_module --with-file-aio --with-threads --with-poll_module --with-select_module --with-cc-opt="-Wno-error ${cflags[*]}"
+    
+    # 如果OpenSSL支持QUIC，则添加HTTP/3相关选项
+    if [ $openssl_supports_quic -eq 1 ]; then
+        configure_args+=("--with-http_v3_module")
+        tyblue "已添加 --with-http_v3_module 编译选项"
+    fi
+    
+    # 执行配置
+    ./configure "${configure_args[@]}"
+
     swap_on 480
     if ! make -j$cpu_thread_num; then
         swap_off
         red    "Nginx编译失败！"
-        green  "欢迎进行Bug report(https://github.com/ywm/Xray-script/issues)，感谢您的支持"
-        yellow "在Bug修复前，建议使用Ubuntu最新版系统"
-        exit 1
+       if [ $openssl_supports_quic -eq 1 ]; then
+            yellow "可能是HTTP/3编译失败，尝试不启用HTTP/3重新编译..."
+            # 移除HTTP/3选项重新编译
+            configure_args=("${configure_args[@]/--with-http_v3_module}")
+            make clean
+            ./configure "${configure_args[@]}"
+            if ! make -j$cpu_thread_num; then
+                green  "欢迎进行Bug report(https://github.com/ywm/Xray-script/issues)，感谢您的支持"
+                yellow "在Bug修复前，建议使用Ubuntu最新版系统"
+                exit 1
+            else
+                yellow "HTTP/3编译失败，已使用HTTP/2版本"
+                openssl_supports_quic=0
+            fi
+        else
+            green  "欢迎进行Bug report(https://github.com/ywm/Xray-script/issues)，感谢您的支持"
+            yellow "在Bug修复前，建议使用Ubuntu最新版系统"
+            exit 1
+        fi
     fi
     swap_off
     cd ..
 }
+
+# 检查Nginx版本和HTTP/3支持
+check_nginx_http3_support()
+{
+    if [ $nginx_is_installed -eq 1 ]; then
+        if ${nginx_prefix}/sbin/nginx -V 2>&1 | grep -q "http_v3_module"; then
+            green "当前Nginx支持HTTP/3"
+            return 0
+        else
+            yellow "当前Nginx不支持HTTP/3"
+            return 1
+        fi
+    fi
+    return 1
+}
+
+# 生成nginx配置时检查HTTP/3支持
+config_nginx_with_http3_check() {
+    local http3_supported=0
+    check_nginx_http3_support && http3_supported=1
+    
+    # 在生成配置时根据HTTP/3支持情况调整
+    if [ $http3_supported -eq 0 ]; then
+        # 移除HTTP/3相关配置
+        sed -i '/listen.*quic/d' "$nginx_config"
+        sed -i '/Alt-Svc.*h3/d' "$nginx_config" 
+        yellow "由于Nginx不支持HTTP/3，已移除相关配置"
+    fi
+}
+
+# 检查系统是否满足HTTP/3编译要求
+check_http3_requirements()
+{
+    tyblue "检查HTTP/3编译要求..."
+    
+    # 检查系统版本
+    if [ $release == "ubuntu" ]; then
+        if ! version_ge "$systemVersion" "20.04"; then
+            yellow "Ubuntu版本低于20.04，可能不支持HTTP/3编译"
+        fi
+    elif [ $release == "debian" ]; then
+        if ! version_ge "$systemVersion" "11"; then
+            yellow "Debian版本低于11，可能不支持HTTP/3编译"
+        fi
+    fi
+    
+    # 检查是否有必要的依赖
+    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == oracle ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+        install_dependence cmake3
+    else
+        install_dependence cmake
+    fi
+}
+
 config_service_nginx()
 {
     rm -rf $nginx_service
@@ -2346,6 +2444,14 @@ EOF
     [ $xray_is_installed -eq 1 ] && is_installed=1 || is_installed=0
 }
 
+
+install_geodata() {
+    mkdir -p /usr/local/share/xray
+    wget -O /usr/local/share/xray/geoip.dat https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.dat
+    wget -O /usr/local/share/xray/geosite.dat https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat
+    green "Xray geodata 已下载完成"
+}
+
 #安装/更新Xray
 install_update_xray()
 {
@@ -2356,15 +2462,46 @@ install_update_xray()
         read -s
         return 1
     fi
+    # 增加了安装xray geodata，是用了mihomo的数据源
+    install_geodata
+
+    # 生成并保存privateKey
+    green "正在生成Xray REALITY私钥..."
+    if [ -f /usr/local/etc/xray/reality_keys.json ]; then
+        yellow "REALITY密钥文件已存在，跳过生成"
+    else
+        mkdir -p /usr/local/etc/xray
+        /usr/local/bin/xray x25519 > /usr/local/etc/xray/reality_keys.json
+        green "REALITY密钥已生成并保存到 /usr/local/etc/xray/reality_keys.json"
+    fi
+
     if ! grep -q "# This file has been edited by Xray-TLS-Web setup script" /etc/systemd/system/xray.service; then
 cat >> /etc/systemd/system/xray.service <<EOF
+[Unit]
+Description=Xray Service
+After=network.target nss-lookup.target
 
 # This file has been edited by Xray-TLS-Web setup script
 [Service]
+
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+# 启动前清理并创建 /dev/shm/xray
 ExecStartPre=/bin/rm -rf /dev/shm/xray
 ExecStartPre=/bin/mkdir /dev/shm/xray
 ExecStartPre=/bin/chmod 711 /dev/shm/xray
+# 停止后清理
 ExecStopPost=/bin/rm -rf /dev/shm/xray
+
+ExecStart=/usr/local/bin/xray run -confdir /usr/local/etc/xray/config.d/
+Restart=on-failure
+RestartPreventExitStatus=23
+LimitNPROC=10000
+LimitNOFILE=1000000
+
+[Install]
+WantedBy=multi-user.target
 EOF
         systemctl daemon-reload
         systemctl -q is-active xray && systemctl restart xray
