@@ -62,9 +62,9 @@ unset pretend_list
 
 # TCP配置，0代表禁用，1代表XTLS，2代表TLS，3代表XTLS+TLS
 unset protocol_1
-# grpc使用的代理协议，0代表禁用，1代表VLESS，2代表VMess
+# grpc使用的代理协议，0代表禁用，1代表VLESS
 unset protocol_2
-# WebSocket使用的代理协议，0代表禁用，1代表VLESS，2代表VMess
+# httpupgrade使用的代理协议，0代表禁用，1代表VLESS
 unset protocol_3
 # grpc的serviceName
 unset serviceName
@@ -653,11 +653,7 @@ get_config_info()
     [ $is_installed -eq 0 ] && return
     local temp
     if grep -q '"network"[ '$'\t]*:[ '$'\t]*"httpupgrade"' $xray_config; then
-        if [[ "$(grep -E '"protocol"[ '$'\t]*:[ '$'\t]*"(vmess|vless)"' $xray_config | tail -n 1)" =~ \"vmess\" ]]; then
-            protocol_3=2
-        else
-            protocol_3=1
-        fi
+        protocol_3=1
         path="$(grep '"path"' $xray_config | tail -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
         xid_3="$(grep '"id"' $xray_config | tail -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
     else
@@ -669,11 +665,7 @@ get_config_info()
         else
             temp=1
         fi
-        if [[ "$(grep -E '"protocol"[ '$'\t]*:[ '$'\t]*"(vmess|vless)"' $xray_config | tail -n $temp | head -n 1)" =~ \"vmess\" ]]; then
-            protocol_2=2
-        else
-            protocol_2=1
-        fi
+        protocol_2=1
         serviceName="$(grep '"serviceName"' $xray_config | cut -d : -f 2 | cut -d \" -f 2)"
         xid_2="$(grep '"id"' $xray_config | tail -n $temp | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
     else
@@ -1731,16 +1723,16 @@ readProtocolConfig()
     tyblue "---------------------请选择传输协议---------------------"
     tyblue " 1. TCP"
     tyblue " 2. gRPC"
-    tyblue " 3. WebSocket"
+    tyblue " 3. HttpUpgrade"
     tyblue " 4. TCP + gRPC"
-    tyblue " 5. TCP + WebSocket"
-    tyblue " 6. gRPC + WebSocket"
-    tyblue " 7. TCP + gRPC + WebSocket"
+    tyblue " 5. TCP + HttpUpgrade"
+    tyblue " 6. gRPC + HttpUpgrade"
+    tyblue " 7. TCP + gRPC + HttpUpgrade"
     yellow " 0. 无 (仅提供Web服务)"
     echo
     blue   " 注："
     blue   "   1. 如不使用CDN，请选择TCP"
-    blue   "   2. gRPC和WebSocket支持通过CDN，关于两者的区别，详见：https://github.com/ywm/Xray-script#关于grpc与websocket"
+    blue   "   2. gRPC和HttpUpgrade支持通过CDN，关于两者的区别，详见：https://github.com/ywm/Xray-script#关于grpc与websocket"
     blue   "   3. 仅TCP能使用XTLS"
     echo
     local choice=""
@@ -1775,34 +1767,8 @@ readProtocolConfig()
             read -p "您的选择是：" protocol_1
         done
     fi
-    if [ $protocol_2 -eq 1 ]; then
-        tyblue "-------------- 请选择使用gRPC传输的代理协议 --------------"
-        tyblue " 1. VMess"
-        tyblue " 2. VLESS"
-        echo
-        yellow " 注：使用VMess的好处是可以对CDN加密，若使用VLESS，CDN提供商可获取传输明文"
-        echo
-        choice=""
-        while [[ ! "$choice" =~ ^([1-9][0-9]*)$ ]] || ((choice>2))
-        do
-            read -p "您的选择是：" choice
-        done
-        [ $choice -eq 1 ] && protocol_2=2
-    fi
-    if [ $protocol_3 -eq 1 ]; then
-        tyblue "-------------- 请选择使用WebSocket传输的代理协议 --------------"
-        tyblue " 1. VMess"
-        tyblue " 2. VLESS"
-        echo
-        yellow " 注：使用VMess的好处是可以对CDN加密，若使用VLESS，CDN提供商可获取传输明文"
-        echo
-        choice=""
-        while [[ ! "$choice" =~ ^([1-9][0-9]*)$ ]] || ((choice>2))
-        do
-            read -p "您的选择是：" choice
-        done
-        [ $choice -eq 1 ] && protocol_3=2
-    fi
+    # 删除 gRPC 的协议选择，直接设置为 VLESS
+    # 删除 HTTPUpgrade 的协议选择，直接设置为 VLESS
 }
 
 #读取伪装类型 输入domain 输出pretend
@@ -2888,11 +2854,7 @@ EOF
         echo '        },' >> $xray_config
         echo '        {' >> $xray_config
         echo '            "listen": "/dev/shm/xray/grpc.sock",' >> $xray_config
-        if [ $protocol_2 -eq 2 ]; then
-            echo '            "protocol": "vmess",' >> $xray_config
-        else
-            echo '            "protocol": "vless",' >> $xray_config
-        fi
+        echo '            "protocol": "vless",' >> $xray_config
         echo '            "settings": {' >> $xray_config
         echo '                "clients": [' >> $xray_config
         echo '                    {' >> $xray_config
@@ -2926,11 +2888,7 @@ EOF
         echo '        },' >> $xray_config
         echo '        {' >> $xray_config
         echo '            "listen": "@/dev/shm/xray/ws.sock",' >> $xray_config
-        if [ $protocol_3 -eq 2 ]; then
-            echo '            "protocol": "vmess",' >> $xray_config
-        else
-            echo '            "protocol": "vless",' >> $xray_config
-        fi
+        echo '            "protocol": "vless",' >> $xray_config
         echo '            "settings": {' >> $xray_config
         echo '                "clients": [' >> $xray_config
         echo '                    {' >> $xray_config
@@ -3151,24 +3109,12 @@ print_share_link()
         do
             tyblue "vless://${xid_2}@${i}:443?type=grpc&security=tls&serviceName=${serviceName}&mode=multi&alpn=h2,http%2F1.1"
         done
-    elif [ $protocol_2 -eq 2 ]; then
-        green  "=========== VMess-gRPC-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m ==========="
-        for i in "${domain_list[@]}"
-        do
-            tyblue "vmess://${xid_2}@${i}:443?type=grpc&security=tls&serviceName=${serviceName}&mode=multi&alpn=h2,http%2F1.1"
-        done
     fi
     if [ $protocol_3 -eq 1 ]; then
-        green  "=========== VLESS-WebSocket-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m ==========="
+        green  "=========== VLESS-httpupgrade-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m ==========="
         for i in "${domain_list[@]}"
         do
             tyblue "vless://${xid_3}@${i}:443?type=httpupgrade&security=tls&path=%2F${path#/}%3Fed=2560"
-        done
-    elif [ $protocol_3 -eq 2 ]; then
-        green  "=========== VMess-WebSocket-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m ==========="
-        for i in "${domain_list[@]}"
-        do
-            tyblue "vmess://${xid_3}@${i}:443?type=httpupgrade&security=tls&path=%2F${path#/}%3Fed=2560"
         done
     fi
 }
@@ -3227,15 +3173,11 @@ print_config_info()
     fi
     if [ $protocol_2 -ne 0 ]; then
         echo
-        if [ $protocol_2 -eq 1 ]; then
-            tyblue "---------------- VLESS-gRPC-TLS (有CDN则走CDN，否则直连) ---------------"
-            tyblue " protocol(传输协议)    ：\\033[33mvless"
-            purple "  (V2RayN选择\"添加[VLESS]服务器\";V2RayNG选择\"手动输入[VLESS]\")"
-        else
-            tyblue "---------------- VMess-gRPC-TLS (有CDN则走CDN，否则直连) ---------------"
-            tyblue " protocol(传输协议)    ：\\033[33mvmess"
-            purple "  (V2RayN选择\"添加[VMess]服务器\";V2RayNG选择\"手动输入[Vmess]\")"
-        fi
+        
+        tyblue "---------------- VLESS-gRPC-TLS (有CDN则走CDN，否则直连) ---------------"
+        tyblue " protocol(传输协议)    ：\\033[33mvless"
+        purple "  (V2RayN选择\"添加[VLESS]服务器\";V2RayNG选择\"手动输入[VLESS]\")"
+       
         if [ ${#domain_list[@]} -eq 1 ]; then
             tyblue " address(地址)         ：\\033[33m${domain_list[*]}"
         else
@@ -3273,14 +3215,11 @@ print_config_info()
     fi
     if [ $protocol_3 -ne 0 ]; then
         echo
-        if [ $protocol_3 -eq 1 ]; then
-            tyblue "------------- VLESS-WebSocket-TLS (有CDN则走CDN，否则直连) -------------"
-            tyblue " protocol(传输协议)    ：\\033[33mvless"
-            purple "  (V2RayN选择\"添加[VLESS]服务器\";V2RayNG选择\"手动输入[VLESS]\")"
-        else
-            tyblue "------------- VMess-WebSocket-TLS (有CDN则走CDN，否则直连) -------------"
-            tyblue " protocol(传输协议)    ：\\033[33mvmess"
-            purple "  (V2RayN选择\"添加[VMess]服务器\";V2RayNG选择\"手动输入[Vmess]\")"
+        
+        tyblue "------------- VLESS-HTTPUpgrade-TLS (有CDN则走CDN，否则直连) -------------"
+        tyblue " protocol(传输协议)    ：\\033[33mvless"
+        purple "  (V2RayN选择\"添加[VLESS]服务器\";V2RayNG选择\"手动输入[VLESS]\")"
+
         fi
         if [ ${#domain_list[@]} -eq 1 ]; then
             tyblue " address(地址)         ：\\033[33m${domain_list[*]}"
@@ -3299,7 +3238,7 @@ print_config_info()
         fi
         tyblue " ---Transport/StreamSettings(底层传输方式/流设置)---"
         tyblue "  network(传输方式)             ：\\033[33mws"
-        purple "   (Shadowrocket传输方式选websocket)"
+        purple "   (Shadowrocket传输方式选httpupgrade)"
         tyblue "  path(路径)                    ：\\033[33m${path}?ed=2048"
         tyblue "  Host                          ：\\033[33m空"
         purple "   (V2RayN(G):伪装域名;Qv2ray:协议设置-请求头)"
@@ -4046,7 +3985,7 @@ change_xray_path()
 {
     get_config_info
     if [ $protocol_3 -eq 0 ]; then
-        red "没有使用WebSocket协议！"
+        red "没有使用HttpUpgrade协议！"
         return 1
     fi
     tyblue "您现在的path是：$path"
@@ -4276,7 +4215,7 @@ start_menu()
     tyblue "  21. 修改传输协议"
     tyblue "  22. 修改id(用户ID/UUID)"
     tyblue "  23. 修改gRPC的serviceName"
-    tyblue "  24. 修改WebSocket的path(路径)"
+    tyblue "  24. 修改HttpUpgrade的path(路径)"
     echo
     tyblue " ----------------其它----------------"
     tyblue "  25. 精简系统"
