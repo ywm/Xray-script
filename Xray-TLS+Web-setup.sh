@@ -2655,7 +2655,7 @@ http {
 EOF
 }
 
-//nginx 配置
+#nginx 配置
 config_nginx()
 {
     config_nginx_init
@@ -3235,7 +3235,7 @@ print_share_link()
         green  "=========== VLESS-gRPC-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m ==========="
         for i in "${domain_list[@]}"
         do
-            tyblue "vless://${xid_2}@${i}:443?type=grpc&security=tls&serviceName=${serviceName}&mode=multi&alpn=h2,http%2F1.1#VLESS-gRPC"
+            tyblue  "vless://${xid_2}@${i}:443?type=grpc&security=tls&serviceName=${serviceName}&mode=multi&alpn=h2,http%2F1.1#VLESS-gRPC"
         done
         echo
     fi
