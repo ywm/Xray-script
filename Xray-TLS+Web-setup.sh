@@ -3224,7 +3224,7 @@ print_share_link()
     echo
     tyblue "分享链接："
     if [ $protocol_1 -eq 0 ]; then
-        green  "============ VLESS-Vision-REALITY (直连) ============
+        green  "============ VLESS-Vision-REALITY 直连 ============
         local first_short_id="${reality_short_ids%% *}"
         first_short_id="${first_short_id//\"/}"
         tyblue "vless://${xid_1}@${ip}:443?security=reality&sni=${reality_server_names}&fp=chrome&pbk=${reality_public_key}&sid=${first_short_id}&type=tcp&flow=xtls-rprx-vision#VLESS-REALITY"
@@ -3240,7 +3240,7 @@ print_share_link()
         echo
     fi
     if [ $protocol_3 -eq 0 ]; then
-        green  "=========== VLESS-XHTTP-TLS (可过CDN) ==========="
+        green  "=========== VLESS-XHTTP-TLS 可过CDN ==========="
         for i in "${domain_list[@]}"
         do
             tyblue "vless://${xid_3}@${i}:443?type=xhttp&security=tls&path=${path}#VLESS-XHTTP"
@@ -3253,26 +3253,26 @@ print_config_info()
     echo -e "\\n\\n\\n"
     if [ $protocol_1 -ne 0 ]; then
         tyblue "--------------------- VLESS-Vision-REALITY (直连) ---------------------"
-        tyblue " protocol(传输协议)    ：\\033[33mvless"
-        purple "  (V2RayN选择\"添加[VLESS]服务器\";V2RayNG选择\"手动输入[VLESS]\")"
-        tyblue " address(地址)         ：\\033[33m服务器ip"
-        purple "  (Qv2ray:主机)"
+        tyblue " protocol传输协议    ：\\033[33mvless"
+        purple "  V2RayN选择\"添加[VLESS]服务器\";V2RayNG选择\"手动输入[VLESS]\""
+        tyblue " address地址         ：\\033[33m服务器ip"
+        purple "  Qv2ray:主机"
         tyblue " port(端口)            ：\\033[33m443"
-        tyblue " id(用户ID/UUID)       ：\\033[33m${xid_1}"
-        tyblue " flow(流控)            ：\\033[33mxtls-rprx-vision"
-        tyblue " encryption(加密)      ：\\033[33mnone"
+        tyblue " id用户ID/UUID       ：\\033[33m${xid_1}"
+        tyblue " flow流控            ：\\033[33mxtls-rprx-vision"
+        tyblue " encryption加密      ：\\033[33mnone"
         tyblue " ---Transport/StreamSettings(底层传输方式/流设置)---"
-        tyblue "  network(传输方式)             ：\\033[33mtcp"
-        tyblue "  security(传输层加密)          ：\\033[33mreality"
+        tyblue "  network传输方式             ：\\033[33mtcp"
+        tyblue "  security传输层加密          ：\\033[33mreality"
         tyblue " ---REALITY Settings---"
         tyblue "  Public Key                    ：\\033[33m${reality_public_key}"
         local first_short_id="${reality_short_ids%% *}"
         first_short_id="${first_short_id//\"/}"
         tyblue "  Short ID                      ：\\033[33m${first_short_id} \\033[35m(可为空或列表中任一)"
         tyblue "  serverName                    ：\\033[33m${reality_server_names}"
-        purple "   (客户端填写此域名)"
+        purple "   客户端填写此域名"
         tyblue "  fingerprint                   ：\\033[33mchrome\\033[32m(推荐)\\033[36m/\\033[33mfirefox\\033[36m/\\033[33msafari\\033[36m/\\033[33medge"
-        purple "   (浏览器指纹，REALITY必须设置)"
+        purple "   浏览器指纹，REALITY必须设置"
         tyblue "  spiderX                       ：\\033[33m/ \\033[35m(可选，爬虫路径)"
         tyblue " ------------------------其他-----------------------"
         tyblue "  Mux(多路复用)                 ：建议关闭"
@@ -3289,21 +3289,21 @@ print_config_info()
     if [ $protocol_2 -ne 0 ]; then
         echo
         tyblue "---------------- VLESS-gRPC-TLS (可过CDN) ---------------"
-        tyblue " protocol(传输协议)    ：\\033[33mvless"
+        tyblue " protocol传输协议    ：\\033[33mvless"
         if [ ${#domain_list[@]} -eq 1 ]; then
-            tyblue " address(地址)         ：\\033[33m${domain_list[*]}"
+            tyblue " address地址         ：\\033[33m${domain_list[*]}"
         else
-            tyblue " address(地址)         ：\\033[33m${domain_list[*]} \\033[35m(任选其一)"
+            tyblue " address(地址         ：\\033[33m${domain_list[*]} \\033[35m(任选其一)"
         fi
-        tyblue " port(端口)            ：\\033[33m443"
-        tyblue " id(用户ID/UUID)       ：\\033[33m${xid_2}"
-        tyblue " flow(流控)            ：\\033[33m空"
-        tyblue " encryption(加密)      ：\\033[33mnone"
-        tyblue " ---Transport/StreamSettings(底层传输方式/流设置)---"
-        tyblue "  network(传输方式)             ：\\033[33mgrpc"
+        tyblue " port端口            ：\\033[33m443"
+        tyblue " id用户ID/UUID       ：\\033[33m${xid_2}"
+        tyblue " flow流控            ：\\033[33m空"
+        tyblue " encryption加密      ：\\033[33mnone"
+        tyblue " ---Transport/StreamSettings底层传输方式/流设置---"
+        tyblue "  network传输方式             ：\\033[33mgrpc"
         tyblue "  serviceName                   ：\\033[33m${serviceName}"
         tyblue "  multiMode                     ：\\033[33mtrue"
-        tyblue "  security(传输层加密)          ：\\033[33mtls"
+        tyblue "  security传输层加密          ：\\033[33mtls"
         tyblue "  serverName                    ：\\033[33m空"
         tyblue "  allowInsecure                 ：\\033[33mfalse"
         tyblue "  fingerprint                   ：\\033[33m空\\033[32m(推荐)\\033[36m/\\033[33mchrome"
@@ -3314,21 +3314,21 @@ print_config_info()
     if [ $protocol_3 -ne 0 ]; then
         echo
         tyblue "------------- VLESS-XHTTP-TLS (可过CDN) -------------"
-        tyblue " protocol(传输协议)    ：\\033[33mvless"
+        tyblue " protocol传输协议    ：\\033[33mvless"
         if [ ${#domain_list[@]} -eq 1 ]; then
-            tyblue " address(地址)         ：\\033[33m${domain_list[*]}"
+            tyblue " address[地址]         ：\\033[33m${domain_list[*]}"
         else
-            tyblue " address(地址)         ：\\033[33m${domain_list[*]} \\033[35m(任选其一)"
+            tyblue " address地址         ：\\033[33m${domain_list[*]} \\033[35m(任选其一)"
         fi
-        tyblue " port(端口)            ：\\033[33m443"
-        tyblue " id(用户ID/UUID)       ：\\033[33m${xid_3}"
-        tyblue " flow(流控)            ：\\033[33m空"
-        tyblue " encryption(加密)      ：\\033[33mnone"
+        tyblue " port端口            ：\\033[33m443"
+        tyblue " id用户ID/UUID       ：\\033[33m${xid_3}"
+        tyblue " flow流控            ：\\033[33m空"
+        tyblue " encryption加密      ：\\033[33mnone"
         tyblue " ---Transport/StreamSettings(底层传输方式/流设置)---"
-        tyblue "  network(传输方式)             ：\\033[33mxhttp"
-        tyblue "  path(路径)                    ：\\033[33m${path}"
+        tyblue "  network传输方式             ：\\033[33mxhttp"
+        tyblue "  path路径                    ：\\033[33m${path}"
         tyblue "  Host                          ：\\033[33m空"
-        tyblue "  security(传输层加密)          ：\\033[33mtls"
+        tyblue "  security传输层加密          ：\\033[33mtls"
         tyblue "  serverName                    ：\\033[33m空"
         tyblue "  allowInsecure                 ：\\033[33mfalse"
         tyblue "  fingerprint                   ：\\033[33m空\\033[32m(推荐)\\033[36m/\\033[33mchrome"
@@ -3336,7 +3336,7 @@ print_config_info()
     fi
     echo
     yellow "注：部分选项可能分享链接无法涉及，建议手动填写"
-    ask_if "是否生成分享链接？(y/n)" && print_share_link
+    ask_if "是否生成分享链接？[y/n]" && print_share_link
     echo
     tyblue " 脚本最后更新时间：2025.1.1"
     echo
