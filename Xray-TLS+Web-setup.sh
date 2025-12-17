@@ -40,6 +40,7 @@ reality_private_key=""
 reality_public_key=""
 reality_short_ids=""
 reality_server_names=""
+reality_dest=""
 
 
 unset cloudreve_is_installed
@@ -60,21 +61,21 @@ unset domain_config_list
 # 域名伪装列表，对应域名列表
 unset pretend_list
 
-# TCP配置，0代表禁用，1代表XTLS，2代表TLS，3代表XTLS+TLS
+# TCP配置，使用REALITY
 unset protocol_1
 # grpc使用的代理协议，0代表禁用，1代表VLESS
 unset protocol_2
-# httpupgrade使用的代理协议，0代表禁用，1代表VLESS
+# XHTTP使用的代理协议，0代表禁用，1代表VLESS
 unset protocol_3
-# grpc的serviceName
+# gRPC的serviceName
 unset serviceName
-# ws的path
+# XHTTP的path
 unset path
 # TCP协议的vless uuid
 unset xid_1
-# grpc协议的vless/vmess uuid
+# grpc协议的vless uuid
 unset xid_2
-# ws协议的vless/vmess uuid
+# XHTTP协议的vless uuid
 unset xid_3
 
 # 现在有没有通过脚本启动swap
@@ -652,40 +653,40 @@ get_config_info()
 {
     [ $is_installed -eq 0 ] && return
     local temp
-    if grep -q '"network"[ '$'\t]*:[ '$'\t]*"httpupgrade"' $xray_config; then
-        protocol_3=1
-        path="$(grep '"path"' $xray_config | tail -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
-        xid_3="$(grep '"id"' $xray_config | tail -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
-    else
-        protocol_3=0
-    fi
-    if grep -q '"network"[ '$'\t]*:[ '$'\t]*"grpc"' $xray_config; then
-        if [ $protocol_3 -ne 0 ]; then
-            temp=2
-        else
-            temp=1
-        fi
-        protocol_2=1
-        serviceName="$(grep '"serviceName"' $xray_config | cut -d : -f 2 | cut -d \" -f 2)"
-        xid_2="$(grep '"id"' $xray_config | tail -n $temp | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
-    else
-        protocol_2=0
-    fi
-    temp=1
-    [ $protocol_2 -ne 0 ] && ((temp++))
-    [ $protocol_3 -ne 0 ] && ((temp++))
-    if [ $(grep -c '"clients"' $xray_config) -eq $temp ]; then
-        if grep -q '"flow"[ '$'\t]*:[ '$'\t]*"xtls-rprx-vision"' $xray_config; then
-            protocol_1=1
-        elif ! grep -q '"flow"' $xray_config; then
-            protocol_1=2
-        else
-            protocol_1=3
-        fi
+    
+    # 检测 REALITY
+    if grep -q '"security"[ '$'\t]*:[ '$'\t]*"reality"' $xray_config; then
+        protocol_1=1
         xid_1="$(grep '"id"' $xray_config | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
+        reality_private_key="$(grep '"privateKey"' $xray_config | cut -d : -f 2 | cut -d \" -f 2)"
+        reality_dest="$(grep '"target"' $xray_config | cut -d : -f 2 | cut -d \" -f 2)"
+        reality_server_names="$(grep '"serverNames"' $xray_config | sed 's/.*\[//;s/\].*//' | tr ',' ' ' | sed 's/"//g')"
+        reality_short_ids="$(grep '"shortIds"' $xray_config | sed 's/.*\[//;s/\].*//' | tr ',' ' ')"
+        
+        # 生成公钥
+        reality_public_key=$(/usr/local/bin/xray x25519 -i "$reality_private_key" | grep "Public key:" | awk '{print $3}')
     else
         protocol_1=0
     fi
+    
+    # 检测 XHTTP
+    if grep -q '"network"[ '$'\t]*:[ '$'\t]*"xhttp"' $xray_config; then
+        protocol_3=1
+        path="$(grep '"path"' $xray_config | tail -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
+        xid_3="$(grep '"id"' $xray_config | grep -A5 '"xhttp"' | grep '"id"' | cut -d : -f 2 | cut -d \" -f 2)"
+    else
+        protocol_3=0
+    fi
+    
+    # 检测 gRPC
+    if grep -q '"network"[ '$'\t]*:[ '$'\t]*"grpc"' $xray_config; then
+        protocol_2=1
+        serviceName="$(grep '"serviceName"' $xray_config | cut -d : -f 2 | cut -d \" -f 2)"
+        xid_2="$(grep '"id"' $xray_config | grep -A5 '"grpc"' | grep '"id"' | cut -d : -f 2 | cut -d \" -f 2)"
+    else
+        protocol_2=0
+    fi
+    
     unset domain_list
     unset true_domain_list
     unset domain_config_list
@@ -1721,19 +1722,19 @@ readProtocolConfig()
 {
     echo -e "\\n\\n\\n"
     tyblue "---------------------请选择传输协议---------------------"
-    tyblue " 1. TCP"
-    tyblue " 2. gRPC"
-    tyblue " 3. HttpUpgrade"
-    tyblue " 4. TCP + gRPC"
-    tyblue " 5. TCP + HttpUpgrade"
-    tyblue " 6. gRPC + HttpUpgrade"
-    tyblue " 7. TCP + gRPC + HttpUpgrade"
+    tyblue " 1. VLESS-Vision-REALITY (直连)"
+    tyblue " 2. VLESS-gRPC-TLS (可过CDN)"
+    tyblue " 3. VLESS-XHTTP-TLS (可过CDN)"
+    tyblue " 4. VLESS-Vision-REALITY + gRPC"
+    tyblue " 5. VLESS-Vision-REALITY + XHTTP"
+    tyblue " 6. gRPC + XHTTP"
+    tyblue " 7. VLESS-Vision-REALITY + gRPC + XHTTP (全协议)"
     yellow " 0. 无 (仅提供Web服务)"
     echo
     blue   " 注："
-    blue   "   1. 如不使用CDN，请选择TCP"
-    blue   "   2. gRPC和HttpUpgrade支持通过CDN，关于两者的区别，详见：https://github.com/ywm/Xray-script#关于grpc与websocket"
-    blue   "   3. 仅TCP能使用XTLS"
+    blue   "   1. REALITY 无需证书，抗主动探测，推荐直连使用"
+    blue   "   2. gRPC和XHTTP支持通过CDN，需要域名和证书"
+    blue   "   3. XHTTP 是 HTTPUpgrade 的升级版，性能更好"
     echo
     local choice=""
     while [[ ! "$choice" =~ ^(0|[1-9][0-9]*)$ ]] || ((choice>7))
@@ -1755,18 +1756,18 @@ readProtocolConfig()
     else
         protocol_3=0
     fi
-    if [ $protocol_1 -eq 1 ]; then
-        tyblue "-------------- 请选择TCP传输配置 --------------"
-        tyblue " 1. VLESS + TCP + XTLS"
-        tyblue " 2. VLESS + TCP + TLS"
-        tyblue " 3. VLESS + TCP + XTLS/TLS"
-        echo
-        protocol_1=""
-        while [[ ! "$protocol_1" =~ ^([1-9][0-9]*)$ ]] || ((protocol_1>3))
-        do
-            read -p "您的选择是：" protocol_1
-        done
-    fi
+#    if [ $protocol_1 -eq 1 ]; then
+#        tyblue "-------------- 请选择TCP传输配置 --------------"
+#        tyblue " 1. VLESS + TCP + XTLS"
+#        tyblue " 2. VLESS + TCP + TLS"
+#        tyblue " 3. VLESS + TCP + XTLS/TLS"
+#        echo
+#        protocol_1=""
+#        while [[ ! "$protocol_1" =~ ^([1-9][0-9]*)$ ]] || ((protocol_1>3))
+#        do
+#            read -p "您的选择是：" protocol_1
+#        done
+#    fi
     # 删除 gRPC 的协议选择，直接设置为 VLESS
     # 删除 HTTPUpgrade 的协议选择，直接设置为 VLESS
 }
@@ -2319,6 +2320,10 @@ install_nginx_part2()
       touch "${nginx_prefix}/custom.d/location.conf"
     fi
     mkdir ${nginx_prefix}/certs
+    
+      # 生成自签名证书
+    generate_self_signed_cert
+    
     mkdir ${nginx_prefix}/html/issue_certs
 cat > ${nginx_prefix}/conf/issue_certs.conf << EOF
 events {
@@ -2422,6 +2427,8 @@ install_geodata() {
 install_update_xray()
 {
     green "正在安装/更新Xray。。。。"
+    mkdir -p /var/log/xray
+    
     if ! bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u root --without-geodata --without-logfiles && ! bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u root --without-geodata --without-logfiles; then
         red    "安装/更新Xray失败"
         yellow "按回车键继续或者按Ctrl+c终止"
@@ -2647,16 +2654,41 @@ http {
 }
 EOF
 }
+
+//nginx 配置
 config_nginx()
 {
     config_nginx_init
     local i
+    local need_certificate=0
+    
+    # 判断是否需要TLS证书
+    if [ $protocol_2 -ne 0 ] || [ $protocol_3 -ne 0 ]; then
+        need_certificate=1
+    fi
+    
+    # HTTP 重定向到 HTTPS
 cat > $nginx_config<<EOF
 server {
     listen 80 reuseport default_server;
     listen [::]:80 reuseport default_server;
-    return 301 https://${domain_list[0]};
+EOF
+
+    if [ $need_certificate -eq 1 ]; then
+        echo "    return 301 https://\${domain_list[0]}\$request_uri;" >> $nginx_config
+    else
+        # 如果不需要证书，直接显示伪装网站
+        echo "    server_name _;" >> $nginx_config
+        echo "    root ${nginx_prefix}/html/${true_domain_list[0]};" >> $nginx_config
+        echo "    index index.html index.htm;" >> $nginx_config
+    fi
+
+cat >> $nginx_config<<EOF
 }
+EOF
+
+    if [ $need_certificate -eq 1 ]; then
+cat >> $nginx_config<<EOF
 server {
     listen 80;
     listen [::]:80;
@@ -2664,66 +2696,65 @@ server {
     return 301 https://\$host\$request_uri;
 }
 EOF
-    local temp_domain_list2=()
-    for i in "${!domain_config_list[@]}"
-    do
-        [ ${domain_config_list[$i]} -eq 1 ] && temp_domain_list2+=("${true_domain_list[$i]}")
-    done
-    if [ ${#temp_domain_list2[@]} -ne 0 ]; then
-cat >> $nginx_config<<EOF
-server {
-    listen 80;
-    listen [::]:80;
-    listen unix:/dev/shm/nginx/default.sock;
-    listen unix:/dev/shm/nginx/h2.sock ;
-    http2 on;
-    server_name ${temp_domain_list2[@]};
-    return 301 https://www.\$host\$request_uri;
-}
-EOF
     fi
+
+    # 如果使用REALITY，需要配置回落处理的服务器
+    if [ $protocol_1 -ne 0 ]; then
 cat >> $nginx_config<<EOF
+
 server {
-    listen unix:/dev/shm/nginx/default.sock default_server;
-    listen unix:/dev/shm/nginx/h2.sock default_server;
+    listen unix:/dev/shm/nginx/reality.sock ssl proxy_protocol;
     http2 on;
-    return 301 https://${domain_list[0]};
-}
+    set_real_ip_from unix:;
+    real_ip_header proxy_protocol;
+    
+    server_name ${domain_list[@]};
 EOF
-    for ((i=0;i<${#domain_list[@]};i++))
-    do
+
+        if [ $need_certificate -eq 1 ]; then
+            # 有证书，使用证书
 cat >> $nginx_config<<EOF
-server {
-    listen unix:/dev/shm/nginx/default.sock;
-    listen unix:/dev/shm/nginx/h2.sock ;
-    http2 on;
-    server_name ${domain_list[$i]};
-    add_header Strict-Transport-Security "max-age=63072000; includeSubdomains; preload" always;
-    include ${nginx_prefix}/custom.d/location.conf ;
+    
+    ssl_certificate ${nginx_prefix}/certs/${true_domain_list[0]}.cer;
+    ssl_certificate_key ${nginx_prefix}/certs/${true_domain_list[0]}.key;
 EOF
-        if [ $protocol_2 -ne 0 ]; then
+        else
+            # 无证书，使用自签名证书或禁用SSL验证
+            # 实际上REALITY回落这里不会真正用到证书，因为REALITY已经处理了TLS
 cat >> $nginx_config<<EOF
-    #client_header_timeout 24h;
-    #ignore_invalid_headers off;
-    location ~ ^/$serviceName/(TunMulti|Tun)$  {
-        client_max_body_size 0;
-        client_body_timeout 24h;
-        #keepalive_requests 1000;
-        #keepalive_time 24h;
-        keepalive_timeout 24h;
-        send_timeout 24h;
-        #grpc_buffer_size 0;
-        grpc_read_timeout 24h;
-        grpc_send_timeout 24h;
-        #grpc_socket_keepalive off;
-        lingering_close always;
-        lingering_time 24h;
-        lingering_timeout 24h;
-        grpc_pass grpc://unix:/dev/shm/xray/grpc.sock;
-    }
+    
+    ssl_certificate ${nginx_prefix}/certs/self-signed.crt;
+    ssl_certificate_key ${nginx_prefix}/certs/self-signed.key;
 EOF
         fi
-        if [ "${pretend_list[$i]}" == "1" ]; then
+
+cat >> $nginx_config<<EOF
+    
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305;
+    ssl_prefer_server_ciphers on;
+    
+EOF
+
+        # XHTTP location (如果REALITY配置了回落到XHTTP)
+        if [ $protocol_3 -ne 0 ]; then
+cat >> $nginx_config<<EOF
+    location $path {
+        proxy_pass http://unix:/dev/shm/xray/xhttp.sock;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+    
+EOF
+        fi
+
+        # 伪装网站
+        for ((i=0;i<${#domain_list[@]};i++))
+        do
+            if [ "${pretend_list[$i]}" == "1" ]; then
 cat >> $nginx_config<<EOF
     location / {
         proxy_set_header X-Forwarded-For 127.0.0.1;
@@ -2733,30 +2764,119 @@ cat >> $nginx_config<<EOF
         client_max_body_size 0;
     }
 EOF
-        elif [ "${pretend_list[$i]}" == "2" ]; then
-            echo "    root ${nginx_prefix}/html/${true_domain_list[$i]};" >> $nginx_config
-            echo "    include ${nginx_prefix}/conf.d/nextcloud.conf;" >> $nginx_config
-        elif [ "${pretend_list[$i]}" == "3" ]; then
-            if [ $protocol_2 -ne 0 ]; then
+            elif [ "${pretend_list[$i]}" == "2" ]; then
+                echo "    root ${nginx_prefix}/html/${true_domain_list[$i]};" >> $nginx_config
+                echo "    include ${nginx_prefix}/conf.d/nextcloud.conf;" >> $nginx_config
+            elif [ "${pretend_list[$i]}" == "3" ]; then
                 echo "    location / {" >> $nginx_config
                 echo "        return 403;" >> $nginx_config
                 echo "    }" >> $nginx_config
+            elif [ "${pretend_list[$i]}" == "4" ]; then
+                echo "    root ${nginx_prefix}/html/${true_domain_list[$i]};" >> $nginx_config
             else
-                echo "    return 403;" >> $nginx_config
-            fi
-        elif [ "${pretend_list[$i]}" == "4" ]; then
-            echo "    root ${nginx_prefix}/html/${true_domain_list[$i]};" >> $nginx_config
-        else
 cat >> $nginx_config<<EOF
     location / {
         proxy_pass ${pretend_list[$i]};
         proxy_set_header referer "${pretend_list[$i]}";
     }
 EOF
-        fi
-        echo "}" >> $nginx_config
-    done
+            fi
+            break
+        done
+
+cat >> $nginx_config<<EOF
+    
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+}
+EOF
+    fi
+
+    # 如果需要证书（gRPC或XHTTP），配置正常的HTTPS服务器
+    if [ $need_certificate -eq 1 ]; then
+        for ((i=0;i<${#domain_list[@]};i++))
+        do
+cat >> $nginx_config<<EOF
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name ${domain_list[$i]};
+    
+    ssl_certificate ${nginx_prefix}/certs/${true_domain_list[$i]}.cer;
+    ssl_certificate_key ${nginx_prefix}/certs/${true_domain_list[$i]}.key;
+    
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305;
+    ssl_prefer_server_ciphers on;
+    
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+    include ${nginx_prefix}/custom.d/location.conf;
+    
+EOF
+
+            # XHTTP location
+            if [ $protocol_3 -ne 0 ]; then
+cat >> $nginx_config<<EOF
+    location $path {
+        proxy_pass http://unix:/dev/shm/xray/xhttp.sock;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+    
+EOF
+            fi
+
+            # gRPC location
+            if [ $protocol_2 -ne 0 ]; then
+cat >> $nginx_config<<EOF
+    location ~ ^/$serviceName/(TunMulti|Tun)\$ {
+        client_max_body_size 0;
+        grpc_pass grpc://unix:/dev/shm/xray/grpc.sock;
+        grpc_set_header Host \$host;
+        grpc_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+    }
+    
+EOF
+            fi
+
+            # 伪装网站配置
+            if [ "${pretend_list[$i]}" == "1" ]; then
+cat >> $nginx_config<<EOF
+    location / {
+        proxy_set_header X-Forwarded-For 127.0.0.1;
+        proxy_set_header Host \$http_host;
+        proxy_redirect off;
+        proxy_pass http://unix:/dev/shm/cloudreve/cloudreve.sock;
+        client_max_body_size 0;
+    }
+EOF
+            elif [ "${pretend_list[$i]}" == "2" ]; then
+                echo "    root ${nginx_prefix}/html/${true_domain_list[$i]};" >> $nginx_config
+                echo "    include ${nginx_prefix}/conf.d/nextcloud.conf;" >> $nginx_config
+            elif [ "${pretend_list[$i]}" == "3" ]; then
+                echo "    location / {" >> $nginx_config
+                echo "        return 403;" >> $nginx_config
+                echo "    }" >> $nginx_config
+            elif [ "${pretend_list[$i]}" == "4" ]; then
+                echo "    root ${nginx_prefix}/html/${true_domain_list[$i]};" >> $nginx_config
+            else
+cat >> $nginx_config<<EOF
+    location / {
+        proxy_pass ${pretend_list[$i]};
+        proxy_set_header referer "${pretend_list[$i]}";
+    }
+EOF
+            fi
+
+            echo "}" >> $nginx_config
+        done
+    fi
+
 cat >> $nginx_config << EOF
+
 #-----------------不要修改以下内容----------------
 #domain_list=${domain_list[@]}
 #true_domain_list=${true_domain_list[@]}
@@ -2765,80 +2885,76 @@ cat >> $nginx_config << EOF
 EOF
 }
 
+
+# 生成自签名证书（仅用于REALITY回落，实际不会被验证）
+generate_self_signed_cert()
+{
+    if [ ! -f "${nginx_prefix}/certs/self-signed.crt" ]; then
+        green "生成自签名证书（用于REALITY回落）..."
+        mkdir -p ${nginx_prefix}/certs
+        openssl req -x509 -nodes -days 36500 -newkey rsa:2048 \
+            -keyout "${nginx_prefix}/certs/self-signed.key" \
+            -out "${nginx_prefix}/certs/self-signed.crt" \
+            -subj "/C=US/ST=State/L=City/O=Organization/CN=localhost" \
+            >/dev/null 2>&1
+    fi
+}
+
+
+
 #配置xray
 config_xray()
 {
     local i
-    local temp_domain
 cat > $xray_config <<EOF
 {
     "log": {
-        "loglevel": "none"
+        "loglevel": "warning",
+        "error": "/var/log/xray/error.log",
+        "access": "/var/log/xray/access.log"
     },
     "inbounds": [
+EOF
+
+    # REALITY + Vision 配置
+    if [ $protocol_1 -ne 0 ]; then
+cat >> $xray_config <<EOF
         {
             "port": 443,
             "protocol": "vless",
             "settings": {
+                "clients": [
+                    {
+                        "id": "$xid_1",
+                        "flow": "xtls-rprx-vision",
+                        "email": "reality@local"
+                    }
+                ],
+                "decryption": "none"
 EOF
-    if [ $protocol_1 -ne 0 ]; then
-        echo '                "clients": [' >> $xray_config
-        echo '                    {' >> $xray_config
-        if [ $protocol_1 -eq 1 ]; then
-            echo '                        "id": "'"$xid_1"'",' >> $xray_config
-            echo '                        "flow": "xtls-rprx-vision"' >> $xray_config
-        elif [ $protocol_1 -eq 2 ]; then
-            echo '                        "id": "'"$xid_1"'"' >> $xray_config
-        else
-            echo '                        "id": "'"$xid_1"'",' >> $xray_config
-            echo '                        "flow": "xtls-rprx-vision"' >> $xray_config
-        fi
-        echo '                    }' >> $xray_config
-        echo '                ],' >> $xray_config
-    fi
-    echo '                "decryption": "none",' >> $xray_config
-    echo '                "fallbacks": [' >> $xray_config
-    if [ $protocol_3 -ne 0 ]; then
+        # 如果有 XHTTP，添加回落配置
+        if [ $protocol_3 -ne 0 ]; then
 cat >> $xray_config <<EOF
+,
+                "fallbacks": [
                     {
-                        "path": "$path",
-                        "dest": "@/dev/shm/xray/ws.sock"
-                    },
-EOF
-    fi
-cat >> $xray_config <<EOF
-                    {
-                        "alpn": "h2",
-                        "dest": "/dev/shm/nginx/h2.sock"
-                    },
-                    {
-                        "dest": "/dev/shm/nginx/default.sock"
+                        "dest": "/dev/shm/xray/xhttp.sock"
                     }
                 ]
+EOF
+        fi
+cat >> $xray_config <<EOF
             },
             "streamSettings": {
-                "network": "tcp",
-                "security": "tls",
-                "tlsSettings": {
-                    "alpn": [
-                        "h2",
-                        "http/1.1"
-                    ],
-                    "minVersion": "1.2",
-                    "certificates": [
-EOF
-    for ((i=0;i<${#true_domain_list[@]};i++))
-    do
-cat >> $xray_config <<EOF
-                        {
-                            "certificateFile": "${nginx_prefix}/certs/${true_domain_list[$i]}.cer",
-                            "keyFile": "${nginx_prefix}/certs/${true_domain_list[$i]}.key",
-                            "ocspStapling": 3600
-EOF
-        ((i==${#true_domain_list[@]}-1)) && echo "                        }" >> $xray_config || echo "                        }," >> $xray_config
-    done
-cat >> $xray_config <<EOF
-                    ]
+                "network": "raw",
+                "security": "reality",
+                "realitySettings": {
+                    "show": false,
+                    "target": "$reality_dest",
+                    "xver": 1,
+                    "serverNames": [$(echo "$reality_server_names" | awk '{for(i=1;i<=NF;i++) printf "\"%s\"%s", $i, (i<NF?", ":"")}')],
+                    "privateKey": "$reality_private_key",
+                    "shortIds": [$(echo "$reality_short_ids" | sed 's/ /, /g')]
                 }
             },
             "sniffing": {
@@ -2847,26 +2963,67 @@ cat >> $xray_config <<EOF
                     "http",
                     "tls",
                     "quic"
-                ]
+                ],
+                "routeOnly": true
             }
+        }
 EOF
-    if [ $protocol_2 -ne 0 ]; then
-        echo '        },' >> $xray_config
-        echo '        {' >> $xray_config
-        echo '            "listen": "/dev/shm/xray/grpc.sock",' >> $xray_config
-        echo '            "protocol": "vless",' >> $xray_config
-        echo '            "settings": {' >> $xray_config
-        echo '                "clients": [' >> $xray_config
-        echo '                    {' >> $xray_config
-        echo "                        \"id\": \"$xid_2\"" >> $xray_config
-        echo '                    }' >> $xray_config
-        if [ $protocol_2 -eq 2 ]; then
-            echo '                ]' >> $xray_config
-        else
-            echo '                ],' >> $xray_config
-            echo '                "decryption": "none"' >> $xray_config
+        if [ $protocol_2 -ne 0 ] || [ $protocol_3 -ne 0 ]; then
+            echo ',' >> $xray_config
         fi
+    fi
+
+    # XHTTP 配置
+    if [ $protocol_3 -ne 0 ]; then
 cat >> $xray_config <<EOF
+        {
+            "listen": "/dev/shm/xray/xhttp.sock,0666",
+            "protocol": "vless",
+            "settings": {
+                "clients": [
+                    {
+                        "id": "$xid_3",
+                        "email": "xhttp@local"
+                    }
+                ],
+                "decryption": "none"
+            },
+            "streamSettings": {
+                "network": "xhttp",
+                "xhttpSettings": {
+                    "path": "$path"
+                }
+            },
+            "sniffing": {
+                "enabled": true,
+                "destOverride": [
+                    "http",
+                    "tls",
+                    "quic"
+                ],
+                "routeOnly": true
+            }
+        }
+EOF
+        if [ $protocol_2 -ne 0 ]; then
+            echo ',' >> $xray_config
+        fi
+    fi
+
+    # gRPC 配置
+    if [ $protocol_2 -ne 0 ]; then
+cat >> $xray_config <<EOF
+        {
+            "listen": "/dev/shm/xray/grpc.sock,0666",
+            "protocol": "vless",
+            "settings": {
+                "clients": [
+                    {
+                        "id": "$xid_2",
+                        "email": "grpc@local"
+                    }
+                ],
+                "decryption": "none"
             },
             "streamSettings": {
                 "network": "grpc",
@@ -2880,50 +3037,35 @@ cat >> $xray_config <<EOF
                     "http",
                     "tls",
                     "quic"
-                ]
+                ],
+                "routeOnly": true
             }
-EOF
-    fi
-    if [ $protocol_3 -ne 0 ]; then
-        echo '        },' >> $xray_config
-        echo '        {' >> $xray_config
-        echo '            "listen": "@/dev/shm/xray/ws.sock",' >> $xray_config
-        echo '            "protocol": "vless",' >> $xray_config
-        echo '            "settings": {' >> $xray_config
-        echo '                "clients": [' >> $xray_config
-        echo '                    {' >> $xray_config
-        echo "                        \"id\": \"$xid_3\"" >> $xray_config
-        echo '                    }' >> $xray_config
-        if [ $protocol_3 -eq 2 ]; then
-            echo '                ]' >> $xray_config
-        else
-            echo '                ],' >> $xray_config
-            echo '                "decryption": "none"' >> $xray_config
-        fi
-cat >> $xray_config <<EOF
-            },
-            "streamSettings": {
-                "network": "httpupgrade",
-                "httpupgradeSettings": {
-                    "path": "$path"
-                }
-            },
-            "sniffing": {
-                "enabled": true,
-                "destOverride": [
-                    "http",
-                    "tls",
-                    "quic"
-                ]
-            }
-EOF
-    fi
-cat >> $xray_config <<EOF
         }
+EOF
+    fi
+
+cat >> $xray_config <<EOF
     ],
+    "routing": {
+        "rules": [
+            {
+                "type": "field",
+                "protocol": [
+                    "bittorrent"
+                ],
+                "outboundTag": "block"
+            }
+        ]
+    },
     "outbounds": [
         {
-            "protocol": "freedom"
+            "protocol": "freedom",
+            "settings": {}
+        },
+        {
+            "tag": "block",
+            "protocol": "blackhole",
+            "settings": {}
         }
     ]
 }
@@ -3081,195 +3223,126 @@ print_share_link()
     fi
     echo
     tyblue "分享链接："
-    if [ $protocol_1 -eq 1 ] || [ $protocol_1 -eq 3 ]; then
-        green  "============ VLESS-TCP-XTLS\\033[35m(不走CDN)\\033[32m ============"
-        for i in "${!domain_list[@]}"
-        do
-            if [ "${pretend_list[$i]}" == "1" ] || [ "${pretend_list[$i]}" == "2" ]; then
-                tyblue "vless://${xid_1}@${ip}:443?security=tls&sni=${domain_list[$i]}&alpn=http%2F1.1&flow=xtls-rprx-vision"
-            else
-                tyblue "vless://${xid_1}@${ip}:443?security=tls&sni=${domain_list[$i]}&alpn=h2,http%2F1.1&flow=xtls-rprx-vision"
-            fi
-        done
+    if [ $protocol_1 -eq 0 ]; then
+        green  "============ VLESS-Vision-REALITY (直连) ============
+        local first_short_id="${reality_short_ids%% *}"
+        first_short_id="${first_short_id//\"/}"
+        tyblue "vless://${xid_1}@${ip}:443?security=reality&sni=${reality_server_names}&fp=chrome&pbk=${reality_public_key}&sid=${first_short_id}&type=tcp&flow=xtls-rprx-vision#VLESS-REALITY"
+        echo
     fi
-    if [ $protocol_1 -eq 2 ] || [ $protocol_1 -eq 3 ]; then
-        green  "============ VLESS-TCP-TLS\\033[35m(不走CDN)\\033[32m ============"
-        for i in "${!domain_list[@]}"
-        do
-            if [ "${pretend_list[$i]}" == "1" ] || [ "${pretend_list[$i]}" == "2" ]; then
-                tyblue "vless://${xid_1}@${ip}:443?security=tls&sni=${domain_list[$i]}&alpn=http%2F1.1"
-            else
-                tyblue "vless://${xid_1}@${ip}:443?security=tls&sni=${domain_list[$i]}&alpn=h2,http%2F1.1"
-            fi
-        done
-    fi
-    if [ $protocol_2 -eq 1 ]; then
+  
+    if [ $protocol_2 -eq 0 ]; then
         green  "=========== VLESS-gRPC-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m ==========="
         for i in "${domain_list[@]}"
         do
-            tyblue "vless://${xid_2}@${i}:443?type=grpc&security=tls&serviceName=${serviceName}&mode=multi&alpn=h2,http%2F1.1"
+            tyblue "vless://${xid_2}@${i}:443?type=grpc&security=tls&serviceName=${serviceName}&mode=multi&alpn=h2,http%2F1.1#VLESS-gRPC"
         done
+        echo
     fi
-    if [ $protocol_3 -eq 1 ]; then
-        green  "=========== VLESS-httpupgrade-TLS \\033[35m(若域名开启了CDN解析则会连接CDN，否则将直连)\\033[32m ==========="
+    if [ $protocol_3 -eq 0 ]; then
+        green  "=========== VLESS-XHTTP-TLS (可过CDN) ==========="
         for i in "${domain_list[@]}"
         do
-            tyblue "vless://${xid_3}@${i}:443?type=httpupgrade&security=tls&path=%2F${path#/}%3Fed=2560"
+            tyblue "vless://${xid_3}@${i}:443?type=xhttp&security=tls&path=${path}#VLESS-XHTTP"
         done
     fi
 }
+
 print_config_info()
 {
     echo -e "\\n\\n\\n"
     if [ $protocol_1 -ne 0 ]; then
-        if [ $protocol_1 -eq 1 ]; then
-            tyblue "--------------------- VLESS-TCP-XTLS (不走CDN) ---------------------"
-        elif [ $protocol_1 -eq 2 ]; then
-            tyblue "--------------------- VLESS-TCP-TLS (不走CDN) ---------------------"
-        else
-            tyblue "--------------------- VLESS-TCP-XTLS/TLS (不走CDN) ---------------------"
-        fi
+        tyblue "--------------------- VLESS-Vision-REALITY (直连) ---------------------"
         tyblue " protocol(传输协议)    ：\\033[33mvless"
         purple "  (V2RayN选择\"添加[VLESS]服务器\";V2RayNG选择\"手动输入[VLESS]\")"
         tyblue " address(地址)         ：\\033[33m服务器ip"
         purple "  (Qv2ray:主机)"
         tyblue " port(端口)            ：\\033[33m443"
         tyblue " id(用户ID/UUID)       ：\\033[33m${xid_1}"
-        if [ $protocol_1 -eq 1 ]; then
-            tyblue " flow(流控)            ：\\033[33mxtls-rprx-vision"
-        elif [ $protocol_1 -eq 2 ]; then
-            tyblue " flow(流控)            ：\\033[33m空"
-        else
-            tyblue " flow(流控)            ："
-            tyblue "                         使用XTLS ：\\033[33mxtls-rprx-vision"
-            tyblue "                         使用TLS  ：\\033[33m空"
-        fi
+        tyblue " flow(流控)            ：\\033[33mxtls-rprx-vision"
         tyblue " encryption(加密)      ：\\033[33mnone"
         tyblue " ---Transport/StreamSettings(底层传输方式/流设置)---"
         tyblue "  network(传输方式)             ：\\033[33mtcp"
-        purple "   (Shadowrocket传输方式选none)"
-        tyblue "  type(伪装类型)                ：\\033[33mnone"
-        purple "   (Qv2ray:协议设置-类型)"
-        tyblue "  security(传输层加密)          ：\\033[33mtls"
-        purple "   (V2RayN(G):底层传输安全;Qv2ray:TLS设置-安全类型)"
-        if [ ${#domain_list[@]} -eq 1 ]; then
-            tyblue "  serverName                    ：\\033[33m${domain_list[*]}"
-        else
-            tyblue "  serverName                    ：\\033[33m${domain_list[*]} \\033[35m(任选其一)"
-        fi
-        purple "   (V2RayN(G):SNI;Qv2ray:TLS设置-服务器地址;Shadowrocket:Peer 名称)"
-        tyblue "  allowInsecure                 ：\\033[33mfalse"
-        purple "   (Qv2ray:TLS设置-允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
-        tyblue "  fingerprint                   ：\\033[33m空\\033[36m/\\033[33mchrome\\033[32m(推荐)\\033[36m/\\033[33mfirefox\\033[36m/\\033[33mios\\033[36m/\\033[33msafari\\033[36m/\\033[33mandroid\\033[36m/\\033[33medge\\033[36m/\\033[33m360\\033[36m/\\033[33mqq\\033[36m/\\033[33mrandom"
-        purple "                                    (此选项决定是否伪造浏览器指纹：空代表不伪造，使用GO程序默认指纹；random代表随机选择一种浏览器伪造指纹)"
-        tyblue "  alpn                          ："
-        tyblue "                                  伪造浏览器指纹  ：此参数不生效，可随意设置"
-        tyblue "                                  不伪造浏览器指纹：若serverName填的域名对应的伪装网站为网盘，建议设置为\\033[33mhttp/1.1\\033[36m；否则建议设置为\\033[33mh2,http/1.1 \\033[35m(此选项为空/未配置时，默认值为\"h2,http/1.1\")"
-        purple "   (Qv2ray:TLS设置-ALPN) (注意Qv2ray如果要设置alpn为h2,http/1.1，请填写\"h2|http/1.1\")"
+        tyblue "  security(传输层加密)          ：\\033[33mreality"
+        tyblue " ---REALITY Settings---"
+        tyblue "  Public Key                    ：\\033[33m${reality_public_key}"
+        local first_short_id="${reality_short_ids%% *}"
+        first_short_id="${first_short_id//\"/}"
+        tyblue "  Short ID                      ：\\033[33m${first_short_id} \\033[35m(可为空或列表中任一)"
+        tyblue "  serverName                    ：\\033[33m${reality_server_names}"
+        purple "   (客户端填写此域名)"
+        tyblue "  fingerprint                   ：\\033[33mchrome\\033[32m(推荐)\\033[36m/\\033[33mfirefox\\033[36m/\\033[33msafari\\033[36m/\\033[33medge"
+        purple "   (浏览器指纹，REALITY必须设置)"
+        tyblue "  spiderX                       ：\\033[33m/ \\033[35m(可选，爬虫路径)"
         tyblue " ------------------------其他-----------------------"
-        tyblue "  Mux(多路复用)                 ：使用XTLS必须关闭;不使用XTLS也建议关闭"
-        purple "   (V2RayN:设置页面-开启Mux多路复用)"
+        tyblue "  Mux(多路复用)                 ：建议关闭"
         tyblue "------------------------------------------------------------------------"
+        echo
+        yellow " REALITY 详细配置："
+        yellow "  Dest: ${reality_dest}"
+        yellow "  ServerNames: ${reality_server_names}"
+        yellow "  ShortIds: ${reality_short_ids}"
+        yellow "  Private Key: ${reality_private_key}"
+        yellow "  Public Key: ${reality_public_key}"
     fi
+    
     if [ $protocol_2 -ne 0 ]; then
         echo
-        
-        tyblue "---------------- VLESS-gRPC-TLS (有CDN则走CDN，否则直连) ---------------"
+        tyblue "---------------- VLESS-gRPC-TLS (可过CDN) ---------------"
         tyblue " protocol(传输协议)    ：\\033[33mvless"
-        purple "  (V2RayN选择\"添加[VLESS]服务器\";V2RayNG选择\"手动输入[VLESS]\")"
-       
         if [ ${#domain_list[@]} -eq 1 ]; then
             tyblue " address(地址)         ：\\033[33m${domain_list[*]}"
         else
             tyblue " address(地址)         ：\\033[33m${domain_list[*]} \\033[35m(任选其一)"
         fi
-        purple "  (Qv2ray:主机)"
         tyblue " port(端口)            ：\\033[33m443"
         tyblue " id(用户ID/UUID)       ：\\033[33m${xid_2}"
-        if [ $protocol_2 -eq 1 ]; then
-            tyblue " flow(流控)            ：\\033[33m空"
-            tyblue " encryption(加密)      ：\\033[33mnone"
-        else
-            tyblue " security(加密方式)    ：使用CDN，推荐\\033[33mauto\\033[36m;不使用CDN，推荐\\033[33mnone"
-            purple "  (Qv2ray:安全选项;Shadowrocket:算法)"
-        fi
+        tyblue " flow(流控)            ：\\033[33m空"
+        tyblue " encryption(加密)      ：\\033[33mnone"
         tyblue " ---Transport/StreamSettings(底层传输方式/流设置)---"
         tyblue "  network(传输方式)             ：\\033[33mgrpc"
         tyblue "  serviceName                   ：\\033[33m${serviceName}"
         tyblue "  multiMode                     ：\\033[33mtrue"
-        purple "   (V2RayN(G)伪装类型(type)选择multi"
         tyblue "  security(传输层加密)          ：\\033[33mtls"
-        purple "   (V2RayN(G):底层传输安全;Qv2ray:TLS设置-安全类型)"
         tyblue "  serverName                    ：\\033[33m空"
-        purple "   (V2RayN(G):SNI和伪装域名;Qv2ray:TLS设置-服务器地址;Shadowrocket:Peer 名称)"
         tyblue "  allowInsecure                 ：\\033[33mfalse"
-        purple "   (Qv2ray:TLS设置-允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
-        tyblue "  fingerprint                   ：\\033[33m空\\033[36m/\\033[33mchrome\\033[32m(推荐)\\033[36m/\\033[33mfirefox\\033[36m/\\033[33msafari"
-        purple "                                           (此选项决定是否伪造浏览器指纹，空代表不伪造)"
-        tyblue "  alpn                          ：建议设置为\\033[33mh2,http/1.1 \\033[35m(此选项为空/未配置时，默认值为\"h2,http/1.1\")"
-        purple "   (Qv2ray:TLS设置-ALPN) (注意Qv2ray如果要设置alpn为h2,http/1.1，请填写\"h2|http/1.1\")"
-        tyblue " ------------------------其他-----------------------"
-        tyblue "  Mux(多路复用)                 ：强烈建议关闭"
-        purple "   (V2RayN:设置页面-开启Mux多路复用)"
+        tyblue "  fingerprint                   ：\\033[33m空\\033[32m(推荐)\\033[36m/\\033[33mchrome"
+        tyblue "  alpn                          ：\\033[33mh2,http/1.1"
         tyblue "------------------------------------------------------------------------"
     fi
+    
     if [ $protocol_3 -ne 0 ]; then
         echo
-        
-        tyblue "------------- VLESS-HTTPUpgrade-TLS (有CDN则走CDN，否则直连) -------------"
+        tyblue "------------- VLESS-XHTTP-TLS (可过CDN) -------------"
         tyblue " protocol(传输协议)    ：\\033[33mvless"
-        purple "  (V2RayN选择\"添加[VLESS]服务器\";V2RayNG选择\"手动输入[VLESS]\")"
-
-        fi
         if [ ${#domain_list[@]} -eq 1 ]; then
             tyblue " address(地址)         ：\\033[33m${domain_list[*]}"
         else
             tyblue " address(地址)         ：\\033[33m${domain_list[*]} \\033[35m(任选其一)"
         fi
-        purple "  (Qv2ray:主机)"
         tyblue " port(端口)            ：\\033[33m443"
         tyblue " id(用户ID/UUID)       ：\\033[33m${xid_3}"
-        if [ $protocol_3 -eq 1 ]; then
-            tyblue " flow(流控)            ：\\033[33m空"
-            tyblue " encryption(加密)      ：\\033[33mnone"
-        else
-            tyblue " security(加密方式)    ：使用CDN，推荐\\033[33mauto\\033[36m;不使用CDN，推荐\\033[33mnone"
-            purple "  (Qv2ray:安全选项;Shadowrocket:算法)"
-        fi
+        tyblue " flow(流控)            ：\\033[33m空"
+        tyblue " encryption(加密)      ：\\033[33mnone"
         tyblue " ---Transport/StreamSettings(底层传输方式/流设置)---"
-        tyblue "  network(传输方式)             ：\\033[33mws"
-        purple "   (Shadowrocket传输方式选httpupgrade)"
-        tyblue "  path(路径)                    ：\\033[33m${path}?ed=2048"
+        tyblue "  network(传输方式)             ：\\033[33mxhttp"
+        tyblue "  path(路径)                    ：\\033[33m${path}"
         tyblue "  Host                          ：\\033[33m空"
-        purple "   (V2RayN(G):伪装域名;Qv2ray:协议设置-请求头)"
         tyblue "  security(传输层加密)          ：\\033[33mtls"
-        purple "   (V2RayN(G):底层传输安全;Qv2ray:TLS设置-安全类型)"
         tyblue "  serverName                    ：\\033[33m空"
-        purple "   (V2RayN(G):SNI和伪装域名;Qv2ray:TLS设置-服务器地址;Shadowrocket:Peer 名称)"
         tyblue "  allowInsecure                 ：\\033[33mfalse"
-        purple "   (Qv2ray:TLS设置-允许不安全的证书(不打勾);Shadowrocket:允许不安全(关闭))"
-        tyblue "  fingerprint                   ：\\033[33m空\\033[32m(推荐)\\033[36m/\\033[33mchrome\\033[36m/\\033[33mfirefox\\033[36m/\\033[33msafari"
-        purple "                                           (此选项决定是否伪造浏览器指纹，空代表不伪造)"
-        tyblue "  alpn                          ：此参数不生效，可随意设置 \\033[35m(Websocket模式下alpn将被固定为\"http/1.1\")"
-        tyblue " ------------------------其他-----------------------"
-        tyblue "  Mux(多路复用)                 ：建议关闭"
-        purple "   (V2RayN:设置页面-开启Mux多路复用)"
+        tyblue "  fingerprint                   ：\\033[33m空\\033[32m(推荐)\\033[36m/\\033[33mchrome"
         tyblue "------------------------------------------------------------------------"
     fi
     echo
-    yellow "注：部分选项可能分享链接无法涉及，如果不怕麻烦，建议手动填写"
+    yellow "注：部分选项可能分享链接无法涉及，建议手动填写"
     ask_if "是否生成分享链接？(y/n)" && print_share_link
     echo
-    yellow " 关于fingerprint与alpn，详见：https://github.com/ywm/Xray-script#关于tls握手tls指纹和alpn"
+    tyblue " 脚本最后更新时间：2025.1.1"
     echo
-    blue   " 若要实现Fullcone(NAT类型开放)，需要以下条件："
-    blue   "   如果客户端系统为Windows，并且正在使用透明代理或TUN/Bypass LAN，请确保当前网络设置为专用网络"
-    echo
-    tyblue " 脚本最后更新时间：2023.1.1"
-    echo
-    red    " 此脚本仅供交流学习使用，请勿使用此脚本行违法之事。网络非法外之地，行非法之事，必将接受法律制裁!!!!"
-    tyblue " 2020.11"
+    red    " 此脚本仅供交流学习使用，请勿使用此脚本行违法之事。"
 }
+
 
 install_update_xray_tls_web()
 {
@@ -3297,6 +3370,9 @@ install_update_xray_tls_web()
     if [ $update -eq 0 ]; then
         readProtocolConfig
         readDomain
+        if [ $protocol_1 -ne 0 ]; then
+            readRealityConfig
+        fi
         path="/$(head -c 20 /dev/urandom | md5sum | head -c 10)"
         serviceName="$(head -c 20 /dev/urandom | md5sum | head -c 10)"
         xid_1="$(cat /proc/sys/kernel/random/uuid)"
@@ -3304,6 +3380,17 @@ install_update_xray_tls_web()
         xid_3="$(cat /proc/sys/kernel/random/uuid)"
     else
         get_config_info
+    fi
+
+    # 判断是否需要证书
+    local need_certificate=0
+    if [ $protocol_2 -ne 0 ] || [ $protocol_3 -ne 0 ]; then
+        need_certificate=1
+        tyblue "检测到使用gRPC或XHTTP协议，需要申请SSL证书"
+    fi
+    
+    if [ $protocol_1 -ne 0 ] && [ $need_certificate -eq 0 ]; then
+        tyblue "仅使用REALITY协议，无需申请证书"
     fi
 
     local choice
@@ -3384,7 +3471,12 @@ install_update_xray_tls_web()
         [ $use_existed_php -eq 0 ] && install_php_compile_toolchains
         install_php_dependence
     fi
-    install_acme_dependence
+    
+    # 只有需要证书时才安装acme.sh依赖
+    if [ $need_certificate -eq 1 ]; then
+        install_acme_dependence
+    fi
+    
     if [ $update -eq 0 ]; then
         install_web_dependence ""
     else
@@ -3417,6 +3509,14 @@ install_update_xray_tls_web()
         systemctl stop nginx
         systemctl disable nginx
         rm -rf ${nginx_prefix}/conf.d
+        if [ $need_certificate -eq 1 ]; then
+            # 需要证书时保留证书目录
+            :
+        else
+            # 不需要证书时可以删除
+            rm -rf ${nginx_prefix}/certs
+        fi
+        
         rm -rf ${nginx_prefix}/certs
         rm -rf ${nginx_prefix}/html/issue_certs
         rm -rf ${nginx_prefix}/conf/issue_certs.conf
@@ -3429,15 +3529,23 @@ install_update_xray_tls_web()
     remove_xray
     install_update_xray
 
-    if [ $update -eq 0 ]; then
-        [ -e $HOME/.acme.sh/acme.sh ] && $HOME/.acme.sh/acme.sh --uninstall
-        rm -rf $HOME/.acme.sh
-        curl https://get.acme.sh | sh
-        $HOME/.acme.sh/acme.sh --register-account -ak ec-256 --server zerossl -m "my@example.com"
+    # 证书申请逻辑
+    if [ $need_certificate -eq 1 ]; then
+        if [ $update -eq 0 ]; then
+            # 首次安装，安装acme.sh
+            [ -e $HOME/.acme.sh/acme.sh ] && $HOME/.acme.sh/acme.sh --uninstall
+            rm -rf $HOME/.acme.sh
+            curl https://get.acme.sh | sh
+            $HOME/.acme.sh/acme.sh --register-account -ak ec-256 --server zerossl -m "my@example.com"
+        fi
+        $HOME/.acme.sh/acme.sh --upgrade --auto-upgrade
+        get_all_certs
+    else
+        green "仅使用REALITY协议，跳过证书申请"
+        # 创建证书目录（即使不申请证书，某些配置可能需要这个目录存在）
+        mkdir -p ${nginx_prefix}/certs
     fi
-    $HOME/.acme.sh/acme.sh --upgrade --auto-upgrade
-    get_all_certs
-
+    
     #配置Nginx和Xray
     config_nginx
     config_xray
@@ -3890,6 +3998,11 @@ change_xray_protocol()
     local protocol_2_old=$protocol_2
     local protocol_3_old=$protocol_3
     readProtocolConfig
+    # 如果新增了REALITY，需要配置
+    if [ $protocol_1_old -eq 0 ] && [ $protocol_1 -ne 0 ]; then
+        readRealityConfig
+    fi
+    
     if [ $protocol_1_old -eq $protocol_1 ] && [ $protocol_2_old -eq $protocol_2 ] && [ $protocol_3_old -eq $protocol_3 ]; then
         red "传输协议未更换"
         return 1
@@ -3985,7 +4098,7 @@ change_xray_path()
 {
     get_config_info
     if [ $protocol_3 -eq 0 ]; then
-        red "没有使用HttpUpgrade协议！"
+        red "没有使用XHTTP协议！"
         return 1
     fi
     tyblue "您现在的path是：$path"
@@ -4002,7 +4115,9 @@ change_xray_path()
         ask_if "是否确定?(y/n)" && break
     done
     config_xray
+    config_nginx
     systemctl -q is-active xray && systemctl restart xray
+    systemctl -q is-active nginx && systemctl restart nginx
     green "更换成功！！"
     print_config_info
 }
@@ -4143,6 +4258,115 @@ change_dns()
     fi
     green "修改完成！！"
 }
+
+# 读取REALITY配置
+readRealityConfig()
+{
+    echo -e "\\n\\n\\n"
+    tyblue "---------------------配置 REALITY---------------------"
+    
+    # 自动使用第一个域名作为 serverName
+    local default_server_name="${domain_list[0]}"
+    tyblue "REALITY serverName: $default_server_name"
+    reality_server_names="$default_server_name"
+    
+    # dest 设置为 Nginx unix socket
+    reality_dest="/dev/shm/nginx/reality.sock"
+    tyblue "REALITY dest: $reality_dest (回落到Nginx)"
+    
+    # 生成密钥对
+    green "正在生成REALITY密钥对..."
+    local key_output=$(/usr/local/bin/xray x25519)
+    reality_private_key=$(echo "$key_output" | grep "Private key:" | awk '{print $3}')
+    reality_public_key=$(echo "$key_output" | grep "Public key:" | awk '{print $3}')
+    
+    if [ -z "$reality_private_key" ] || [ -z "$reality_public_key" ]; then
+        red "密钥生成失败！"
+        exit 1
+    fi
+    
+    green "密钥生成成功！"
+    tyblue "Private Key: $reality_private_key"
+    tyblue "Public Key: $reality_public_key"
+    
+    # 生成shortIds
+    tyblue "请输入shortIds (多个用空格分隔，留空则自动生成)"
+    read -p "shortIds: " reality_short_ids
+    if [ -z "$reality_short_ids" ]; then
+        # 自动生成两个shortId，一个空，一个随机
+        reality_short_ids='""'
+        reality_short_ids+=" $(head -c 8 /dev/urandom | xxd -p)"
+        green "已自动生成shortIds"
+    fi
+    
+    echo
+    tyblue "REALITY配置完成！"
+    tyblue "Dest: $reality_dest"
+    tyblue "ServerNames: $reality_server_names"
+    tyblue "ShortIds: $reality_short_ids"
+    echo
+}
+
+change_reality_config()
+{
+    get_config_info
+    if [ $protocol_1 -eq 0 ]; then
+        red "没有使用REALITY协议"
+        return 1
+    fi
+    
+    tyblue "当前REALITY配置："
+    yellow "  ServerNames: $reality_server_names"
+    yellow "  Dest: $reality_dest"
+    yellow "  ShortIds: $reality_short_ids"
+    yellow "  Private Key: $reality_private_key"
+    yellow "  Public Key: $reality_public_key"
+    echo
+    
+    tyblue "请选择要修改的项："
+    tyblue " 1. 重新生成密钥对"
+    tyblue " 2. 重新生成ShortIds"
+    tyblue " 3. 修改ServerNames"
+    tyblue " 0. 返回"
+    
+    local choice=""
+    while [[ ! "$choice" =~ ^(0|[1-3])$ ]]
+    do
+        read -p "您的选择是：" choice
+    done
+    
+    [ $choice -eq 0 ] && return 0
+    
+    if [ $choice -eq 1 ]; then
+        green "正在生成新的密钥对..."
+        local key_output=$(/usr/local/bin/xray x25519)
+        reality_private_key=$(echo "$key_output" | grep "Private key:" | awk '{print $3}')
+        reality_public_key=$(echo "$key_output" | grep "Public key:" | awk '{print $3}')
+        green "新密钥生成成功！"
+        yellow "Private Key: $reality_private_key"
+        yellow "Public Key: $reality_public_key"
+    elif [ $choice -eq 2 ]; then
+        reality_short_ids='""'
+        reality_short_ids+=" $(head -c 8 /dev/urandom | xxd -p)"
+        green "ShortIds已重新生成"
+        yellow "ShortIds: $reality_short_ids"
+    elif [ $choice -eq 3 ]; then
+        tyblue "当前ServerNames: $reality_server_names"
+        tyblue "请输入新的ServerNames (多个用空格分隔)："
+        read -p "ServerNames: " reality_server_names
+        if [ -z "$reality_server_names" ]; then
+            red "ServerNames不能为空"
+            return 1
+        fi
+        green "ServerNames已修改"
+    fi
+    
+    config_xray
+    systemctl -q is-active xray && systemctl restart xray
+    green "REALITY配置已更新！"
+    print_config_info
+}
+
 #开始菜单
 start_menu()
 {
@@ -4158,7 +4382,7 @@ start_menu()
     local cloudreve_status
     [ $cloudreve_is_installed -eq 1 ] && cloudreve_status="\\033[32m已安装" || cloudreve_status="\\033[31m未安装"
     systemctl -q is-active cloudreve && cloudreve_status+="                \\033[32m运行中" || cloudreve_status+="                \\033[31m未运行"
-    tyblue "------------------------ Xray-TLS+Web 搭建/管理脚本 ------------------------"
+    tyblue "------------------------ Xray-REALITY+Web 搭建/管理脚本 ------------------------"
     echo
     tyblue "           Xray   ：           ${xray_status}"
     echo
@@ -4172,20 +4396,19 @@ start_menu()
     echo
     tyblue "----------------------------------注意事项----------------------------------"
     yellow " 1. 此脚本需要一个解析到本服务器的域名"
-    tyblue " 2. 此脚本安装时间较长，建议在安装前阅读："
-    tyblue "      https://github.com/ywm/Xray-script#安装时长说明"
+    yellow " 2. REALITY协议无需证书，可直连使用"
     green  " 3. 建议在纯净的系统上使用此脚本 (VPS控制台-重置系统)"
     tyblue "----------------------------------------------------------------------------"
     echo
     echo
     tyblue " -----------安装/更新/卸载-----------"
     if [ $is_installed -eq 0 ]; then
-        green  "   1. 安装Xray-TLS+Web"
+        green  "   1. 安装Xray-REALITY+Web"
     else
-        green  "   1. 重新安装Xray-TLS+Web"
+        green  "   1. 重新安装Xray-REALITY+Web"
     fi
     purple "         流程：[更新系统组件]->[安装bbr]->[安装php]->安装Nginx->安装Xray->申请证书->配置文件->[安装/配置Cloudreve]"
-    green  "   2. 更新Xray-TLS+Web"
+    green  "   2. 更新Xray-REALITY+Web"
     purple "         流程：更新脚本->[更新系统组件]->[更新bbr]->[更新php]->[更新Nginx]->更新Xray->更新证书->更新配置文件->[更新Cloudreve]"
     tyblue "   3. 检查更新/更新脚本"
     tyblue "   4. 更新系统组件"
@@ -4195,13 +4418,13 @@ start_menu()
     tyblue "   7. 检查更新/更新Nginx"
     tyblue "   8. 更新Cloudreve"
     tyblue "   9. 更新Xray"
-    red    "  10. 卸载Xray-TLS+Web"
+    red    "  10. 卸载Xray-REALITY+Web"
     red    "  11. 卸载php"
     red    "  12. 卸载Cloudreve"
     echo
     tyblue " --------------启动/停止-------------"
-    tyblue "  13. 启动/重启Xray-TLS+Web"
-    tyblue "  14. 停止Xray-TLS+Web"
+    tyblue "  13. 启动/重启Xray-REALITY+Web"
+    tyblue "  14. 停止Xray-REALITY+Web"
     echo
     tyblue " ----------------管理----------------"
     tyblue "  15. 查看配置信息"
@@ -4215,28 +4438,29 @@ start_menu()
     tyblue "  21. 修改传输协议"
     tyblue "  22. 修改id(用户ID/UUID)"
     tyblue "  23. 修改gRPC的serviceName"
-    tyblue "  24. 修改HttpUpgrade的path(路径)"
+    tyblue "  24. 修改XHTTP的path(路径)"
+    tyblue "  25. 修改REALITY配置"
     echo
     tyblue " ----------------其它----------------"
-    tyblue "  25. 精简系统"
-    purple "         删除不必要的系统组件，即使已经安装 Xray-TLS+Web 仍然可以使用此功能"
-    tyblue "  26. 尝试修复退格键无法使用的问题"
+    tyblue "  26. 精简系统"
+    purple "         删除不必要的系统组件，即使已经安装 Xray-REALITY+Web 仍然可以使用此功能"
+    tyblue "  27. 尝试修复退格键无法使用的问题"
     purple "         部分ssh工具(如Xshell)可能有这类问题"
-    tyblue "  27. 修改dns"
+    tyblue "  28. 修改dns"
     yellow "  0. 退出脚本"
     echo
     echo
     local choice=""
-    while [[ ! "$choice" =~ ^(0|[1-9][0-9]*)$ ]] || ((choice>27))
+    while [[ ! "$choice" =~ ^(0|[1-9][0-9]*)$ ]] || ((choice>28))
     do
         read -p "您的选择是：" choice
     done
-    if (( choice==2 || (7<=choice&&choice<=9) || choice==13 || (15<=choice&&choice<=24) )) && [ $is_installed -eq 0 ]; then
-        red "请先安装Xray-TLS+Web！！"
+    if (( choice==2 || (7<=choice&&choice<=9) || choice==13 || (15<=choice&&choice<=25) )) && [ $is_installed -eq 0 ]; then
+        red "请先安装Xray-REALITY+Web！！"
         return 1
     fi
     if (( 17<=choice&&choice<=20 )) && ! (systemctl -q is-active nginx && systemctl -q is-active xray); then
-        red "请先启动Xray-TLS+Web！！"
+        red "请先启动Xray-REALITY+Web！！"
         return 1
     fi
     if [ $choice -eq 1 ]; then
@@ -4346,10 +4570,12 @@ start_menu()
     elif [ $choice -eq 24 ]; then
         change_xray_path
     elif [ $choice -eq 25 ]; then
-        simplify_system
+        change_reality_config
     elif [ $choice -eq 26 ]; then
-        repair_tuige
+        simplify_system
     elif [ $choice -eq 27 ]; then
+        repair_tuige
+    elif [ $choice -eq 28 ]; then
         change_dns
     fi
 }
@@ -4361,3 +4587,4 @@ else
     update=0
     start_menu
 fi
+
