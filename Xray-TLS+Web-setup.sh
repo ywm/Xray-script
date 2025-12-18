@@ -251,7 +251,7 @@ test_important_dependence_installed()
                 temp_exit_code=0
             else
                 red "安装依赖 \"$1\" 出错！"
-                green  "欢迎进行Bug report(https://github.com/ywm/Xray-script/issues)，感谢您的支持"
+                green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
                 yellow "按回车键继续或者Ctrl+c退出"
                 read -s
             fi
@@ -301,7 +301,7 @@ install_dependence()
             $apt_no_install_recommends -y -f install
             if ! $apt_no_install_recommends -y install "$@"; then
                 yellow "依赖安装失败！！"
-                green  "欢迎进行Bug report(https://github.com/ywm/Xray-script/issues)，感谢您的支持"
+                green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
                 yellow "按回车键继续或者Ctrl+c退出"
                 read -s
             fi
@@ -309,7 +309,7 @@ install_dependence()
     else
         if ! redhat_install "$@"; then
             yellow "依赖安装失败！！"
-            green  "欢迎进行Bug report(https://github.com/ywm/Xray-script/issues)，感谢您的支持"
+            green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
             yellow "按回车键继续或者Ctrl+c退出"
             read -s
         fi
@@ -415,7 +415,7 @@ install_epel()
             if $dnf repolist epel | grep -q epel; then
                 return
             fi
-            yellow "epel源安装失败，这可能导致之后的安装失败，也可能没有影响(取决于你的系统的repo包含软件是否丰富)"
+            yellow "epel源安装失败，这可能导致之后的安装失败，也可能没有影响[取决于你的系统的repo包含软件是否丰富]"
             echo
             tyblue "除了安装epel源过程出错，也有可能是因为你使用的系统比较冷门导致安装失败"
             tyblue "这种情况下可以手动安装epel源，之后重新运行脚本"
@@ -423,7 +423,7 @@ install_epel()
             yellow "epel源安装失败！！"
         fi
         echo
-        green  "欢迎进行Bug report(https://github.com/ywm/Xray-script/issues)，感谢您的支持"
+        green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
         yellow "按回车键继续或者Ctrl+c退出"
         read -s
     fi
@@ -435,7 +435,7 @@ fedora_install_remi()
     fi
     if ! redhat_install "https://rpms.remirepo.net/fedora/remi-release-$systemVersion.rpm"; then
         yellow "remi源安装失败！！"
-        green  "欢迎进行Bug report(https://github.com/ywm/Xray-script/issues)，感谢您的支持"
+        green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
         yellow "按回车键继续或者Ctrl+c退出"
         read -s
     fi
@@ -501,7 +501,7 @@ swap_on()
 {
     if [ $using_swap_now -ne 0 ]; then
         red    "开启swap错误发生"
-        green  "欢迎进行Bug report(https://github.com/ywm/Xray-script/issues)，感谢您的支持"
+        green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
         yellow "按回车键继续或者Ctrl+c退出"
         read -s
     fi
@@ -514,7 +514,7 @@ swap_on()
             rm -rf ${temp_dir}/swap
             red    "开启swap失败！"
             yellow "可能是机器内存和硬盘空间都不足"
-            green  "欢迎进行Bug report(https://github.com/ywm/Xray-script/issues)，感谢您的支持"
+            green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
             yellow "按回车键继续或者Ctrl+c退出"
             read -s
         fi
@@ -528,7 +528,7 @@ swap_off()
             using_swap_now=0
         else
             red    "关闭swap失败！"
-            green  "欢迎进行Bug report(https://github.com/ywm/Xray-script/issues)，感谢您的
+            green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的
 支持"
             yellow "按回车键继续或者Ctrl+c退出"
             read -s
@@ -902,7 +902,7 @@ get_system_info()
     timezone="$(ls -l /etc/localtime | awk -F zoneinfo/ '{print $NF}')"
     if [[ ! -L /etc/localtime ]] || [ "$timezone" == "" ]; then
         yellow "获取时区失败！"
-        green  "欢迎进行Bug report(https://github.com/ywm/Xray-script/issues)，感谢您的支持"
+        green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
         yellow "按回车键继续或者Ctrl+c退出"
         read -s
     fi
@@ -930,7 +930,7 @@ get_system_info()
     systemVersion="$(bash -c "echo $(grep '^[ '$'\t]*VERSION_ID[ '$'\t]*=' /etc/os-release | cut -d = -f 2-)")"
     if [ "$(bash -c "echo $(grep '^[ '$'\t]*ID[ '$'\t]*=' /etc/os-release | cut -d = -f 2-)")" == "" ] || [ "$systemVersion" == "" ]; then
         yellow "获取系统信息失败！"
-        green  "欢迎进行Bug report(https://github.com/ywm/Xray-script/issues)，感谢您的支持"
+        green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
         yellow "按回车键继续或者Ctrl+c退出"
         read -s
     fi
@@ -977,7 +977,7 @@ check_nginx_installed_system()
     fi
     red "卸载失败！"
     yellow "请尝试更换系统，建议使用Ubuntu最新版系统"
-    green  "欢迎进行Bug report(https://github.com/ywm/Xray-script/issues)，感谢您的支持"
+    green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
     exit 1
 }
 
@@ -1575,7 +1575,7 @@ install_bbr()
                         if ! version_ge "$(dpkg --list | grep '^[ '$'\t]*ii[ '$'\t][ '$'\t]*linux-base[ '$'\t]' | awk '{print $3}')" "4.5ubuntu1~16.04.1"; then
                             if ! $apt update; then
                                 red "$apt update出错"
-                                green  "欢迎进行Bug report(https://github.com/ywm/Xray-script/issues)，感谢您的支持"
+                                green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
                                 yellow "按回车键继续或者Ctrl+c退出"
                                 read -s
                             fi
@@ -1968,7 +1968,7 @@ install_php_dependence()
             $apt_no_install_recommends -y -f install
             if ! $apt_no_install_recommends -y install libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-2-dev libffi-dev libpng-dev libgd-dev libwebp-dev libjpeg-dev libxpm-dev libfreetype6-dev libgmp-dev libc-client2007e-dev libicu-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt1-dev libzip-dev libmagickwand-dev && ! $apt_no_install_recommends -y install libxml2-dev libsqlite3-dev libsystemd-dev libacl1-dev libapparmor-dev libssl-dev libkrb5-dev libpcre2-dev zlib1g-dev libbz2-dev libcurl4-openssl-dev libqdbm-dev libdb-dev libtokyocabinet-dev liblmdb-dev libenchant-dev libffi-dev libpng-dev libgd-dev libwebp-dev libjpeg-dev libxpm-dev libfreetype6-dev libgmp-dev libc-client2007e-dev libicu-dev libldap2-dev libsasl2-dev libonig-dev unixodbc-dev freetds-dev libpq-dev libpspell-dev libedit-dev libmm-dev libsnmp-dev libsodium-dev libargon2-dev libtidy-dev libxslt1-dev libzip-dev libmagickwand-dev; then
                 yellow "依赖安装失败！！"
-                green  "欢迎进行Bug report(https://github.com/ywm/Xray-script/issues)，感谢您的支持"
+                green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
                 yellow "按回车键继续或者Ctrl+c退出"
                 read -s
             fi
@@ -2039,7 +2039,7 @@ compile_php()
     if ! make -j$cpu_thread_num; then
         swap_off
         red    "php编译失败！"
-        green  "欢迎进行Bug report(https://github.com/ywm/Xray-script/issues)，感谢您的支持"
+        green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
         yellow "在Bug修复前，建议使用Ubuntu最新版系统"
         exit 1
     fi
@@ -2062,7 +2062,7 @@ instal_php_imagick()
     if ! make -j$cpu_thread_num; then
         swap_off
         yellow "php-imagick编译失败"
-        green  "欢迎进行Bug report(https://github.com/ywm/Xray-script/issues)，感谢您的支持"
+        green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
         yellow "在Bug修复前，建议使用Ubuntu最新版系统"
         yellow "按回车键继续或者按Ctrl+c终止"
         read -s
@@ -2199,7 +2199,7 @@ compile_nginx()
             make clean
             ./configure "${configure_args[@]}"
             if ! make -j$cpu_thread_num; then
-                green  "欢迎进行Bug report(https://github.com/ywm/Xray-script/issues)，感谢您的支持"
+                green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
                 yellow "在Bug修复前，建议使用Ubuntu最新版系统"
                 exit 1
             else
@@ -2207,7 +2207,7 @@ compile_nginx()
                 openssl_supports_quic=0
             fi
         else
-            green  "欢迎进行Bug report(https://github.com/ywm/Xray-script/issues)，感谢您的支持"
+            green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
             yellow "在Bug修复前，建议使用Ubuntu最新版系统"
             exit 1
         fi
@@ -3252,12 +3252,12 @@ print_config_info()
 {
     echo -e "\\n\\n\\n"
     if [ $protocol_1 -ne 0 ]; then
-        tyblue "--------------------- VLESS-Vision-REALITY (直连) ---------------------"
+        tyblue "--------------------- VLESS-Vision-REALITY [直连] ---------------------"
         tyblue " protocol传输协议    ：\\033[33mvless"
         purple "  V2RayN选择\"添加[VLESS]服务器\";V2RayNG选择\"手动输入[VLESS]\""
         tyblue " address地址         ：\\033[33m服务器ip"
         purple "  Qv2ray:主机"
-        tyblue " port(端口)            ：\\033[33m443"
+        tyblue " port端口            ：\\033[33m443"
         tyblue " id用户ID/UUID       ：\\033[33m${xid_1}"
         tyblue " flow流控            ：\\033[33mxtls-rprx-vision"
         tyblue " encryption加密      ：\\033[33mnone"
@@ -3273,9 +3273,9 @@ print_config_info()
         purple "   客户端填写此域名"
         tyblue "  fingerprint                   ：\\033[33mchrome\\033[32m(推荐)\\033[36m/\\033[33mfirefox\\033[36m/\\033[33msafari\\033[36m/\\033[33medge"
         purple "   浏览器指纹，REALITY必须设置"
-        tyblue "  spiderX                       ：\\033[33m/ \\033[35m(可选，爬虫路径)"
+        tyblue "  spiderX                       ：\\033[33m/ \\033[35m 可选，爬虫路径 "
         tyblue " ------------------------其他-----------------------"
-        tyblue "  Mux(多路复用)                 ：建议关闭"
+        tyblue "  Mux[多路复用]                 ：建议关闭"
         tyblue "------------------------------------------------------------------------"
         echo
         yellow " REALITY 详细配置："
@@ -3288,7 +3288,7 @@ print_config_info()
     
     if [ $protocol_2 -ne 0 ]; then
         echo
-        tyblue "---------------- VLESS-gRPC-TLS (可过CDN) ---------------"
+        tyblue "---------------- VLESS-gRPC-TLS [可过CDN] ---------------"
         tyblue " protocol传输协议    ：\\033[33mvless"
         if [ ${#domain_list[@]} -eq 1 ]; then
             tyblue " address地址         ：\\033[33m${domain_list[*]}"
