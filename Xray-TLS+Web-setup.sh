@@ -37,10 +37,11 @@ cloudreve_service="/etc/systemd/system/cloudreve.service"
 
 # 1. 新增Reality相关变量和函数
 reality_private_key=""
-reality_public_key=""
+reality_password=""
 reality_short_ids=""
 reality_server_names=""
 reality_dest=""
+reality_hash32=""
 
 
 unset cloudreve_is_installed
@@ -662,8 +663,8 @@ get_config_info()
         reality_server_names="$(grep '"serverNames"' $xray_config | sed 's/.*\[//;s/\].*//' | tr ',' ' ' | sed 's/"//g')"
         reality_short_ids="$(grep '"shortIds"' $xray_config | sed 's/.*\[//;s/\].*//' | tr ',' ' ')"
         
-        # 生成公钥
-        reality_public_key=$(/usr/local/bin/xray x25519 -i "$reality_private_key" | grep "Public key:" | awk '{print $3}')
+        # 生成密码
+        reality_password=$(/usr/local/bin/xray x25519 -i "$reality_private_key" | awk '/^Password:/ {print $2}')
     else
         protocol_1=0
     fi
@@ -3267,7 +3268,7 @@ print_share_link()
         green  "============ VLESS-Vision-REALITY 直连 ============"
         local first_short_id="${reality_short_ids%% *}"
         first_short_id="${first_short_id//\"/}"
-        tyblue "vless://${xid_1}@${ip}:443?security=reality&sni=${reality_server_names}&fp=chrome&pbk=${reality_public_key}&sid=${first_short_id}&type=tcp&flow=xtls-rprx-vision#VLESS-REALITY"
+        tyblue "vless://${xid_1}@${ip}:443?security=reality&sni=${reality_server_names}&fp=chrome&pbk=${reality_password}&sid=${first_short_id}&type=tcp&flow=xtls-rprx-vision#VLESS-REALITY"
         echo
     fi
   
@@ -3305,7 +3306,7 @@ print_config_info()
         tyblue "  network传输方式             ：\\033[33mtcp"
         tyblue "  security传输层加密          ：\\033[33mreality"
         tyblue " ---REALITY Settings---"
-        tyblue "  Public Key                    ：\\033[33m${reality_public_key}"
+        tyblue "  Password                    ：\\033[33m${reality_password}"
         local first_short_id="${reality_short_ids%% *}"
         first_short_id="${first_short_id//\"/}"
         tyblue "  Short ID                      ：\\033[33m${first_short_id} \\033[35m[可为空或列表中任一]"
@@ -3323,7 +3324,7 @@ print_config_info()
         yellow "  ServerNames: ${reality_server_names}"
         yellow "  ShortIds: ${reality_short_ids}"
         yellow "  Private Key: ${reality_private_key}"
-        yellow "  Public Key: ${reality_public_key}"
+        yellow "  Password: ${reality_password}"
     fi
     
     if [ $protocol_2 -ne 0 ]; then
@@ -4317,17 +4318,18 @@ readRealityConfig()
     # 生成密钥对
     green "正在生成REALITY密钥对..."
     local key_output=$(/usr/local/bin/xray x25519)
-    reality_private_key=$(echo "$key_output" | grep "Private key:" | awk '{print $3}')
-    reality_public_key=$(echo "$key_output" | grep "Public key:" | awk '{print $3}')
-    
-    if [ -z "$reality_private_key" ] || [ -z "$reality_public_key" ]; then
+    reality_private_key=$(echo "$key_output" | awk '/^PrivateKey:/ {print $2}')
+    reality_password=$(echo "$key_output" | awk '/^Password:/ {print $2}')
+    reality_hash32=$(echo "$key_output" | awk '/^Hash32:/ {print $2}')
+
+    if [ -z "$reality_private_key" ] || [ -z "$reality_password" ]; then
         red "密钥生成失败！"
         exit 1
     fi
     
     green "密钥生成成功！"
-    tyblue "Private Key: $reality_private_key"
-    tyblue "Public Key: $reality_public_key"
+    tyblue "PrivateKey: $reality_private_key"
+    tyblue "Password:: $reality_password"
     
     # 生成shortIds
     tyblue "请输入shortIds [多个用空格分隔，留空则自动生成]"
@@ -4359,8 +4361,8 @@ change_reality_config()
     yellow "  ServerNames: $reality_server_names"
     yellow "  Dest: $reality_dest"
     yellow "  ShortIds: $reality_short_ids"
-    yellow "  Private Key: $reality_private_key"
-    yellow "  Public Key: $reality_public_key"
+    yellow "  PrivateKey: $reality_private_key"
+    yellow "  Password: $reality_password"
     echo
     
     tyblue "请选择要修改的项："
@@ -4380,11 +4382,11 @@ change_reality_config()
     if [ $choice -eq 1 ]; then
         green "正在生成新的密钥对..."
         local key_output=$(/usr/local/bin/xray x25519)
-        reality_private_key=$(echo "$key_output" | grep "Private key:" | awk '{print $3}')
-        reality_public_key=$(echo "$key_output" | grep "Public key:" | awk '{print $3}')
+        reality_private_key=$(echo "$key_output" | awk '/^PrivateKey:/ {print $2}')
+        reality_password=$(echo "$key_output" | awk '/^Password:/ {print $2}')
         green "新密钥生成成功！"
-        yellow "Private Key: $reality_private_key"
-        yellow "Public Key: $reality_public_key"
+        yellow "PrivateKey: $reality_private_key"
+        yellow "Password: $reality_password"
     elif [ $choice -eq 2 ]; then
         reality_short_ids='""'
         reality_short_ids+=" $(head -c 8 /dev/urandom | xxd -p)"
