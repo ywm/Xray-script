@@ -168,7 +168,7 @@ ask_update_script()
 {
     if check_script_update; then
         green "脚本可升级"
-        ask_if "是否升级脚本？(y/n)" && update_script
+        ask_if "是否升级脚本？[y/n]" && update_script
     else
         green "脚本已经是最新版本"
     fi
@@ -177,7 +177,7 @@ ask_update_script_force()
 {
     if check_script_update; then
         green "脚本可升级"
-        if ask_if "是否升级脚本？(y/n)"; then
+        if ask_if "是否升级脚本？[y/n]"; then
             update_script
         else
             red "请先更新脚本"
@@ -528,8 +528,7 @@ swap_off()
             using_swap_now=0
         else
             red    "关闭swap失败！"
-            green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的
-支持"
+            green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
             yellow "按回车键继续或者Ctrl+c退出"
             read -s
         fi
@@ -969,7 +968,7 @@ check_nginx_installed_system()
     yellow " 如果您不记得之前有安装过Nginx，那么可能是使用别的一键脚本时安装的"
     yellow " 建议使用纯净的系统运行此脚本"
     echo
-    ! ask_if "是否尝试卸载？(y/n)" && exit 0
+    ! ask_if "是否尝试卸载？[y/n]" && exit 0
     apt_purge '^nginx' '^libnginx'
     $dnf -y remove 'nginx*'
     if [[ ! -f /usr/lib/systemd/system/nginx.service ]] && [[ ! -f /lib/systemd/system/nginx.service ]]; then
@@ -1002,7 +1001,7 @@ check_SELinux()
     }
     if getenforce 2>/dev/null | grep -wqi Enforcing || grep -Eq '^[ '$'\t]*SELINUX[ '$'\t]*=[ '$'\t]*enforcing[ '$'\t]*$' /etc/sysconfig/selinux 2>/dev/null || grep -Eq '^[ '$'\t]*SELINUX[ '$'\t]*=[ '$'\t]*enforcing[ '$'\t]*$' /etc/selinux/config 2>/dev/null; then
         yellow "检测到SELinux已开启，脚本可能无法正常运行"
-        if ask_if "尝试关闭SELinux?(y/n)"; then
+        if ask_if "尝试关闭SELinux?[y/n]"; then
             turn_off_selinux
         else
             exit 0
@@ -1022,7 +1021,7 @@ check_ssh_timeout()
     tyblue " 如果中途断开连接将会很麻烦"
     tyblue " 设置ssh连接超时时间将有效降低断连可能性"
     echo
-    ! ask_if "是否设置ssh连接超时时间？(y/n)" && return 0
+    ! ask_if "是否设置ssh连接超时时间？[y/n]" && return 0
     sed -i '/^[ \t]*ClientAliveInterval[ \t]/d' /etc/ssh/sshd_config
     sed -i '/^[ \t]*ClientAliveCountMax[ \t]/d' /etc/ssh/sshd_config
     echo >> /etc/ssh/sshd_config
@@ -1709,7 +1708,7 @@ install_bbr()
         elif [ $choice -eq 10 ]; then
             tyblue " 该操作将会卸载除现在正在使用的内核外的其余内核"
             tyblue "    您正在使用的内核是：$(uname -r)"
-            ask_if "是否继续？(y/n)" && remove_other_kernel
+            ask_if "是否继续？[y/n]" && remove_other_kernel
         else
             break
         fi
@@ -1838,7 +1837,7 @@ readPretend()
                 yellow " 6. Fedora 30+"
                 yellow " 7. Oracle Linux 8+"
                 yellow " 8. 其他以 Red Hat 8+ 为基的系统"
-                ! ask_if "确定选择吗？(y/n)" && queren=0 && continue
+                ! ask_if "确定选择吗？[y/n]" && queren=0 && continue
             elif [ $release == "deepin" ]; then
                 red "php暂不支持deepin，请更换其他系统"
                 sleep 3s
@@ -1849,11 +1848,11 @@ readPretend()
                 tyblue "安装Nextcloud需要安装php"
                 yellow "编译&&安装php可能需要额外消耗15-60分钟"
                 yellow "php将占用一定系统资源，不建议内存<512M的机器使用"
-                ! ask_if "确定选择吗？(y/n)" && queren=0
+                ! ask_if "确定选择吗？[y/n]" && queren=0
             fi
         elif [ $pretend -eq 4 ]; then
             tyblue "安装完成后请在 \"${nginx_prefix}/html/$1\" 放置您的网站源代码"
-            ! ask_if "确认并继续？(y/n)" && queren=0
+            ! ask_if "确认并继续？[y/n]" && queren=0
         elif [ $pretend -eq 5 ]; then
             yellow "输入反向代理网址，格式如：\"https://v.qq.com\""
             pretend=""
@@ -1917,7 +1916,7 @@ readDomain()
             done
         fi
         echo
-        ask_if "您输入的域名是\"$domain\"，确认吗？(y/n)" && queren=1
+        ask_if "您输入的域名是\"$domain\"，确认吗？[y/n]" && queren=1
     done
     readPretend "$domain"
     true_domain_list+=("$domain")
@@ -2175,9 +2174,50 @@ compile_nginx()
     sed -i "s/OPTIMIZE[ \\t]*=>[ \\t]*'-O'/OPTIMIZE          => '-O3'/g" src/http/modules/perl/Makefile.PL
     sed -i 's/NGX_PERL_CFLAGS="$CFLAGS `$NGX_PERL -MExtUtils::Embed -e ccopts`"/NGX_PERL_CFLAGS="`$NGX_PERL -MExtUtils::Embed -e ccopts` $CFLAGS"/g' auto/lib/perl/conf
     sed -i 's/NGX_PM_CFLAGS=`$NGX_PERL -MExtUtils::Embed -e ccopts`/NGX_PM_CFLAGS="`$NGX_PERL -MExtUtils::Embed -e ccopts` $CFLAGS"/g' auto/lib/perl/conf
-    ./configure --prefix="${nginx_prefix}" --user=root --group=root --with-threads --with-file-aio --with-http_ssl_module --with-http_v2_module --with-http_realip_module --with-http_addition_module --with-http_xslt_module=dynamic --with-http_image_filter_module=dynamic --with-http_geoip_module=dynamic --with-http_sub_module --with-http_dav_module --with-http_flv_module --with-http_mp4_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_auth_request_module --with-http_random_index_module --with-http_secure_link_module --with-http_degradation_module --with-http_slice_module --with-http_stub_status_module --with-http_perl_module=dynamic --with-mail=dynamic --with-mail_ssl_module --with-stream=dynamic --with-stream_ssl_module --with-stream_realip_module --with-stream_geoip_module=dynamic --with-stream_ssl_preread_module --with-google_perftools_module --with-compat --with-cc-opt="${cflags[*]}" --with-openssl="../$openssl_version" --with-openssl-opt="${cflags[*]}"
+    #./configure --prefix="${nginx_prefix}" --user=root --group=root --with-threads --with-file-aio --with-http_ssl_module --with-http_v2_module --with-http_realip_module --with-http_addition_module --with-http_xslt_module=dynamic --with-http_image_filter_module=dynamic --with-http_geoip_module=dynamic --with-http_sub_module --with-http_dav_module --with-http_flv_module --with-http_mp4_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_auth_request_module --with-http_random_index_module --with-http_secure_link_module --with-http_degradation_module --with-http_slice_module --with-http_stub_status_module --with-http_perl_module=dynamic --with-mail=dynamic --with-mail_ssl_module --with-stream=dynamic --with-stream_ssl_module --with-stream_realip_module --with-stream_geoip_module=dynamic --with-stream_ssl_preread_module --with-google_perftools_module --with-compat --with-cc-opt="${cflags[*]}" --with-openssl="../$openssl_version" --with-openssl-opt="${cflags[*]}"
     #--with-select_module --with-poll_module --with-cpp_test_module --with-pcre --with-pcre-jit --with-libatomic
     #./configure --prefix=/usr/local/nginx --with-openssl=../$openssl_version --with-mail=dynamic --with-mail_ssl_module --with-stream=dynamic --with-stream_ssl_module --with-stream_realip_module --with-stream_geoip_module=dynamic --with-stream_ssl_preread_module --with-http_ssl_module --with-http_v2_module --with-http_realip_module --with-http_addition_module --with-http_xslt_module=dynamic --with-http_image_filter_module=dynamic --with-http_geoip_module=dynamic --with-http_sub_module --with-http_dav_module --with-http_flv_module --with-http_mp4_module --with-http_gunzip_module --with-http_gzip_static_module --with-http_auth_request_module --with-http_random_index_module --with-http_secure_link_module --with-http_degradation_module --with-http_slice_module --with-http_stub_status_module --with-http_perl_module=dynamic --with-pcre --with-libatomic --with-compat --with-cpp_test_module --with-google_perftools_module --with-file-aio --with-threads --with-poll_module --with-select_module --with-cc-opt="-Wno-error ${cflags[*]}"
+
+      # 构建配置参数数组
+    local configure_args=(
+        "--prefix=${nginx_prefix}"
+        "--user=root"
+        "--group=root"
+        "--with-threads"
+        "--with-file-aio"
+        "--with-http_ssl_module"
+        "--with-http_v2_module"
+        "--with-http_realip_module"
+        "--with-http_addition_module"
+        "--with-http_xslt_module=dynamic"
+        "--with-http_image_filter_module=dynamic"
+        "--with-http_geoip_module=dynamic"
+        "--with-http_sub_module"
+        "--with-http_dav_module"
+        "--with-http_flv_module"
+        "--with-http_mp4_module"
+        "--with-http_gunzip_module"
+        "--with-http_gzip_static_module"
+        "--with-http_auth_request_module"
+        "--with-http_random_index_module"
+        "--with-http_secure_link_module"
+        "--with-http_degradation_module"
+        "--with-http_slice_module"
+        "--with-http_stub_status_module"
+        "--with-http_perl_module=dynamic"
+        "--with-mail=dynamic"
+        "--with-mail_ssl_module"
+        "--with-stream=dynamic"
+        "--with-stream_ssl_module"
+        "--with-stream_realip_module"
+        "--with-stream_geoip_module=dynamic"
+        "--with-stream_ssl_preread_module"
+        "--with-google_perftools_module"
+        "--with-compat"
+        "--with-cc-opt=${cflags[*]}"
+        "--with-openssl=../$openssl_version"
+        "--with-openssl-opt=${cflags[*]}"
+    )
     
     # 如果OpenSSL支持QUIC，则添加HTTP/3相关选项
     if [ $openssl_supports_quic -eq 1 ]; then
@@ -2832,7 +2872,7 @@ EOF
             # gRPC location
             if [ $protocol_2 -ne 0 ]; then
 cat >> $nginx_config<<EOF
-    location ~ ^/$serviceName/(TunMulti|Tun)\$ {
+    location ~ ^/$serviceName/(TunMulti|Tun)$ {
         client_max_body_size 0;
         grpc_pass grpc://unix:/dev/shm/xray/grpc.sock;
         grpc_set_header Host \$host;
@@ -3224,7 +3264,7 @@ print_share_link()
     echo
     tyblue "分享链接："
     if [ $protocol_1 -eq 0 ]; then
-        green  "============ VLESS-Vision-REALITY 直连 ============
+        green  "============ VLESS-Vision-REALITY 直连 ============"
         local first_short_id="${reality_short_ids%% *}"
         first_short_id="${first_short_id//\"/}"
         tyblue "vless://${xid_1}@${ip}:443?security=reality&sni=${reality_server_names}&fp=chrome&pbk=${reality_public_key}&sid=${first_short_id}&type=tcp&flow=xtls-rprx-vision#VLESS-REALITY"
@@ -3261,17 +3301,17 @@ print_config_info()
         tyblue " id用户ID/UUID       ：\\033[33m${xid_1}"
         tyblue " flow流控            ：\\033[33mxtls-rprx-vision"
         tyblue " encryption加密      ：\\033[33mnone"
-        tyblue " ---Transport/StreamSettings(底层传输方式/流设置)---"
+        tyblue " ---Transport/StreamSettings[底层传输方式/流设置]---"
         tyblue "  network传输方式             ：\\033[33mtcp"
         tyblue "  security传输层加密          ：\\033[33mreality"
         tyblue " ---REALITY Settings---"
         tyblue "  Public Key                    ：\\033[33m${reality_public_key}"
         local first_short_id="${reality_short_ids%% *}"
         first_short_id="${first_short_id//\"/}"
-        tyblue "  Short ID                      ：\\033[33m${first_short_id} \\033[35m(可为空或列表中任一)"
+        tyblue "  Short ID                      ：\\033[33m${first_short_id} \\033[35m[可为空或列表中任一]"
         tyblue "  serverName                    ：\\033[33m${reality_server_names}"
         purple "   客户端填写此域名"
-        tyblue "  fingerprint                   ：\\033[33mchrome\\033[32m(推荐)\\033[36m/\\033[33mfirefox\\033[36m/\\033[33msafari\\033[36m/\\033[33medge"
+        tyblue "  fingerprint                   ：\\033[33mchrome\\033[32m[推荐]\\033[36m/\\033[33mfirefox\\033[36m/\\033[33msafari\\033[36m/\\033[33medge"
         purple "   浏览器指纹，REALITY必须设置"
         tyblue "  spiderX                       ：\\033[33m/ \\033[35m 可选，爬虫路径 "
         tyblue " ------------------------其他-----------------------"
@@ -3293,7 +3333,7 @@ print_config_info()
         if [ ${#domain_list[@]} -eq 1 ]; then
             tyblue " address地址         ：\\033[33m${domain_list[*]}"
         else
-            tyblue " address(地址         ：\\033[33m${domain_list[*]} \\033[35m(任选其一)"
+            tyblue " address(地址         ：\\033[33m${domain_list[*]} \\033[35m[任选其一]"
         fi
         tyblue " port端口            ：\\033[33m443"
         tyblue " id用户ID/UUID       ：\\033[33m${xid_2}"
@@ -3306,14 +3346,14 @@ print_config_info()
         tyblue "  security传输层加密          ：\\033[33mtls"
         tyblue "  serverName                    ：\\033[33m空"
         tyblue "  allowInsecure                 ：\\033[33mfalse"
-        tyblue "  fingerprint                   ：\\033[33m空\\033[32m(推荐)\\033[36m/\\033[33mchrome"
+        tyblue "  fingerprint                   ：\\033[33m空\\033[32m[推荐]\\033[36m/\\033[33mchrome"
         tyblue "  alpn                          ：\\033[33mh2,http/1.1"
         tyblue "------------------------------------------------------------------------"
     fi
     
     if [ $protocol_3 -ne 0 ]; then
         echo
-        tyblue "------------- VLESS-XHTTP-TLS (可过CDN) -------------"
+        tyblue "------------- VLESS-XHTTP-TLS [可过CDN] -------------"
         tyblue " protocol传输协议    ：\\033[33mvless"
         if [ ${#domain_list[@]} -eq 1 ]; then
             tyblue " address[地址]         ：\\033[33m${domain_list[*]}"
@@ -3324,14 +3364,14 @@ print_config_info()
         tyblue " id用户ID/UUID       ：\\033[33m${xid_3}"
         tyblue " flow流控            ：\\033[33m空"
         tyblue " encryption加密      ：\\033[33mnone"
-        tyblue " ---Transport/StreamSettings(底层传输方式/流设置)---"
+        tyblue " ---Transport/StreamSettings[底层传输方式/流设置]---"
         tyblue "  network传输方式             ：\\033[33mxhttp"
         tyblue "  path路径                    ：\\033[33m${path}"
         tyblue "  Host                          ：\\033[33m空"
         tyblue "  security传输层加密          ：\\033[33mtls"
         tyblue "  serverName                    ：\\033[33m空"
         tyblue "  allowInsecure                 ：\\033[33mfalse"
-        tyblue "  fingerprint                   ：\\033[33m空\\033[32m(推荐)\\033[36m/\\033[33mchrome"
+        tyblue "  fingerprint                   ：\\033[33m空\\033[32m[推荐]\\033[36m/\\033[33mchrome"
         tyblue "------------------------------------------------------------------------"
     fi
     echo
@@ -3405,7 +3445,7 @@ install_update_xray_tls_web()
     if [ $install_php -eq 1 ]; then
         if [ $update -eq 1 ]; then
             if check_php_update; then
-                ! ask_if "检测到php有新版本，是否更新?(y/n)" && use_existed_php=1
+                ! ask_if "检测到php有新版本，是否更新?[y/n]" && use_existed_php=1
             else
                 green "php已经是最新版本，不更新"
                 use_existed_php=1
@@ -3427,7 +3467,7 @@ install_update_xray_tls_web()
     local use_existed_nginx=0
     if [ $update -eq 1 ]; then
         if check_nginx_update; then
-            ! ask_if "检测到Nginx有新版本，是否更新?(y/n)" && use_existed_nginx=1
+            ! ask_if "检测到Nginx有新版本，是否更新?[y/n]" && use_existed_nginx=1
         else
             green "Nginx已经是最新版本，不更新"
             use_existed_nginx=1
@@ -3616,7 +3656,7 @@ install_check_update_update_php()
         yellow " 6. Fedora 30+"
         yellow " 7. Oracle Linux 8+"
         yellow " 8. 其他以 Red Hat 8+ 为基的系统"
-        ! ask_if "确定选择吗？(y/n)" && return 0
+        ! ask_if "确定选择吗？[y/n]" && return 0
     elif [ $release == "deepin" ]; then
         red "php暂不支持deepin，请选择其他系统"
         return 1
@@ -3630,7 +3670,7 @@ install_check_update_update_php()
         ask_update_script_force
         if check_php_update; then
             green "php有新版本"
-            ! ask_if "是否更新？(y/n)" && return 0
+            ! ask_if "是否更新？[y/n]" && return 0
         else
             green "php已是最新版本"
             return 0
@@ -3641,7 +3681,7 @@ install_check_update_update_php()
         tyblue "安装php用于运行nextcloud网盘"
         yellow "编译&&安装php可能需要消耗15-60分钟"
         yellow "且php将占用一定系统资源，不建议内存<512M的机器使用"
-        ! ask_if "是否继续？(y/n)" && return 0
+        ! ask_if "是否继续？[y/n]" && return 0
     fi
     check_ssh_timeout
     get_config_info
@@ -3668,7 +3708,7 @@ check_update_update_nginx()
     ask_update_script_force
     if check_nginx_update; then
         green "Nginx有新版本"
-        ! ask_if "是否更新？(y/n)" && return 0
+        ! ask_if "是否更新？[y/n]" && return 0
     else
         green "Nginx已是最新版本"
         return 0
@@ -3735,8 +3775,8 @@ reinit_domain()
     check_important_dependence_installed wget wget
     install_acme_dependence
     ask_update_script
-    yellow "重置域名将删除所有现有域名(包括域名证书、伪装网站等)"
-    ! ask_if "是否继续？(y/n)" && return 0
+    yellow "重置域名将删除所有现有域名[包括域名证书、伪装网站等]"
+    ! ask_if "是否继续？[y/n]" && return 0
     get_config_info
     readDomain
     if [ "${pretend_list[-1]}" == "2" ] && [ $php_is_installed -eq 0 ]; then
@@ -3876,7 +3916,7 @@ delete_domain()
     ((delete--))
     if [ "${pretend_list[$delete]}" == "2" ]; then
         red "警告：此操作可能导致该域名下的Nextcloud网盘数据被删除"
-        ! ask_if "是否要继续？(y/n)" && return 0
+        ! ask_if "是否要继续？[y/n]" && return 0
     fi
     $HOME/.acme.sh/acme.sh --remove --domain ${true_domain_list[$delete]} --ecc
     rm -rf $HOME/.acme.sh/${true_domain_list[$delete]}_ecc
@@ -3937,7 +3977,7 @@ change_pretend()
     fi
     if [ "${pretend_list[$change]}" == "2" ]; then
         red "警告：此操作可能导致该域名下的Nextcloud网盘数据被删除"
-        ! ask_if "是否要继续？(y/n)" && return 0
+        ! ask_if "是否要继续？[y/n]" && return 0
     fi
     local need_cloudreve=0
     check_need_cloudreve && need_cloudreve=1
@@ -3971,7 +4011,7 @@ reinstall_cloudreve()
     get_config_info
     ! check_need_cloudreve && red "Cloudreve目前没有绑定域名" && return 1
     red "重新安装Cloudreve将删除所有的网盘文件以及帐户信息，并重置管理员密码"
-    ! ask_if "确定要继续吗？(y/n)" && return 0
+    ! ask_if "确定要继续吗？[y/n]" && return 0
     [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
     check_SELinux
     check_important_dependence_installed ca-certificates ca-certificates
@@ -4043,7 +4083,7 @@ change_xray_id()
     fi
     local xid="xid_$flag"
     tyblue "您现在的id是：${!xid}"
-    ! ask_if "是否要继续?(y/n)" && return 0
+    ! ask_if "是否要继续?[y/n]" && return 0
     while true
     do
         xid=""
@@ -4053,7 +4093,7 @@ change_xray_id()
             read xid
         done
         tyblue "您输入的id是：$xid"
-        ask_if "是否确定?(y/n)" && break
+        ask_if "是否确定?[y/n]" && break
     done
     if [ $flag -eq 1 ]; then
         xid_1="$xid"
@@ -4075,17 +4115,17 @@ change_xray_serviceName()
         return 1
     fi
     tyblue "您现在的serviceName是：$serviceName"
-    ! ask_if "是否要继续?(y/n)" && return 0
+    ! ask_if "是否要继续?[y/n]" && return 0
     while true
     do
         serviceName=""
         while [ -z "$serviceName" ]
         do
-            tyblue "---------------请输入新的serviceName(字母数字组合)---------------"
+            tyblue "---------------请输入新的serviceName[字母数字组合]---------------"
             read serviceName
         done
         tyblue "您输入的serviceName是：$serviceName"
-        ask_if "是否确定?(y/n)" && break
+        ask_if "是否确定?[y/n]" && break
     done
     config_xray
     config_nginx
@@ -4102,17 +4142,17 @@ change_xray_path()
         return 1
     fi
     tyblue "您现在的path是：$path"
-    ! ask_if "是否要继续?(y/n)" && return 0
+    ! ask_if "是否要继续?[y/n]" && return 0
     while true
     do
         path=""
         while [ -z "$path" ]
         do
-            tyblue "---------------请输入新的path(/+字母数字组合)---------------"
+            tyblue "---------------请输入新的path[/+字母数字组合]---------------"
             read path
         done
         tyblue "您输入的path是：$path"
-        ask_if "是否确定?(y/n)" && break
+        ask_if "是否确定?[y/n]" && break
     done
     config_xray
     config_nginx
@@ -4134,13 +4174,13 @@ simplify_system()
     yellow "警告："
     tyblue " 1. 此功不能保证在所有系统运行成功 (特别是某些VPS定制系统)，如果运行失败，可能导致VPS无法开机"
     tyblue " 2. 如果VPS上部署了 Xray-TLS+Web 以外的东西，可能被误删"
-    ! ask_if "是否要继续?(y/n)" && return 0
+    ! ask_if "是否要继续?[y/n]" && return 0
     echo
     local save_ssh=0
     yellow "提示：精简系统可能导致ssh配置文件(/etc/ssh/sshd_config)恢复默认"
     tyblue "这可能导致ssh端口恢复默认(22)，且有些系统默认仅允许密钥登录(不允许密码登录)"
     tyblue "你可以自己备份ssh文件或使用脚本自动备份"
-    ask_if "是否备份ssh配置文件?(y/n)" && save_ssh=1
+    ask_if "是否备份ssh配置文件?[y/n]" && save_ssh=1
     if [ $save_ssh -eq 1 ]; then
         enter_temp_dir
         cp /etc/ssh/sshd_config sshd_config
@@ -4190,18 +4230,18 @@ simplify_system()
             $apt update
             $apt -y -f --no-install-recommends install
             if ! apt_auto_remove_purge "${remove_packages[@]}"; then
-                red    "精简系统时有错误发生(某些软件包卸载失败)"
+                red    "精简系统时有错误发生[某些软件包卸载失败]"
                 echo
                 tyblue "如果您是小白，建议选择n终止卸载，如果后续仍有出现错误，请重装系统"
                 echo
                 tyblue "否则，可以按照以下步骤尝试修复："
-                tyblue " 1. 阅读错误信息，找到导致卸载错误的软件包；手动运行这条命令可能可以帮助寻找错误包： $apt -f --no-install-recommends install (在终端中运行，参考2)"
-                tyblue " 2. 按ctrl+z将脚本挂在后台，也可尝试新建一个终端(不一定能新建成功)"
+                tyblue " 1. 阅读错误信息，找到导致卸载错误的软件包；手动运行这条命令可能可以帮助寻找错误包： $apt -f --no-install-recommends install [在终端中运行，参考2]"
+                tyblue " 2. 按ctrl+z将脚本挂在后台，也可尝试新建一个终端[不一定能新建成功]"
                 tyblue " 3. 如果能看出导致卸载错误的原因并解决是最好；如果不能，运行 '$apt update && $apt --no-install-recommends install 软件包名' 手动升级该软件包"
-                tyblue " 4. 运行fg命令返回脚本(对应ctrl+z命令)"
+                tyblue " 4. 运行fg命令返回脚本[对应ctrl+z命令]"
                 tyblue " 5. 在完成上述步骤后，选择y继续卸载"
                 echo
-                if ask_if "继续卸载?(y/n)"; then
+                if ask_if "继续卸载?[y/n]"; then
                     if ! apt_auto_remove_purge "${remove_packages[@]}"; then
                         red "卸载失败！"
                         tyblue "按回车键继续，如果后续仍有出现错误，请重装系统"
@@ -4231,7 +4271,7 @@ simplify_system()
 repair_tuige()
 {
     yellow "尝试修复退格键异常问题，退格键正常请不要修复"
-    ! ask_if "是否要继续?(y/n)" && return 0
+    ! ask_if "是否要继续?[y/n]" && return 0
     if stty -a | grep -q 'erase = ^?'; then
         stty erase '^H'
     elif stty -a | grep -q 'erase = ^H'; then
@@ -4242,11 +4282,11 @@ repair_tuige()
 change_dns()
 {
     red    "注意！！"
-    red    "1.部分云服务商(如阿里云)使用本地服务器作为软件包源，修改dns后需要换源！！"
+    red    "1.部分云服务商[如阿里云]使用本地服务器作为软件包源，修改dns后需要换源！！"
     red    "  如果不明白，那么请在安装完成后再修改dns，并且修改完后不要重新安装"
     red    "2.Ubuntu系统重启后可能会恢复原dns"
-    tyblue "此操作将修改dns服务器为1.1.1.1和1.0.0.1(cloudflare公共dns)"
-    ! ask_if "是否要继续?(y/n)" && return 0
+    tyblue "此操作将修改dns服务器为1.1.1.1和1.0.0.1[cloudflare公共dns]"
+    ! ask_if "是否要继续?[y/n]" && return 0
     if ! grep -q "#This file has been edited by Xray-TLS-Web-setup-script" /etc/resolv.conf; then
         sed -i 's/^[ \t]*nameserver[ \t][ \t]*/#&/' /etc/resolv.conf
         {
@@ -4272,7 +4312,7 @@ readRealityConfig()
     
     # dest 设置为 Nginx unix socket
     reality_dest="/dev/shm/nginx/reality.sock"
-    tyblue "REALITY dest: $reality_dest (回落到Nginx)"
+    tyblue "REALITY dest: $reality_dest [回落到Nginx]"
     
     # 生成密钥对
     green "正在生成REALITY密钥对..."
@@ -4290,7 +4330,7 @@ readRealityConfig()
     tyblue "Public Key: $reality_public_key"
     
     # 生成shortIds
-    tyblue "请输入shortIds (多个用空格分隔，留空则自动生成)"
+    tyblue "请输入shortIds [多个用空格分隔，留空则自动生成]"
     read -p "shortIds: " reality_short_ids
     if [ -z "$reality_short_ids" ]; then
         # 自动生成两个shortId，一个空，一个随机
@@ -4352,7 +4392,7 @@ change_reality_config()
         yellow "ShortIds: $reality_short_ids"
     elif [ $choice -eq 3 ]; then
         tyblue "当前ServerNames: $reality_server_names"
-        tyblue "请输入新的ServerNames (多个用空格分隔)："
+        tyblue "请输入新的ServerNames [多个用空格分隔]："
         read -p "ServerNames: " reality_server_names
         if [ -z "$reality_server_names" ]; then
             red "ServerNames不能为空"
@@ -4397,7 +4437,7 @@ start_menu()
     tyblue "----------------------------------注意事项----------------------------------"
     yellow " 1. 此脚本需要一个解析到本服务器的域名"
     yellow " 2. REALITY协议无需证书，可直连使用"
-    green  " 3. 建议在纯净的系统上使用此脚本 (VPS控制台-重置系统)"
+    green  " 3. 建议在纯净的系统上使用此脚本 [VPS控制台-重置系统]"
     tyblue "----------------------------------------------------------------------------"
     echo
     echo
@@ -4436,16 +4476,16 @@ start_menu()
     tyblue "  20. 重新安装Cloudreve"
     purple "         将删除所有Cloudreve网盘的文件和帐户信息，管理员密码忘记可用此选项恢复"
     tyblue "  21. 修改传输协议"
-    tyblue "  22. 修改id(用户ID/UUID)"
+    tyblue "  22. 修改id[用户ID/UUID]"
     tyblue "  23. 修改gRPC的serviceName"
-    tyblue "  24. 修改XHTTP的path(路径)"
+    tyblue "  24. 修改XHTTP的path[路径]"
     tyblue "  25. 修改REALITY配置"
     echo
     tyblue " ----------------其它----------------"
     tyblue "  26. 精简系统"
     purple "         删除不必要的系统组件，即使已经安装 Xray-REALITY+Web 仍然可以使用此功能"
     tyblue "  27. 尝试修复退格键无法使用的问题"
-    purple "         部分ssh工具(如Xshell)可能有这类问题"
+    purple "         部分ssh工具[如Xshell]可能有这类问题"
     tyblue "  28. 修改dns"
     yellow "  0. 退出脚本"
     echo
@@ -4520,7 +4560,7 @@ start_menu()
         install_update_xray
         green "Xray更新完成！"
     elif [ $choice -eq 10 ]; then
-        ! ask_if "确定要删除吗?(y/n)" && return 0
+        ! ask_if "确定要删除吗?[y/n]" && return 0
         [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
         check_important_dependence_installed ca-certificates ca-certificates
         check_important_dependence_installed curl curl
@@ -4534,12 +4574,12 @@ start_menu()
     elif [ $choice -eq 11 ]; then
         get_config_info
         [ $is_installed -eq 1 ] && check_need_php && red "有域名正在使用php" && return 1
-        ! ask_if "确定要删除php吗?(y/n)" && return 0
+        ! ask_if "确定要删除php吗?[y/n]" && return 0
         remove_php && green "删除完成！"
     elif [ $choice -eq 12 ]; then
         get_config_info
         [ $is_installed -eq 1 ] && check_need_cloudreve && red "有域名正在使用Cloudreve" && return 1
-        ! ask_if "确定要删除cloudreve吗?(y/n)" && return 0
+        ! ask_if "确定要删除cloudreve吗?[y/n]" && return 0
         remove_cloudreve && green "删除完成！"
     elif [ $choice -eq 13 ]; then
         restart_xray_tls_web
