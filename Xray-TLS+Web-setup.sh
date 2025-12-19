@@ -2716,7 +2716,7 @@ server {
 EOF
 
     if [ $need_certificate -eq 1 ]; then
-        echo "    return 301 https://\${domain_list[0]}\$request_uri;" >> $nginx_config
+        echo "    return 301 https://${domain_list[0]}\$request_uri;" >> $nginx_config
     else
         # 如果不需要证书，直接显示伪装网站
         echo "    server_name _;" >> $nginx_config
@@ -2995,7 +2995,7 @@ cat >> $xray_config <<EOF
                     "xver": 1,
                     "serverNames": [$(echo "$reality_server_names" | awk '{for(i=1;i<=NF;i++) printf "\"%s\"%s", $i, (i<NF?", ":"")}')],
                     "privateKey": "$reality_private_key",
-                    "shortIds": [$(echo "$reality_short_ids" | sed 's/ /, /g')]
+                    "shortIds": [$(echo "$reality_short_ids" | awk '{for(i=1;i<=NF;i++) printf "\"%s\"%s", $i, (i<NF?", ":"")}')]
                 }
             },
             "sniffing": {
