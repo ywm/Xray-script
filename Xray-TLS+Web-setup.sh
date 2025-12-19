@@ -2995,7 +2995,7 @@ cat >> $xray_config <<EOF
                     "xver": 1,
                     "serverNames": [$(echo "$reality_server_names" | awk '{for(i=1;i<=NF;i++) printf "\"%s\"%s", $i, (i<NF?", ":"")}')],
                     "privateKey": "$reality_private_key",
-                    "shortIds": [$(echo "$reality_short_ids" | awk '{for(i=1;i<=NF;i++) printf "\"%s\"%s", $i, (i<NF?", ":"")}')]
+                    "shortIds": [$(echo "$reality_short_ids" | awk '{for(i=1;i<=NF;i++){printf "\"%s\"%s", $i, (i<NF?", ":"")}}')]
                 }
             },
             "sniffing": {
