@@ -2525,9 +2525,52 @@ EOF
     [ $nginx_is_installed -eq 1 ] && is_installed=1 || is_installed=0
 }
 
+
+
+#证书有效期判断
+check_cert_valid()
+{
+    local cert_file="$1"
+    local renew_before_days="${2:-15}"
+
+    [ ! -f "$cert_file" ] && return 1
+
+    local not_before not_after
+    not_before="$(openssl x509 -in "$cert_file" -noout -startdate 2>/dev/null | cut -d= -f2)"
+    not_after="$(openssl x509 -in "$cert_file" -noout -enddate 2>/dev/null | cut -d= -f2)"
+
+    [ -z "$not_before" ] || [ -z "$not_after" ] && return 1
+
+    local now_ts nb_ts na_ts renew_ts
+    now_ts="$(date +%s)"
+    nb_ts="$(date -d "$not_before" +%s 2>/dev/null)"
+    na_ts="$(date -d "$not_after" +%s 2>/dev/null)"
+
+    [ -z "$nb_ts" ] || [ -z "$na_ts" ] && return 1
+
+    renew_ts="$((na_ts - renew_before_days * 86400))"
+
+    [ "$now_ts" -ge "$nb_ts" ] && [ "$now_ts" -lt "$renew_ts" ]
+}
+
+
+
 #获取证书 参数: 域名位置
 get_cert()
 {
+
+    local cert_file="${nginx_prefix}/certs/${true_domain_list[$1]}.cer"
+    local key_file="${nginx_prefix}/certs/${true_domain_list[$1]}.key"
+
+   # 如果证书或密钥不存在，直接申请
+    if [ -f "$cert_file" ] && [ -f "$key_file" ]; then
+        if check_cert_valid "$cert_file" 15; then
+            green "证书 ${true_domain_list[$1]} 仍在有效期内，跳过 ACME 申请与安装"
+            return 0
+        fi
+    else
+        green "证书或密钥不存在，开始申请"
+    fi
     if [ ${domain_config_list[$1]} -eq 1 ]; then
         green "正在获取 \"${domain_list[$1]}\"、\"${true_domain_list[$1]}\" 的域名证书"
     else
@@ -3249,6 +3292,7 @@ let_init_nextcloud()
     read -s
     echo
 }
+
 
 print_share_link()
 {
