@@ -19,8 +19,8 @@ unset timezone
 unset ssh_service
 
 #安装配置信息
-nginx_version="nginx-1.28.0"
-openssl_version="openssl-3.5.2"
+nginx_version="nginx-1.29.4"
+openssl_version="openssl-3.6.0"
 nginx_prefix="/usr/local/nginx"
 nginx_config="${nginx_prefix}/conf.d/xray.conf"
 nginx_service="/etc/systemd/system/nginx.service"
@@ -675,8 +675,6 @@ get_config_info()
         protocol_3=0
     fi
     
-    # 检测 gRPC
-    protocol_2=0
     
     unset domain_list
     unset true_domain_list
@@ -1743,7 +1741,6 @@ readProtocolConfig()
         protocol_3=0
     fi
     
-    protocol_2=0  # 禁用 gRPC
 }
 
 #读取伪装类型 输入domain 输出pretend
@@ -2722,7 +2719,7 @@ config_nginx()
     local need_certificate=0
     
     # 判断是否需要TLS证书
-    if [ $protocol_2 -ne 0 ] || [ $protocol_3 -ne 0 ]; then
+    if [ $protocol_3 -ne 0 ]; then
         need_certificate=1
     fi
     
@@ -2842,6 +2839,7 @@ generate_self_signed_cert()
 
 
 
+#配置xray
 #配置xray
 config_xray()
 {
@@ -3257,7 +3255,7 @@ install_update_xray_tls_web()
 
     # 判断是否需要证书
     local need_certificate=0
-    if [ $protocol_2 -ne 0 ] || [ $protocol_3 -ne 0 ]; then
+    if [ $protocol_3 -ne 0 ]; then
         need_certificate=1
         tyblue "检测到使用gRPC或XHTTP协议，需要申请SSL证书"
     fi
@@ -3868,7 +3866,6 @@ change_xray_protocol()
 {
     get_config_info
     local protocol_1_old=$protocol_1
-    local protocol_2_old=$protocol_2
     local protocol_3_old=$protocol_3
     readProtocolConfig
     # 如果新增了REALITY，需要配置
@@ -3876,7 +3873,7 @@ change_xray_protocol()
         readRealityConfig
     fi
     
-    if [ $protocol_1_old -eq $protocol_1 ] && [ $protocol_2_old -eq $protocol_2 ] && [ $protocol_3_old -eq $protocol_3 ]; then
+    if [ $protocol_1_old -eq $protocol_1 ]  && [ $protocol_3_old -eq $protocol_3 ]; then
         red "传输协议未更换"
         return 1
     fi
