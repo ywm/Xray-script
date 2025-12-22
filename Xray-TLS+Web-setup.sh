@@ -64,18 +64,15 @@ unset pretend_list
 
 # TCP配置，使用REALITY
 unset protocol_1
-# grpc使用的代理协议，0代表禁用，1代表VLESS
-unset protocol_2
+
 # XHTTP使用的代理协议，0代表禁用，1代表VLESS
 unset protocol_3
-# gRPC的serviceName
-unset serviceName
+
 # XHTTP的path
 unset path
 # TCP协议的vless uuid
 unset xid_1
-# grpc协议的vless uuid
-unset xid_2
+
 # XHTTP协议的vless uuid
 unset xid_3
 
@@ -679,13 +676,7 @@ get_config_info()
     fi
     
     # 检测 gRPC
-    if grep -q '"network"[ '$'\t]*:[ '$'\t]*"grpc"' $xray_config; then
-        protocol_2=1
-        serviceName="$(grep '"serviceName"' $xray_config | cut -d : -f 2 | cut -d \" -f 2)"
-        xid_2="$(grep '"id"' $xray_config | grep -A5 '"grpc"' | grep '"id"' | cut -d : -f 2 | cut -d \" -f 2)"
-    else
-        protocol_2=0
-    fi
+    protocol_2=0
     
     unset domain_list
     unset true_domain_list
@@ -1723,53 +1714,36 @@ readProtocolConfig()
     echo -e "\\n\\n\\n"
     tyblue "---------------------请选择传输协议---------------------"
     tyblue " 1. VLESS-Vision-REALITY (直连)"
-    tyblue " 2. VLESS-gRPC-TLS (可过CDN)"
-    tyblue " 3. VLESS-XHTTP-TLS (可过CDN)"
-    tyblue " 4. VLESS-Vision-REALITY + gRPC"
-    tyblue " 5. VLESS-Vision-REALITY + XHTTP"
-    tyblue " 6. gRPC + XHTTP"
-    tyblue " 7. VLESS-Vision-REALITY + gRPC + XHTTP (全协议)"
+    tyblue " 2. VLESS-XHTTP-TLS (可过CDN)"
+    tyblue " 3. VLESS-Vision-REALITY + XHTTP (推荐)"
     yellow " 0. 无 (仅提供Web服务)"
     echo
     blue   " 注："
-    blue   "   1. REALITY 无需证书，抗主动探测，推荐直连使用"
-    blue   "   2. gRPC和XHTTP支持通过CDN，需要域名和证书"
-    blue   "   3. XHTTP 是 HTTPUpgrade 的升级版，性能更好"
+    blue   "   1. REALITY 无需证书,抗主动探测,推荐直连使用"
+    blue   "   2. XHTTP 支持通过CDN,需要域名和证书"
+    blue   "   3. 选项3同时提供 REALITY 直连和 XHTTP CDN"
     echo
     local choice=""
-    while [[ ! "$choice" =~ ^(0|[1-9][0-9]*)$ ]] || ((choice>7))
+    while [[ ! "$choice" =~ ^(0|[1-3])$ ]]
     do
         read -p "您的选择是：" choice
     done
-    if [ $choice -eq 1 ] || [ $choice -eq 4 ] || [ $choice -eq 5 ] || [ $choice -eq 7 ]; then
+    
+    if [ $choice -eq 1 ]; then
         protocol_1=1
-    else
+        protocol_3=0
+    elif [ $choice -eq 2 ]; then
         protocol_1=0
-    fi
-    if [ $choice -eq 2 ] || [ $choice -eq 4 ] || [ $choice -eq 6 ] || [ $choice -eq 7 ]; then
-        protocol_2=1
-    else
-        protocol_2=0
-    fi
-    if [ $choice -eq 3 ] || [ $choice -eq 5 ] || [ $choice -eq 6 ] || [ $choice -eq 7 ]; then
+        protocol_3=1
+    elif [ $choice -eq 3 ]; then
+        protocol_1=1
         protocol_3=1
     else
+        protocol_1=0
         protocol_3=0
     fi
-#    if [ $protocol_1 -eq 1 ]; then
-#        tyblue "-------------- 请选择TCP传输配置 --------------"
-#        tyblue " 1. VLESS + TCP + XTLS"
-#        tyblue " 2. VLESS + TCP + TLS"
-#        tyblue " 3. VLESS + TCP + XTLS/TLS"
-#        echo
-#        protocol_1=""
-#        while [[ ! "$protocol_1" =~ ^([1-9][0-9]*)$ ]] || ((protocol_1>3))
-#        do
-#            read -p "您的选择是：" protocol_1
-#        done
-#    fi
-    # 删除 gRPC 的协议选择，直接设置为 VLESS
-    # 删除 HTTPUpgrade 的协议选择，直接设置为 VLESS
+    
+    protocol_2=0  # 禁用 gRPC
 }
 
 #读取伪装类型 输入domain 输出pretend
@@ -2740,6 +2714,7 @@ EOF
 }
 
 #nginx 配置
+#nginx 配置
 config_nginx()
 {
     config_nginx_init
@@ -2751,28 +2726,14 @@ config_nginx()
         need_certificate=1
     fi
     
-    # HTTP 重定向到 HTTPS
+    # HTTP 80端口 - 重定向到 HTTPS
 cat > $nginx_config<<EOF
 server {
     listen 80 reuseport default_server;
     listen [::]:80 reuseport default_server;
-EOF
-
-    if [ $need_certificate -eq 1 ]; then
-        echo "    return 301 https://${domain_list[0]}\$request_uri;" >> $nginx_config
-    else
-        # 如果不需要证书，直接显示伪装网站
-        echo "    server_name _;" >> $nginx_config
-        echo "    root ${nginx_prefix}/html/${true_domain_list[0]};" >> $nginx_config
-        echo "    index index.html index.htm;" >> $nginx_config
-    fi
-
-cat >> $nginx_config<<EOF
+    return 301 https://${domain_list[0]}\$request_uri;
 }
-EOF
 
-    if [ $need_certificate -eq 1 ]; then
-cat >> $nginx_config<<EOF
 server {
     listen 80;
     listen [::]:80;
@@ -2780,10 +2741,8 @@ server {
     return 301 https://\$host\$request_uri;
 }
 EOF
-    fi
 
-    # 如果使用REALITY，需要配置回落处理的服务器
-    if [ $protocol_1 -ne 0 ]; then
+    # Unix Socket 服务器 - 用于 REALITY 回落
 cat >> $nginx_config<<EOF
 
 server {
@@ -2793,101 +2752,9 @@ server {
     real_ip_header proxy_protocol;
     
     server_name ${domain_list[@]};
-EOF
-
-        if [ $need_certificate -eq 1 ]; then
-            # 有证书，使用证书
-cat >> $nginx_config<<EOF
     
     ssl_certificate ${nginx_prefix}/certs/${true_domain_list[0]}.cer;
     ssl_certificate_key ${nginx_prefix}/certs/${true_domain_list[0]}.key;
-EOF
-        else
-            # 无证书，使用自签名证书或禁用SSL验证
-            # 实际上REALITY回落这里不会真正用到证书，因为REALITY已经处理了TLS
-cat >> $nginx_config<<EOF
-    
-    ssl_certificate ${nginx_prefix}/certs/self-signed.crt;
-    ssl_certificate_key ${nginx_prefix}/certs/self-signed.key;
-EOF
-        fi
-
-cat >> $nginx_config<<EOF
-    
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305;
-    ssl_prefer_server_ciphers on;
-    
-EOF
-
-        # XHTTP location (如果REALITY配置了回落到XHTTP)
-        if [ $protocol_3 -ne 0 ]; then
-cat >> $nginx_config<<EOF
-    location $path {
-        proxy_pass http://unix:/dev/shm/xray/xhttp.sock;
-        proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-    
-EOF
-        fi
-
-        # 伪装网站
-        for ((i=0;i<${#domain_list[@]};i++))
-        do
-            if [ "${pretend_list[$i]}" == "1" ]; then
-cat >> $nginx_config<<EOF
-    location / {
-        proxy_set_header X-Forwarded-For 127.0.0.1;
-        proxy_set_header Host \$http_host;
-        proxy_redirect off;
-        proxy_pass http://unix:/dev/shm/cloudreve/cloudreve.sock;
-        client_max_body_size 0;
-    }
-EOF
-            elif [ "${pretend_list[$i]}" == "2" ]; then
-                echo "    root ${nginx_prefix}/html/${true_domain_list[$i]};" >> $nginx_config
-                echo "    include ${nginx_prefix}/conf.d/nextcloud.conf;" >> $nginx_config
-            elif [ "${pretend_list[$i]}" == "3" ]; then
-                echo "    location / {" >> $nginx_config
-                echo "        return 403;" >> $nginx_config
-                echo "    }" >> $nginx_config
-            elif [ "${pretend_list[$i]}" == "4" ]; then
-                echo "    root ${nginx_prefix}/html/${true_domain_list[$i]};" >> $nginx_config
-            else
-cat >> $nginx_config<<EOF
-    location / {
-        proxy_pass ${pretend_list[$i]};
-        proxy_set_header referer "${pretend_list[$i]}";
-    }
-EOF
-            fi
-            break
-        done
-
-cat >> $nginx_config<<EOF
-    
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
-}
-EOF
-    fi
-
-    # 如果需要证书(gRPC或XHTTP)，配置正常的HTTPS服务器
-    if [ $need_certificate -eq 1 ]; then
-        for ((i=0;i<${#domain_list[@]};i++))
-        do
-cat >> $nginx_config<<EOF
-
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name ${domain_list[$i]};
-    
-    ssl_certificate ${nginx_prefix}/certs/${true_domain_list[$i]}.cer;
-    ssl_certificate_key ${nginx_prefix}/certs/${true_domain_list[$i]}.key;
     
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305;
@@ -2898,8 +2765,8 @@ server {
     
 EOF
 
-            # XHTTP location
-            if [ $protocol_3 -ne 0 ]; then
+    # 如果启用了 XHTTP，添加 location
+    if [ $protocol_3 -ne 0 ]; then
 cat >> $nginx_config<<EOF
     location $path {
         proxy_pass http://unix:/dev/shm/xray/xhttp.sock;
@@ -2911,23 +2778,12 @@ cat >> $nginx_config<<EOF
     }
     
 EOF
-            fi
+    fi
 
-            # gRPC location
-            if [ $protocol_2 -ne 0 ]; then
-cat >> $nginx_config<<EOF
-    location ~ ^/$serviceName/(TunMulti|Tun)$ {
-        client_max_body_size 0;
-        grpc_pass grpc://unix:/dev/shm/xray/grpc.sock;
-        grpc_set_header Host \$host;
-        grpc_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-    }
-    
-EOF
-            fi
-
-            # 伪装网站配置
-            if [ "${pretend_list[$i]}" == "1" ]; then
+    # 伪装网站配置
+    for ((i=0;i<${#domain_list[@]};i++))
+    do
+        if [ "${pretend_list[$i]}" == "1" ]; then
 cat >> $nginx_config<<EOF
     location / {
         proxy_set_header X-Forwarded-For 127.0.0.1;
@@ -2937,29 +2793,29 @@ cat >> $nginx_config<<EOF
         client_max_body_size 0;
     }
 EOF
-            elif [ "${pretend_list[$i]}" == "2" ]; then
-                echo "    root ${nginx_prefix}/html/${true_domain_list[$i]};" >> $nginx_config
-                echo "    include ${nginx_prefix}/conf.d/nextcloud.conf;" >> $nginx_config
-            elif [ "${pretend_list[$i]}" == "3" ]; then
-                echo "    location / {" >> $nginx_config
-                echo "        return 403;" >> $nginx_config
-                echo "    }" >> $nginx_config
-            elif [ "${pretend_list[$i]}" == "4" ]; then
-                echo "    root ${nginx_prefix}/html/${true_domain_list[$i]};" >> $nginx_config
-            else
+        elif [ "${pretend_list[$i]}" == "2" ]; then
+            echo "    root ${nginx_prefix}/html/${true_domain_list[$i]};" >> $nginx_config
+            echo "    include ${nginx_prefix}/conf.d/nextcloud.conf;" >> $nginx_config
+        elif [ "${pretend_list[$i]}" == "3" ]; then
+            echo "    location / {" >> $nginx_config
+            echo "        return 403;" >> $nginx_config
+            echo "    }" >> $nginx_config
+        elif [ "${pretend_list[$i]}" == "4" ]; then
+            echo "    root ${nginx_prefix}/html/${true_domain_list[$i]};" >> $nginx_config
+        else
+            echo "    location / {" >> $nginx_config
+            echo "        proxy_pass ${pretend_list[$i]};" >> $nginx_config
+            echo "        proxy_set_header referer \"${pretend_list[$i]}\";" >> $nginx_config
+            echo "    }" >> $nginx_config
+        fi
+        break
+    done
+
 cat >> $nginx_config<<EOF
-    location / {
-        proxy_pass ${pretend_list[$i]};
-        proxy_set_header referer "${pretend_list[$i]}";
-    }
+}
 EOF
-            fi
 
-            echo "}" >> $nginx_config
-        done
-    fi
-
-cat >> $nginx_config << EOF
+cat >> $nginx_config<<EOF
 
 #-----------------不要修改以下内容----------------
 #domain_list=${domain_list[@]}
@@ -3000,7 +2856,7 @@ cat > $xray_config <<EOF
     "inbounds": [
 EOF
 
-    # REALITY + Vision 配置
+    # REALITY + Vision 配置 - 监听443端口
     if [ $protocol_1 -ne 0 ]; then
 cat >> $xray_config <<EOF
         {
@@ -3016,7 +2872,8 @@ cat >> $xray_config <<EOF
                 ],
                 "decryption": "none"
 EOF
-        # 如果有 XHTTP，添加回落配置
+
+        # 如果启用了 XHTTP，添加回落配置
         if [ $protocol_3 -ne 0 ]; then
 cat >> $xray_config <<EOF
 ,
@@ -3027,6 +2884,7 @@ cat >> $xray_config <<EOF
                 ]
 EOF
         fi
+
 cat >> $xray_config <<EOF
             },
             "streamSettings": {
@@ -3034,11 +2892,11 @@ cat >> $xray_config <<EOF
                 "security": "reality",
                 "realitySettings": {
                     "show": false,
-                    "target": "$reality_dest",
+                    "target": "/dev/shm/nginx/reality.sock",
                     "xver": 1,
                     "serverNames": [$(echo "$reality_server_names" | awk '{for(i=1;i<=NF;i++) printf "\"%s\"%s", $i, (i<NF?", ":"")}')],
                     "privateKey": "$reality_private_key",
-                    "shortIds": [$(echo "$reality_short_ids" | awk '{for(i=1;i<=NF;i++){printf "\"%s\"%s", $i, (i<NF?", ":"")}}')]
+                    "shortIds": [$(echo "$reality_short_ids" | sed 's/ /, /g')]
                 }
             },
             "sniffing": {
@@ -3052,7 +2910,7 @@ cat >> $xray_config <<EOF
             }
         }
 EOF
-        if [ $protocol_2 -ne 0 ] || [ $protocol_3 -ne 0 ]; then
+        if [ $protocol_3 -ne 0 ]; then
             echo ',' >> $xray_config
         fi
     fi
@@ -3076,43 +2934,6 @@ cat >> $xray_config <<EOF
                 "network": "xhttp",
                 "xhttpSettings": {
                     "path": "$path"
-                }
-            },
-            "sniffing": {
-                "enabled": true,
-                "destOverride": [
-                    "http",
-                    "tls",
-                    "quic"
-                ],
-                "routeOnly": true
-            }
-        }
-EOF
-        if [ $protocol_2 -ne 0 ]; then
-            echo ',' >> $xray_config
-        fi
-    fi
-
-    # gRPC 配置
-    if [ $protocol_2 -ne 0 ]; then
-cat >> $xray_config <<EOF
-        {
-            "listen": "/dev/shm/xray/grpc.sock,0666",
-            "protocol": "vless",
-            "settings": {
-                "clients": [
-                    {
-                        "id": "$xid_2",
-                        "email": "grpc@local"
-                    }
-                ],
-                "decryption": "none"
-            },
-            "streamSettings": {
-                "network": "grpc",
-                "grpcSettings": {
-                    "serviceName": "$serviceName"
                 }
             },
             "sniffing": {
@@ -3315,15 +3136,7 @@ print_share_link()
         tyblue "vless://${xid_1}@${ip}:443?security=reality&sni=${reality_server_names}&fp=chrome&pbk=${reality_password}&sid=${first_short_id}&type=tcp&flow=xtls-rprx-vision#VLESS-REALITY"
         echo
     fi
-  
-    if [ $protocol_2 -eq 0 ]; then
-        green  "=========== VLESS-gRPC-TLS [若域名开启了CDN解析则会连接CDN，否则将直连]==========="
-        for i in "${domain_list[@]}"
-        do
-            tyblue  "vless://${xid_2}@${i}:443?type=grpc&security=tls&serviceName=${serviceName}&mode=multi&alpn=h2,http%2F1.1#VLESS-gRPC"
-        done
-        echo
-    fi
+
     if [ $protocol_3 -eq 0 ]; then
         green  "=========== VLESS-XHTTP-TLS 可过CDN ==========="
         for i in "${domain_list[@]}"
@@ -3369,31 +3182,6 @@ print_config_info()
         yellow "  ShortIds: ${reality_short_ids}"
         yellow "  Private Key: ${reality_private_key}"
         yellow "  Password: ${reality_password}"
-    fi
-    
-    if [ $protocol_2 -ne 0 ]; then
-        echo
-        tyblue "---------------- VLESS-gRPC-TLS [可过CDN] ---------------"
-        tyblue " protocol传输协议    ：\\033[33mvless"
-        if [ ${#domain_list[@]} -eq 1 ]; then
-            tyblue " address地址         ：\\033[33m${domain_list[*]}"
-        else
-            tyblue " address(地址         ：\\033[33m${domain_list[*]} \\033[35m[任选其一]"
-        fi
-        tyblue " port端口            ：\\033[33m443"
-        tyblue " id用户ID/UUID       ：\\033[33m${xid_2}"
-        tyblue " flow流控            ：\\033[33m空"
-        tyblue " encryption加密      ：\\033[33mnone"
-        tyblue " ---Transport/StreamSettings底层传输方式/流设置---"
-        tyblue "  network传输方式             ：\\033[33mgrpc"
-        tyblue "  serviceName                   ：\\033[33m${serviceName}"
-        tyblue "  multiMode                     ：\\033[33mtrue"
-        tyblue "  security传输层加密          ：\\033[33mtls"
-        tyblue "  serverName                    ：\\033[33m空"
-        tyblue "  allowInsecure                 ：\\033[33mfalse"
-        tyblue "  fingerprint                   ：\\033[33m空\\033[32m[推荐]\\033[36m/\\033[33mchrome"
-        tyblue "  alpn                          ：\\033[33mh2,http/1.1"
-        tyblue "------------------------------------------------------------------------"
     fi
     
     if [ $protocol_3 -ne 0 ]; then
@@ -4093,10 +3881,7 @@ change_xray_protocol()
         return 1
     fi
     [ $protocol_1_old -eq 0 ] && [ $protocol_1 -ne 0 ] && xid_1=$(cat /proc/sys/kernel/random/uuid)
-    if [ $protocol_2_old -eq 0 ] && [ $protocol_2 -ne 0 ]; then
-        serviceName="$(head -c 20 /dev/urandom | md5sum | head -c 10)"
-        xid_2=$(cat /proc/sys/kernel/random/uuid)
-    fi
+
     if [ $protocol_3_old -eq 0 ] && [ $protocol_3 -ne 0 ]; then
         path="/$(head -c 20 /dev/urandom | md5sum | head -c 10)"
         xid_3=$(cat /proc/sys/kernel/random/uuid)
@@ -4114,8 +3899,7 @@ change_xray_id()
     local flag=""
     tyblue "-------------请输入你要修改的id-------------"
     tyblue " 1. TCP的id"
-    tyblue " 2. gRPC的id"
-    tyblue " 3. WebSocket的id"
+    tyblue " 2. XHTTP的id"
     echo
     while [[ ! "$flag" =~ ^([1-9][0-9]*)$ ]] || ((flag>3))
     do
@@ -4142,40 +3926,11 @@ change_xray_id()
     done
     if [ $flag -eq 1 ]; then
         xid_1="$xid"
-    elif [ $flag -eq 2 ]; then
-        xid_2="$xid"
     else
         xid_3="$xid"
     fi
     config_xray
     systemctl -q is-active xray && systemctl restart xray
-    green "更换成功！！"
-    print_config_info
-}
-change_xray_serviceName()
-{
-    get_config_info
-    if [ $protocol_2 -eq 0 ]; then
-        red "没有使用gRPC协议！"
-        return 1
-    fi
-    tyblue "您现在的serviceName是：$serviceName"
-    ! ask_if "是否要继续?[y/n]" && return 0
-    while true
-    do
-        serviceName=""
-        while [ -z "$serviceName" ]
-        do
-            tyblue "---------------请输入新的serviceName[字母数字组合]---------------"
-            read serviceName
-        done
-        tyblue "您输入的serviceName是：$serviceName"
-        ask_if "是否确定?[y/n]" && break
-    done
-    config_xray
-    config_nginx
-    systemctl -q is-active xray && systemctl restart xray
-    systemctl -q is-active nginx && systemctl restart nginx
     green "更换成功！！"
     print_config_info
 }
@@ -4523,16 +4278,15 @@ start_menu()
     purple "         将删除所有Cloudreve网盘的文件和帐户信息，管理员密码忘记可用此选项恢复"
     tyblue "  21. 修改传输协议"
     tyblue "  22. 修改id[用户ID/UUID]"
-    tyblue "  23. 修改gRPC的serviceName"
-    tyblue "  24. 修改XHTTP的path[路径]"
-    tyblue "  25. 修改REALITY配置"
+    tyblue "  23. 修改XHTTP的path[路径]"
+    tyblue "  24. 修改REALITY配置"
     echo
     tyblue " ----------------其它----------------"
-    tyblue "  26. 精简系统"
+    tyblue "  25. 精简系统"
     purple "         删除不必要的系统组件，即使已经安装 Xray-REALITY+Web 仍然可以使用此功能"
-    tyblue "  27. 尝试修复退格键无法使用的问题"
+    tyblue "  26. 尝试修复退格键无法使用的问题"
     purple "         部分ssh工具[如Xshell]可能有这类问题"
-    tyblue "  28. 修改dns"
+    tyblue "  27. 修改dns"
     yellow "  0. 退出脚本"
     echo
     echo
@@ -4652,16 +4406,14 @@ start_menu()
     elif [ $choice -eq 22 ]; then
         change_xray_id
     elif [ $choice -eq 23 ]; then
-        change_xray_serviceName
-    elif [ $choice -eq 24 ]; then
         change_xray_path
-    elif [ $choice -eq 25 ]; then
+    elif [ $choice -eq 24 ]; then
         change_reality_config
-    elif [ $choice -eq 26 ]; then
+    elif [ $choice -eq 25 ]; then
         simplify_system
-    elif [ $choice -eq 27 ]; then
+    elif [ $choice -eq 26 ]; then
         repair_tuige
-    elif [ $choice -eq 28 ]; then
+    elif [ $choice -eq 27 ]; then
         change_dns
     fi
 }
