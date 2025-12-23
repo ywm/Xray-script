@@ -2896,7 +2896,7 @@ cat >> $xray_config <<EOF
                     "xver": 1,
                     "serverNames": [$(echo "$reality_server_names" | awk '{for(i=1;i<=NF;i++) printf "\"%s\"%s", $i, (i<NF?", ":"")}')],
                     "privateKey": "$reality_private_key",
-                    "shortIds": [$(echo "$reality_short_ids" | sed 's/ /, /g')]
+                    "shortIds": [${reality_short_ids// /, }]
                 }
             },
             "sniffing": {
@@ -3207,6 +3207,9 @@ print_config_info()
         tyblue "  fingerprint                   ：\\033[33m空\\033[32m[推荐]\\033[36m/\\033[33mchrome"
         tyblue "------------------------------------------------------------------------"
     fi
+      # 保存分享链接
+    save_share_links
+    
     echo
     yellow "注：部分选项可能分享链接无法涉及，建议手动填写"
     ask_if "是否生成分享链接？[y/n]" && print_share_link
@@ -4149,9 +4152,13 @@ readRealityConfig()
     read -p "shortIds: " reality_short_ids
     if [ -z "$reality_short_ids" ]; then
         # 自动生成两个shortId，一个空，一个随机
-        reality_short_ids='""'
-        reality_short_ids+=" $(head -c 8 /dev/urandom | xxd -p)"
-        green "已自动生成shortIds"
+        local random_id=$(head -c 8 /dev/urandom | xxd -p)
+        reality_short_ids="\"\" \"${random_id}\""
+        green "已自动生成shortIds: $reality_short_ids"
+    else
+        # 用户输入，需要验证格式
+        # 移除可能的多余空格，确保格式正确
+        reality_short_ids=$(echo "$reality_short_ids" | sed 's/  */ /g')
     fi
     
     echo
@@ -4221,6 +4228,383 @@ change_reality_config()
     green "REALITY配置已更新！"
     print_config_info
 }
+
+# 生成 VLESS 分享链接
+generate_vless_share_link()
+{
+    local protocol="$1"  # 1=REALITY, 3=XHTTP
+    local server_ip="$2"
+    local share_links=()
+    
+    if [ $protocol -eq 1 ]; then
+        # VLESS-Vision-REALITY
+        local first_short_id="${reality_short_ids%% *}"
+        first_short_id="${first_short_id//\"/}"
+        
+        local server_name="${reality_server_names%% *}"
+        server_name="${server_name//\"/}"
+        
+        # 构建分享链接
+        local link="vless://${xid_1}@${server_ip}:443"
+        link+="?security=reality"
+        link+="&sni=$(echo -n "$server_name" | jq -sRr @uri)"
+        link+="&fp=chrome"
+        link+="&pbk=$(echo -n "$reality_password" | jq -sRr @uri)"
+        link+="&sid=$(echo -n "$first_short_id" | jq -sRr @uri)"
+        link+="&type=tcp"
+        link+="&flow=xtls-rprx-vision"
+        link+="#$(echo -n "VLESS-REALITY-${server_name}" | jq -sRr @uri)"
+        
+        share_links+=("$link")
+        
+    elif [ $protocol -eq 3 ]; then
+        # VLESS-XHTTP-TLS
+        for domain in "${domain_list[@]}"
+        do
+            local link="vless://${xid_3}@${domain}:443"
+            link+="?type=xhttp"
+            link+="&security=tls"
+            link+="&path=$(echo -n "$path" | jq -sRr @uri)"
+            link+="#$(echo -n "VLESS-XHTTP-${domain}" | jq -sRr @uri)"
+            
+            share_links+=("$link")
+        done
+    fi
+    
+    printf '%s\n' "${share_links[@]}"
+}
+
+# 保存分享链接到文件
+save_share_links()
+{
+    local share_file="${nginx_prefix}/share_links.txt"
+    
+    echo "# Xray-REALITY+Web 分享链接" > "$share_file"
+    echo "# 生成时间: $(date '+%Y-%m-%d %H:%M:%S')" >> "$share_file"
+    echo "" >> "$share_file"
+    
+    if [ $protocol_1 -ne 0 ]; then
+        local ip=""
+        # 尝试自动获取服务器IP
+        ip=$(curl -s4m8 ip.sb) || ip=$(curl -s6m8 ip.sb) || ip=""
+        
+        if [ -z "$ip" ]; then
+            echo "# VLESS-Vision-REALITY (请手动替换 YOUR_SERVER_IP)" >> "$share_file"
+            ip="YOUR_SERVER_IP"
+        else
+            echo "# VLESS-Vision-REALITY" >> "$share_file"
+        fi
+        
+        echo "" >> "$share_file"
+        generate_vless_share_link 1 "$ip" >> "$share_file"
+        echo "" >> "$share_file"
+    fi
+    
+    if [ $protocol_3 -ne 0 ]; then
+        echo "# VLESS-XHTTP-TLS (可过CDN)" >> "$share_file"
+        echo "" >> "$share_file"
+        generate_vless_share_link 3 "" >> "$share_file"
+        echo "" >> "$share_file"
+    fi
+    
+    # 添加详细配置信息
+    echo "" >> "$share_file"
+    echo "# ==================== 详细配置信息 ====================" >> "$share_file"
+    echo "" >> "$share_file"
+    
+    if [ $protocol_1 -ne 0 ]; then
+        cat >> "$share_file" << EOF
+# REALITY 配置
+Server: $ip:443
+UUID: $xid_1
+Flow: xtls-rprx-vision
+Security: reality
+SNI: ${reality_server_names}
+Fingerprint: chrome
+PublicKey: $reality_password
+ShortId: ${reality_short_ids}
+
+EOF
+    fi
+    
+    if [ $protocol_3 -ne 0 ]; then
+        cat >> "$share_file" << EOF
+# XHTTP 配置
+Server: ${domain_list[*]}
+Port: 443
+UUID: $xid_3
+Type: xhttp
+Path: $path
+Security: tls
+
+EOF
+    fi
+    
+    chmod 600 "$share_file"
+    green "分享链接已保存到: $share_file"
+}
+
+# 生成 VLESS 分享链接
+generate_vless_share_link()
+{
+    local protocol="$1"  # 1=REALITY, 3=XHTTP
+    local server_ip="$2"
+    local share_links=()
+    
+    if [ $protocol -eq 1 ]; then
+        # VLESS-Vision-REALITY
+        local first_short_id="${reality_short_ids%% *}"
+        first_short_id="${first_short_id//\"/}"
+        
+        local server_name="${reality_server_names%% *}"
+        server_name="${server_name//\"/}"
+        
+        # 构建分享链接
+        local link="vless://${xid_1}@${server_ip}:443"
+        link+="?security=reality"
+        link+="&sni=$(echo -n "$server_name" | jq -sRr @uri)"
+        link+="&fp=chrome"
+        link+="&pbk=$(echo -n "$reality_password" | jq -sRr @uri)"
+        link+="&sid=$(echo -n "$first_short_id" | jq -sRr @uri)"
+        link+="&type=tcp"
+        link+="&flow=xtls-rprx-vision"
+        link+="#$(echo -n "VLESS-REALITY-${server_name}" | jq -sRr @uri)"
+        
+        share_links+=("$link")
+        
+    elif [ $protocol -eq 3 ]; then
+        # VLESS-XHTTP-TLS
+        for domain in "${domain_list[@]}"
+        do
+            local link="vless://${xid_3}@${domain}:443"
+            link+="?type=xhttp"
+            link+="&security=tls"
+            link+="&path=$(echo -n "$path" | jq -sRr @uri)"
+            link+="#$(echo -n "VLESS-XHTTP-${domain}" | jq -sRr @uri)"
+            
+            share_links+=("$link")
+        done
+    fi
+    
+    printf '%s\n' "${share_links[@]}"
+}
+
+# 保存分享链接到文件
+save_share_links()
+{
+    local share_file="${nginx_prefix}/share_links.txt"
+    
+    echo "# Xray-REALITY+Web 分享链接" > "$share_file"
+    echo "# 生成时间: $(date '+%Y-%m-%d %H:%M:%S')" >> "$share_file"
+    echo "" >> "$share_file"
+    
+    if [ $protocol_1 -ne 0 ]; then
+        local ip=""
+        # 尝试自动获取服务器IP
+        ip=$(curl -s4m8 ip.sb) || ip=$(curl -s6m8 ip.sb) || ip=""
+        
+        if [ -z "$ip" ]; then
+            echo "# VLESS-Vision-REALITY (请手动替换 YOUR_SERVER_IP)" >> "$share_file"
+            ip="YOUR_SERVER_IP"
+        else
+            echo "# VLESS-Vision-REALITY" >> "$share_file"
+        fi
+        
+        echo "" >> "$share_file"
+        generate_vless_share_link 1 "$ip" >> "$share_file"
+        echo "" >> "$share_file"
+    fi
+    
+    if [ $protocol_3 -ne 0 ]; then
+        echo "# VLESS-XHTTP-TLS (可过CDN)" >> "$share_file"
+        echo "" >> "$share_file"
+        generate_vless_share_link 3 "" >> "$share_file"
+        echo "" >> "$share_file"
+    fi
+    
+    # 添加详细配置信息
+    echo "" >> "$share_file"
+    echo "# ==================== 详细配置信息 ====================" >> "$share_file"
+    echo "" >> "$share_file"
+    
+    if [ $protocol_1 -ne 0 ]; then
+        cat >> "$share_file" << EOF
+# REALITY 配置
+Server: $ip:443
+UUID: $xid_1
+Flow: xtls-rprx-vision
+Security: reality
+SNI: ${reality_server_names}
+Fingerprint: chrome
+PublicKey: $reality_password
+ShortId: ${reality_short_ids}
+
+EOF
+    fi
+    
+    if [ $protocol_3 -ne 0 ]; then
+        cat >> "$share_file" << EOF
+# XHTTP 配置
+Server: ${domain_list[*]}
+Port: 443
+UUID: $xid_3
+Type: xhttp
+Path: $path
+Security: tls
+
+EOF
+    fi
+    
+    chmod 600 "$share_file"
+    green "分享链接已保存到: $share_file"
+}
+
+# 生成 VLESS 分享链接
+generate_vless_share_link()
+{
+    local protocol="$1"  # 1=REALITY, 3=XHTTP
+    local server_ip="$2"
+    local share_links=()
+    
+    if [ $protocol -eq 1 ]; then
+        # VLESS-Vision-REALITY
+        local first_short_id="${reality_short_ids%% *}"
+        first_short_id="${first_short_id//\"/}"
+        
+        local server_name="${reality_server_names%% *}"
+        server_name="${server_name//\"/}"
+        
+        # 构建分享链接
+        local link="vless://${xid_1}@${server_ip}:443"
+        link+="?security=reality"
+        link+="&sni=$(echo -n "$server_name" | jq -sRr @uri)"
+        link+="&fp=chrome"
+        link+="&pbk=$(echo -n "$reality_password" | jq -sRr @uri)"
+        link+="&sid=$(echo -n "$first_short_id" | jq -sRr @uri)"
+        link+="&type=tcp"
+        link+="&flow=xtls-rprx-vision"
+        link+="#$(echo -n "VLESS-REALITY-${server_name}" | jq -sRr @uri)"
+        
+        share_links+=("$link")
+        
+    elif [ $protocol -eq 3 ]; then
+        # VLESS-XHTTP-TLS
+        for domain in "${domain_list[@]}"
+        do
+            local link="vless://${xid_3}@${domain}:443"
+            link+="?type=xhttp"
+            link+="&security=tls"
+            link+="&path=$(echo -n "$path" | jq -sRr @uri)"
+            link+="#$(echo -n "VLESS-XHTTP-${domain}" | jq -sRr @uri)"
+            
+            share_links+=("$link")
+        done
+    fi
+    
+    printf '%s\n' "${share_links[@]}"
+}
+
+# 保存分享链接到文件
+save_share_links()
+{
+    local share_file="${nginx_prefix}/share_links.txt"
+    
+    echo "# Xray-REALITY+Web 分享链接" > "$share_file"
+    echo "# 生成时间: $(date '+%Y-%m-%d %H:%M:%S')" >> "$share_file"
+    echo "" >> "$share_file"
+    
+    if [ $protocol_1 -ne 0 ]; then
+        local ip=""
+        # 尝试自动获取服务器IP
+        ip=$(curl -s4m8 ip.sb) || ip=$(curl -s6m8 ip.sb) || ip=""
+        
+        if [ -z "$ip" ]; then
+            echo "# VLESS-Vision-REALITY (请手动替换 YOUR_SERVER_IP)" >> "$share_file"
+            ip="YOUR_SERVER_IP"
+        else
+            echo "# VLESS-Vision-REALITY" >> "$share_file"
+        fi
+        
+        echo "" >> "$share_file"
+        generate_vless_share_link 1 "$ip" >> "$share_file"
+        echo "" >> "$share_file"
+    fi
+    
+    if [ $protocol_3 -ne 0 ]; then
+        echo "# VLESS-XHTTP-TLS (可过CDN)" >> "$share_file"
+        echo "" >> "$share_file"
+        generate_vless_share_link 3 "" >> "$share_file"
+        echo "" >> "$share_file"
+    fi
+    
+    # 添加详细配置信息
+    echo "" >> "$share_file"
+    echo "# ==================== 详细配置信息 ====================" >> "$share_file"
+    echo "" >> "$share_file"
+    
+    if [ $protocol_1 -ne 0 ]; then
+        cat >> "$share_file" << EOF
+# REALITY 配置
+Server: $ip:443
+UUID: $xid_1
+Flow: xtls-rprx-vision
+Security: reality
+SNI: ${reality_server_names}
+Fingerprint: chrome
+PublicKey: $reality_password
+ShortId: ${reality_short_ids}
+
+EOF
+    fi
+    
+    if [ $protocol_3 -ne 0 ]; then
+        cat >> "$share_file" << EOF
+# XHTTP 配置
+Server: ${domain_list[*]}
+Port: 443
+UUID: $xid_3
+Type: xhttp
+Path: $path
+Security: tls
+
+EOF
+    fi
+    
+    chmod 600 "$share_file"
+    green "分享链接已保存到: $share_file"
+}
+
+# 生成二维码（可选）
+generate_qrcode()
+{
+    if ! command -v qrencode &> /dev/null; then
+        return 0
+    fi
+    
+    local qr_dir="${nginx_prefix}/qrcodes"
+    mkdir -p "$qr_dir"
+    
+    local i=1
+    if [ $protocol_1 -ne 0 ]; then
+        local ip=$(curl -s4m8 ip.sb) || ip=$(curl -s6m8 ip.sb) || ip="YOUR_SERVER_IP"
+        local link=$(generate_vless_share_link 1 "$ip" | head -n 1)
+        qrencode -o "${qr_dir}/reality_${i}.png" "$link" 2>/dev/null
+        ((i++))
+    fi
+    
+    if [ $protocol_3 -ne 0 ]; then
+        while IFS= read -r link; do
+            qrencode -o "${qr_dir}/xhttp_${i}.png" "$link" 2>/dev/null
+            ((i++))
+        done < <(generate_vless_share_link 3 "")
+    fi
+    
+    if [ $i -gt 1 ]; then
+        green "二维码已保存到: $qr_dir"
+    fi
+}
+
+
 
 #开始菜单
 start_menu()
