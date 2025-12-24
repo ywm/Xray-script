@@ -62,6 +62,10 @@ unset domain_config_list
 # 域名伪装列表，对应域名列表
 unset pretend_list
 
+# 新增：子域名前缀列表
+unset subdomain_prefix_list
+
+
 # TCP配置，使用REALITY
 unset protocol_1
 
@@ -675,15 +679,18 @@ get_config_info()
         protocol_3=0
     fi
     
-    
+    # 读取域名配置
     unset domain_list
     unset true_domain_list
     unset domain_config_list
     unset pretend_list
+    unset subdomain_prefix_list
+    
     domain_list=($(grep "^#domain_list=" $nginx_config | cut -d = -f 2))
     true_domain_list=($(grep "^#true_domain_list=" $nginx_config | cut -d = -f 2))
     domain_config_list=($(grep "^#domain_config_list=" $nginx_config | cut -d = -f 2))
     pretend_list=($(grep "^#pretend_list=" $nginx_config | cut -d = -f 2))
+    subdomain_prefix_list=($(grep "^#subdomain_prefix_list=" $nginx_config | cut -d = -f 2))
 }
 gen_cflags()
 {
@@ -1712,14 +1719,17 @@ readProtocolConfig()
     echo -e "\\n\\n\\n"
     tyblue "---------------------请选择传输协议---------------------"
     tyblue " 1. VLESS-Vision-REALITY (直连)"
+    purple "     无需证书，抗主动探测，适合直连使用"
     tyblue " 2. VLESS-XHTTP-TLS (可过CDN)"
-    tyblue " 3. VLESS-Vision-REALITY + XHTTP (推荐)"
+    purple "     需要域名和证书，可通过CDN隐藏真实IP"
+    green  " 3. REALITY + XHTTP (推荐)"
+    purple "     使用Nginx SNI分流，两者可同时运行"
     yellow " 0. 无 (仅提供Web服务)"
     echo
     blue   " 注："
-    blue   "   1. REALITY 无需证书,抗主动探测,推荐直连使用"
-    blue   "   2. XHTTP 支持通过CDN,需要域名和证书"
-    blue   "   3. 选项3同时提供 REALITY 直连和 XHTTP CDN"
+    blue   "   1. REALITY 无需证书，抗主动探测"
+    blue   "   2. XHTTP 支持CDN，需要域名和证书"
+    green  "   3. 采用 Nginx 前置架构，端口不冲突！"
     echo
     local choice=""
     while [[ ! "$choice" =~ ^(0|[1-3])$ ]]
@@ -1740,7 +1750,6 @@ readProtocolConfig()
         protocol_1=0
         protocol_3=0
     fi
-    
 }
 
 #读取伪装类型 输入domain 输出pretend
@@ -1835,6 +1844,8 @@ readPretend()
         fi
     done
 }
+
+
 readDomain()
 {
     check_domain()
@@ -1851,51 +1862,151 @@ readDomain()
             return 0
         fi
     }
-    local domain
-    local domain_config=""
+    
+    local main_domain=""
     local pretend
+    
     echo -e "\\n\\n\\n"
-    tyblue "--------------------请选择域名解析情况--------------------"
-    tyblue " 1. 主域名 和 www.主域名 都解析到此服务器上 \\033[32m(推荐)"
-    green  "    如：123.com 和 www.123.com 都解析到此服务器上"
-    tyblue " 2. 仅某个特定域名解析到此服务器上"
-    green  "    如：123.com 或 www.123.com 或 xxx.123.com 中的一个解析到此服务器上"
-    echo
-    while [ "$domain_config" != "1" ] && [ "$domain_config" != "2" ]
-    do
-        read -p "您的选择是：" domain_config
-    done
+    tyblue "--------------------域名配置--------------------"
+    
+    # 读取主域名
     local queren=0
     while [ $queren -ne 1 ]
     do
-        domain=""
+        main_domain=""
         echo
-        if [ $domain_config -eq 1 ]; then
-            tyblue '---------请输入主域名(前面不带"www."、"http://"或"https://")---------'
-            while ! check_domain "$domain"
-            do
-                read -p "请输入域名：" domain
-            done
-        else
-            tyblue '-------请输入解析到此服务器的域名(前面不带"http://"或"https://")-------'
-            while [ -z "$domain" ]
-            do
-                read -p "请输入域名：" domain
-                if [ "$(echo -n "$domain" | wc -c)" -gt 46 ]; then
-                    red "域名过长！"
-                    domain=""
-                fi
-            done
-        fi
+        tyblue '---------请输入主域名(前面不带"www."、"http://"或"https://")---------'
+        tyblue "例如: example.com"
+        while ! check_domain "$main_domain"
+        do
+            read -p "请输入域名：" main_domain
+        done
         echo
-        ask_if "您输入的域名是\"$domain\"，确认吗？[y/n]" && queren=1
+        ask_if "您输入的域名是\"$main_domain\"，确认吗？[y/n]" && queren=1
     done
-    readPretend "$domain"
-    true_domain_list+=("$domain")
-    [ $domain_config -eq 1 ] && domain_list+=("www.$domain") || domain_list+=("$domain")
-    domain_config_list+=("$domain_config")
-    pretend_list+=("$pretend")
+    
+    # 根据协议配置子域名
+    unset domain_list
+    unset true_domain_list
+    unset domain_config_list
+    unset pretend_list
+    unset subdomain_prefix_list
+    
+    echo -e "\\n\\n"
+    tyblue "--------------------子域名配置--------------------"
+    
+    if [ $protocol_1 -ne 0 ] && [ $protocol_3 -ne 0 ]; then
+        # 同时使用 REALITY 和 XHTTP
+        tyblue "检测到同时启用 REALITY 和 XHTTP"
+        tyblue "将使用不同子域名区分各协议"
+        echo
+        
+        # REALITY 子域名
+        local reality_subdomain=""
+        tyblue "请输入 REALITY 使用的子域名前缀 [默认: reality]"
+        read -p "子域名前缀: " reality_subdomain
+        [ -z "$reality_subdomain" ] && reality_subdomain="reality"
+        local reality_domain="${reality_subdomain}.${main_domain}"
+        
+        # XHTTP 子域名
+        local xhttp_subdomain=""
+        echo
+        tyblue "请输入 XHTTP 使用的子域名前缀 [默认: cdn]"
+        read -p "子域名前缀: " xhttp_subdomain
+        [ -z "$xhttp_subdomain" ] && xhttp_subdomain="cdn"
+        local xhttp_domain="${xhttp_subdomain}.${main_domain}"
+        
+        echo
+        green "域名配置："
+        green "  主域名:  $main_domain"
+        green "  REALITY: $reality_domain"
+        green "  XHTTP:   $xhttp_domain"
+        echo
+        
+        if ! ask_if "确认配置？[y/n]"; then
+            readDomain
+            return
+        fi
+        
+        # 存储域名配置
+        domain_list=("$reality_domain" "$xhttp_domain")
+        true_domain_list=("$main_domain" "$main_domain")
+        domain_config_list=(2 2)  # 2表示子域名配置
+        subdomain_prefix_list=("$reality_subdomain" "$xhttp_subdomain")
+        
+    elif [ $protocol_1 -ne 0 ]; then
+        # 仅 REALITY
+        tyblue "请选择 REALITY 域名配置："
+        tyblue " 1. 使用子域名 (推荐)"
+        tyblue "    例如: reality.${main_domain}"
+        tyblue " 2. 使用主域名"
+        tyblue "    直接使用: ${main_domain}"
+        echo
+        local choice=""
+        while [[ ! "$choice" =~ ^[12]$ ]]
+        do
+            read -p "您的选择是：" choice
+        done
+        
+        if [ $choice -eq 1 ]; then
+            local subdomain=""
+            tyblue "请输入子域名前缀 [默认: reality]"
+            read -p "子域名前缀: " subdomain
+            [ -z "$subdomain" ] && subdomain="reality"
+            domain_list=("${subdomain}.${main_domain}")
+            domain_config_list=(2)
+            subdomain_prefix_list=("$subdomain")
+        else
+            domain_list=("$main_domain")
+            domain_config_list=(1)
+            subdomain_prefix_list=("")
+        fi
+        
+        true_domain_list=("$main_domain")
+        
+    elif [ $protocol_3 -ne 0 ]; then
+        # 仅 XHTTP
+        tyblue "请选择 XHTTP 域名配置："
+        tyblue " 1. 使用子域名 (推荐，便于CDN)"
+        tyblue "    例如: cdn.${main_domain}"
+        tyblue " 2. 使用主域名"
+        tyblue "    直接使用: ${main_domain}"
+        echo
+        local choice=""
+        while [[ ! "$choice" =~ ^[12]$ ]]
+        do
+            read -p "您的选择是：" choice
+        done
+        
+        if [ $choice -eq 1 ]; then
+            local subdomain=""
+            tyblue "请输入子域名前缀 [默认: cdn]"
+            read -p "子域名前缀: " subdomain
+            [ -z "$subdomain" ] && subdomain="cdn"
+            domain_list=("${subdomain}.${main_domain}")
+            domain_config_list=(2)
+            subdomain_prefix_list=("$subdomain")
+        else
+            domain_list=("$main_domain")
+            domain_config_list=(1)
+            subdomain_prefix_list=("")
+        fi
+        
+        true_domain_list=("$main_domain")
+        
+    else
+        # 仅 Web
+        domain_list=("$main_domain")
+        true_domain_list=("$main_domain")
+        domain_config_list=(1)
+        subdomain_prefix_list=("")
+    fi
+    
+    # 选择伪装网站类型
+    readPretend "${true_domain_list[0]}"
+    pretend_list=("$pretend")
 }
+
 
 install_nginx_compile_toolchains()
 {
@@ -2713,115 +2824,263 @@ EOF
 }
 
 #nginx 配置
-#nginx 配置
 config_nginx()
 {
     config_nginx_init
-    local i
-    local need_certificate=0
     
-    # 判断是否需要TLS证书
-    if [ $protocol_3 -ne 0 ]; then
-        need_certificate=1
-    fi
-    
-    # HTTP 80端口 - 重定向到 HTTPS
-cat > $nginx_config<<EOF
-server {
-    listen 80 reuseport default_server;
-    listen [::]:80 reuseport default_server;
-    return 301 https://${domain_list[0]}\$request_uri;
+    # 生成主配置文件
+    cat > ${nginx_prefix}/conf/nginx.conf <<'EOF'
+user  root root;
+worker_processes  auto;
+
+#error_log  logs/error.log;
+google_perftools_profiles /dev/shm/nginx/tcmalloc/tcmalloc;
+
+events {
+    worker_connections  1024;
 }
 
-server {
-    listen 80;
-    listen [::]:80;
-    server_name ${domain_list[@]};
-    return 301 https://\$host\$request_uri;
-}
 EOF
 
-    # Unix Socket 服务器 - 用于 REALITY 回落
-cat >> $nginx_config<<EOF
-
-server {
-    listen unix:/dev/shm/nginx/reality.sock ssl proxy_protocol;
-    http2 on;
-    set_real_ip_from unix:;
-    real_ip_header proxy_protocol;
-    
-    server_name ${domain_list[@]};
-    
-    ssl_certificate ${nginx_prefix}/certs/${true_domain_list[0]}.cer;
-    ssl_certificate_key ${nginx_prefix}/certs/${true_domain_list[0]}.key;
-    
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305;
-    ssl_prefer_server_ciphers on;
-    
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
-    include ${nginx_prefix}/custom.d/location.conf;
-    
+    # 如果有协议需要配置，添加 stream 模块
+    if [ $protocol_1 -ne 0 ] || [ $protocol_3 -ne 0 ]; then
+        cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
+# Stream 模块 - SNI 分流
+stream {
+    map $ssl_preread_server_name $backend_name {
 EOF
 
-    # 如果启用了 XHTTP，添加 location
-    if [ $protocol_3 -ne 0 ]; then
-cat >> $nginx_config<<EOF
-    location $path {
-        proxy_pass http://unix:/dev/shm/xray/xhttp.sock;
-        proxy_http_version 1.1;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-    
+        # 配置 SNI 分流规则
+        local sni_index=0
+        if [ $protocol_1 -ne 0 ]; then
+            cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
+        ${domain_list[$sni_index]} reality;  # REALITY 域名
 EOF
-    fi
-
-    # 伪装网站配置
-    for ((i=0;i<${#domain_list[@]};i++))
-    do
-        if [ "${pretend_list[$i]}" == "1" ]; then
-cat >> $nginx_config<<EOF
-    location / {
-        proxy_set_header X-Forwarded-For 127.0.0.1;
-        proxy_set_header Host \$http_host;
-        proxy_redirect off;
-        proxy_pass http://unix:/dev/shm/cloudreve/cloudreve.sock;
-        client_max_body_size 0;
-    }
-EOF
-        elif [ "${pretend_list[$i]}" == "2" ]; then
-            echo "    root ${nginx_prefix}/html/${true_domain_list[$i]};" >> $nginx_config
-            echo "    include ${nginx_prefix}/conf.d/nextcloud.conf;" >> $nginx_config
-        elif [ "${pretend_list[$i]}" == "3" ]; then
-            echo "    location / {" >> $nginx_config
-            echo "        return 403;" >> $nginx_config
-            echo "    }" >> $nginx_config
-        elif [ "${pretend_list[$i]}" == "4" ]; then
-            echo "    root ${nginx_prefix}/html/${true_domain_list[$i]};" >> $nginx_config
-        else
-            echo "    location / {" >> $nginx_config
-            echo "        proxy_pass ${pretend_list[$i]};" >> $nginx_config
-            echo "        proxy_set_header referer \"${pretend_list[$i]}\";" >> $nginx_config
-            echo "    }" >> $nginx_config
+            ((sni_index++))
         fi
-        break
-    done
+        
+        if [ $protocol_3 -ne 0 ]; then
+            cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
+        ${domain_list[$sni_index]} xhttp;    # XHTTP 域名
+EOF
+        fi
 
-cat >> $nginx_config<<EOF
+        # 默认规则（防止未匹配的SNI）
+        cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
+        default web;
+EOF
+
+        cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
+    }
+    
+EOF
+
+        # 配置 upstream
+        if [ $protocol_1 -ne 0 ]; then
+            cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
+    upstream reality {
+        server unix:/dev/shm/xray/reality.sock;
+    }
+    
+EOF
+        fi
+
+        if [ $protocol_3 -ne 0 ]; then
+            cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
+    upstream xhttp {
+        server unix:/dev/shm/xray/xhttp_entry.sock;
+    }
+    
+EOF
+        fi
+
+        # 添加默认 upstream（处理未匹配的SNI）
+        cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
+    upstream web {
+        server unix:/dev/shm/nginx/default_web.sock;
+    }
+    
+EOF
+
+        # Stream 服务器配置
+        cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
+    server {
+        listen 443;
+        listen [::]:443;
+        ssl_preread on;
+        proxy_protocol on;
+        proxy_pass $backend_name;
+    }
+}
+
+EOF
+    fi
+
+    # HTTP 模块
+    cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+    
+    sendfile        on;
+    keepalive_timeout  65;
+
+    # HTTP 80 重定向
+    server {
+        listen 80 reuseport default_server;
+        listen [::]:80 reuseport default_server;
+        return 301 https://$host$request_uri;
+    }
+EOF
+
+    # XHTTP Web 服务器（用于处理伪装流量）
+    if [ $protocol_3 -ne 0 ]; then
+        cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
+
+    # XHTTP Web 服务器
+    server {
+        listen unix:/dev/shm/nginx/xhttp_web.sock ssl proxy_protocol;
+        http2 on;
+        set_real_ip_from unix:;
+        real_ip_header proxy_protocol;
+        
+        server_name ${domain_list[@]};
+        
+        ssl_certificate ${nginx_prefix}/certs/${true_domain_list[0]}.cer;
+        ssl_certificate_key ${nginx_prefix}/certs/${true_domain_list[0]}.key;
+        
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305;
+        ssl_prefer_server_ciphers on;
+        
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+        include ${nginx_prefix}/custom.d/location.conf;
+        
+EOF
+        # 伪装网站配置
+        add_pretend_config
+        
+        cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
+    }
+EOF
+    fi
+
+    # REALITY 回落 Web 服务器
+    if [ $protocol_1 -ne 0 ]; then
+        cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
+
+    # REALITY 回落 Web 服务器
+    server {
+        listen unix:/dev/shm/nginx/reality_web.sock ssl proxy_protocol;
+        http2 on;
+        set_real_ip_from unix:;
+        real_ip_header proxy_protocol;
+        
+        server_name ${domain_list[@]};
+        
+        ssl_certificate ${nginx_prefix}/certs/${true_domain_list[0]}.cer;
+        ssl_certificate_key ${nginx_prefix}/certs/${true_domain_list[0]}.key;
+        
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305;
+        ssl_prefer_server_ciphers on;
+        
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+        include ${nginx_prefix}/custom.d/location.conf;
+        
+EOF
+        # 伪装网站配置
+        add_pretend_config
+        
+        cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
+    }
+EOF
+    fi
+
+    # 默认 Web 服务器（处理未匹配的SNI）
+    if [ $protocol_1 -ne 0 ] || [ $protocol_3 -ne 0 ]; then
+        cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
+
+    # 默认 Web 服务器（未匹配SNI）
+    server {
+        listen unix:/dev/shm/nginx/default_web.sock ssl proxy_protocol;
+        http2 on;
+        set_real_ip_from unix:;
+        real_ip_header proxy_protocol;
+        
+        server_name _;
+        
+        ssl_certificate ${nginx_prefix}/certs/${true_domain_list[0]}.cer;
+        ssl_certificate_key ${nginx_prefix}/certs/${true_domain_list[0]}.key;
+        
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305;
+        ssl_prefer_server_ciphers on;
+        
+        location / {
+            return 403;
+        }
+    }
+EOF
+    fi
+
+    cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
 }
 EOF
 
-cat >> $nginx_config<<EOF
+    # 添加配置信息注释
+    cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
 
 #-----------------不要修改以下内容----------------
 #domain_list=${domain_list[@]}
 #true_domain_list=${true_domain_list[@]}
 #domain_config_list=${domain_config_list[@]}
 #pretend_list=${pretend_list[@]}
+#subdomain_prefix_list=${subdomain_prefix_list[@]}
 EOF
+}
+
+# 添加伪装网站配置的辅助函数
+add_pretend_config()
+{
+    local i
+    for ((i=0;i<${#pretend_list[@]};i++))
+    do
+        if [ "${pretend_list[$i]}" == "1" ]; then
+            cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
+        location / {
+            proxy_set_header X-Forwarded-For 127.0.0.1;
+            proxy_set_header Host $http_host;
+            proxy_redirect off;
+            proxy_pass http://unix:/dev/shm/cloudreve/cloudreve.sock;
+            client_max_body_size 0;
+        }
+EOF
+        elif [ "${pretend_list[$i]}" == "2" ]; then
+            cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
+        root ${nginx_prefix}/html/${true_domain_list[$i]};
+        include ${nginx_prefix}/conf.d/nextcloud.conf;
+EOF
+        elif [ "${pretend_list[$i]}" == "3" ]; then
+            cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
+        location / {
+            return 403;
+        }
+EOF
+        elif [ "${pretend_list[$i]}" == "4" ]; then
+            cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
+        root ${nginx_prefix}/html/${true_domain_list[$i]};
+EOF
+        else
+            cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
+        location / {
+            proxy_pass ${pretend_list[$i]};
+            proxy_set_header referer "${pretend_list[$i]}";
+        }
+EOF
+        fi
+        break
+    done
 }
 
 
@@ -2842,11 +3101,9 @@ generate_self_signed_cert()
 
 
 #配置xray
-#配置xray
 config_xray()
 {
-    local i
-cat > $xray_config <<EOF
+    cat > $xray_config <<EOF
 {
     "log": {
         "loglevel": "warning",
@@ -2856,11 +3113,11 @@ cat > $xray_config <<EOF
     "inbounds": [
 EOF
 
-    # REALITY + Vision 配置 - 监听443端口
+    # REALITY 配置
     if [ $protocol_1 -ne 0 ]; then
-cat >> $xray_config <<EOF
+        cat >> $xray_config <<EOF
         {
-            "port": 443,
+            "listen": "/dev/shm/xray/reality.sock,0666",
             "protocol": "vless",
             "settings": {
                 "clients": [
@@ -2870,54 +3127,88 @@ cat >> $xray_config <<EOF
                         "email": "reality@local"
                     }
                 ],
-                "decryption": "none"
-EOF
-
-        # 如果启用了 XHTTP，添加回落配置
-        if [ $protocol_3 -ne 0 ]; then
-cat >> $xray_config <<EOF
-,
+                "decryption": "none",
                 "fallbacks": [
                     {
-                        "dest": "/dev/shm/xray/xhttp.sock"
+                        "dest": "/dev/shm/nginx/reality_web.sock",
+                        "xver": 1
                     }
                 ]
-EOF
-        fi
-
-cat >> $xray_config <<EOF
             },
             "streamSettings": {
                 "network": "raw",
                 "security": "reality",
                 "realitySettings": {
                     "show": false,
-                    "target": "/dev/shm/nginx/reality.sock",
+                    "target": "/dev/shm/nginx/reality_web.sock",
                     "xver": 1,
                     "serverNames": [$(echo "$reality_server_names" | awk '{for(i=1;i<=NF;i++) printf "\"%s\"%s", $i, (i<NF?", ":"")}')],
                     "privateKey": "$reality_private_key",
                     "shortIds": [${reality_short_ids// /, }]
+                },
+                "rawSettings": {
+                    "acceptProxyProtocol": true
                 }
             },
             "sniffing": {
                 "enabled": true,
-                "destOverride": [
-                    "http",
-                    "tls",
-                    "quic"
-                ],
+                "destOverride": ["http", "tls", "quic"],
                 "routeOnly": true
             }
         }
 EOF
-        if [ $protocol_3 -ne 0 ]; then
-            echo ',' >> $xray_config
-        fi
+        [ $protocol_3 -ne 0 ] && echo ',' >> $xray_config
     fi
 
     # XHTTP 配置
     if [ $protocol_3 -ne 0 ]; then
-cat >> $xray_config <<EOF
+        cat >> $xray_config <<EOF
+        {
+            "listen": "/dev/shm/xray/xhttp_entry.sock,0666",
+            "protocol": "vless",
+            "settings": {
+                "clients": [
+                    {
+                        "id": "$xid_3",
+                        "email": "xhttp-entry@local"
+                    }
+                ],
+                "decryption": "none",
+                "fallbacks": [
+                    {
+                        "path": "$path",
+                        "dest": "/dev/shm/xray/xhttp.sock",
+                        "xver": 1
+                    },
+                    {
+                        "dest": "/dev/shm/nginx/xhttp_web.sock",
+                        "xver": 1
+                    }
+                ]
+            },
+            "streamSettings": {
+                "network": "raw",
+                "security": "tls",
+                "tlsSettings": {
+                    "certificates": [
+                        {
+                            "certificateFile": "${nginx_prefix}/certs/${true_domain_list[0]}.cer",
+                            "keyFile": "${nginx_prefix}/certs/${true_domain_list[0]}.key"
+                        }
+                    ],
+                    "minVersion": "1.2",
+                    "maxVersion": "1.3"
+                },
+                "rawSettings": {
+                    "acceptProxyProtocol": true
+                }
+            },
+            "sniffing": {
+                "enabled": true,
+                "destOverride": ["http", "tls", "quic"],
+                "routeOnly": true
+            }
+        },
         {
             "listen": "/dev/shm/xray/xhttp.sock,0666",
             "protocol": "vless",
@@ -2938,26 +3229,20 @@ cat >> $xray_config <<EOF
             },
             "sniffing": {
                 "enabled": true,
-                "destOverride": [
-                    "http",
-                    "tls",
-                    "quic"
-                ],
+                "destOverride": ["http", "tls", "quic"],
                 "routeOnly": true
             }
         }
 EOF
     fi
 
-cat >> $xray_config <<EOF
+    cat >> $xray_config <<'EOF'
     ],
     "routing": {
         "rules": [
             {
                 "type": "field",
-                "protocol": [
-                    "bittorrent"
-                ],
+                "protocol": ["bittorrent"],
                 "outboundTag": "block"
             }
         ]
@@ -3149,6 +3434,20 @@ print_share_link()
 print_config_info()
 {
     echo -e "\\n\\n\\n"
+    tyblue "==================== 架构信息 ===================="
+    green  " 架构模式: Nginx 前置 + Xray 后置"
+    tyblue " 流量走向: 客户端 → Nginx SNI分流 → Xray → 回落Nginx"
+    echo
+    
+    if [ $protocol_1 -ne 0 ] && [ $protocol_3 -ne 0 ]; then
+        tyblue "当前配置："
+        tyblue "  443端口(Nginx) → SNI分流"
+        tyblue "    ├─ ${domain_list[0]} → REALITY"
+        tyblue "    └─ ${domain_list[1]} → XHTTP"
+    fi
+    echo
+
+
     if [ $protocol_1 -ne 0 ]; then
         tyblue "--------------------- VLESS-Vision-REALITY [直连] ---------------------"
         tyblue " protocol传输协议    ：\\033[33mvless"
@@ -3209,7 +3508,7 @@ print_config_info()
     fi
       # 保存分享链接
     save_share_links
-    
+
     echo
     yellow "注：部分选项可能分享链接无法涉及，建议手动填写"
     ask_if "是否生成分享链接？[y/n]" && print_share_link
@@ -3250,9 +3549,7 @@ install_update_xray_tls_web()
             readRealityConfig
         fi
         path="/$(head -c 20 /dev/urandom | md5sum | head -c 10)"
-        serviceName="$(head -c 20 /dev/urandom | md5sum | head -c 10)"
         xid_1="$(cat /proc/sys/kernel/random/uuid)"
-        xid_2="$(cat /proc/sys/kernel/random/uuid)"
         xid_3="$(cat /proc/sys/kernel/random/uuid)"
     else
         get_config_info
@@ -4123,12 +4420,11 @@ readRealityConfig()
     tyblue "---------------------配置 REALITY---------------------"
     
     # 自动使用第一个域名作为 serverName
-    local default_server_name="${domain_list[0]}"
-    tyblue "REALITY serverName: $default_server_name"
-    reality_server_names="$default_server_name"
+    reality_server_names="${domain_list[0]}"
+    tyblue "REALITY serverName: $reality_server_names"
     
     # dest 设置为 Nginx unix socket
-    reality_dest="/dev/shm/nginx/reality.sock"
+    reality_dest="/dev/shm/nginx/reality_web.sock"
     tyblue "REALITY dest: $reality_dest [回落到Nginx]"
     
     # 生成密钥对
@@ -4145,24 +4441,22 @@ readRealityConfig()
     
     green "密钥生成成功！"
     tyblue "PrivateKey: $reality_private_key"
-    tyblue "Password:: $reality_password"
+    tyblue "Password: $reality_password"
     
     # 生成shortIds
     tyblue "请输入shortIds [多个用空格分隔，留空则自动生成]"
+    tyblue "格式: 空字符串和随机hex，例如: \"\" \"abc123\""
     read -p "shortIds: " reality_short_ids
+    
     if [ -z "$reality_short_ids" ]; then
-        # 自动生成两个shortId，一个空，一个随机
+        # 自动生成：空字符串和随机hex
         local random_id=$(head -c 8 /dev/urandom | xxd -p)
         reality_short_ids="\"\" \"${random_id}\""
         green "已自动生成shortIds: $reality_short_ids"
-    else
-        # 用户输入，需要验证格式
-        # 移除可能的多余空格，确保格式正确
-        reality_short_ids=$(echo "$reality_short_ids" | sed 's/  */ /g')
     fi
     
     echo
-    tyblue "REALITY配置完成！"
+    tyblue "REALITY配置完成："
     tyblue "Dest: $reality_dest"
     tyblue "ServerNames: $reality_server_names"
     tyblue "ShortIds: $reality_short_ids"
