@@ -2826,7 +2826,7 @@ read_cf_api()
 # 获取泛域名证书 参数: 域名位置 (此时 $1 通常指向主域名)
 get_cert()
 {
-    # 在全能模式下，true_domain_list[$1] 存储的是主域名 zhuzhunian.cn
+    # 在全能模式下，true_domain_list[$1]
     local main_domain="${true_domain_list[$1]}"
     local cert_file="${nginx_prefix}/certs/${main_domain}.cer"
     local key_file="${nginx_prefix}/certs/${main_domain}.key"
