@@ -4561,7 +4561,7 @@ change_xray_id()
     done
     if [ $flag -eq 1 ]; then
         xid_1="$xid"
-    else if [ $flag -eq 2 ]; then
+    elif [ $flag -eq 2 ]; then
         xid_2="$xid"
     else
         xid_3="$xid"
