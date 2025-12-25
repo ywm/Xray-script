@@ -69,6 +69,10 @@ unset subdomain_prefix_list
 # TCP配置，使用REALITY
 unset protocol_1
 
+# 使用 protocol_2 代表 Trojan (protocol_1是Reality, protocol_3是XHTTP)
+unset protocol_2
+
+
 # XHTTP使用的代理协议，0代表禁用，1代表VLESS
 unset protocol_3
 
@@ -77,8 +81,13 @@ unset path
 # TCP协议的vless uuid
 unset xid_1
 
+# trojan 协议的vless uuid
+unset xid_2
+
 # XHTTP协议的vless uuid
 unset xid_3
+
+
 
 # 现在有没有通过脚本启动swap
 using_swap_now=0
@@ -668,6 +677,16 @@ get_config_info()
         reality_password=$(/usr/local/bin/xray x25519 -i "$reality_private_key" | awk '/^Password:/ {print $2}')
     else
         protocol_1=0
+    fi
+
+
+    # 检测 Trojan
+    if grep -q '"protocol"[ '$'\t]*:[ '$'\t]*"trojan"' $xray_config; then
+        protocol_2=1
+        # 读取 Trojan 的 password (相当于 UUID)
+        xid_2="$(grep -A10 '"protocol"[ '$'\t]*:[ '$'\t]*"trojan"' $xray_config | grep '"password"' | head -n1 | cut -d : -f 2 | cut -d \" -f 2)"
+    else
+        protocol_2=0
     fi
     
     # 检测 XHTTP
@@ -1719,36 +1738,39 @@ readProtocolConfig()
     echo -e "\\n\\n\\n"
     tyblue "---------------------请选择传输协议---------------------"
     tyblue " 1. VLESS-Vision-REALITY (直连)"
-    purple "     无需证书，抗主动探测，适合直连使用"
     tyblue " 2. VLESS-XHTTP-TLS (可过CDN)"
-    purple "     需要域名和证书，可通过CDN隐藏真实IP"
-    green  " 3. REALITY + XHTTP (推荐)"
-    purple "     使用Nginx SNI分流，两者可同时运行"
+    tyblue " 3. REALITY + XHTTP (推荐)"
+    # [新增选项]
+    tyblue  " 4. REALITY + XHTTP + Trojan (全能模式)" 
+    purple "     同时启用三种协议，Trojan使用独立域名"
     yellow " 0. 无 (仅提供Web服务)"
     echo
-    blue   " 注："
-    blue   "   1. REALITY 无需证书，抗主动探测"
-    blue   "   2. XHTTP 支持CDN，需要域名和证书"
-    green  "   3. 采用 Nginx 前置架构，端口不冲突！"
-    echo
+    # ... existing code ...
+    
+    # 修改读取逻辑
     local choice=""
-    while [[ ! "$choice" =~ ^(0|[1-3])$ ]]
+    while [[ ! "$choice" =~ ^(0|[1-4])$ ]]
     do
         read -p "您的选择是：" choice
     done
     
+    # 重置变量
+    protocol_1=0
+    protocol_2=0
+    protocol_3=0
+
     if [ $choice -eq 1 ]; then
         protocol_1=1
-        protocol_3=0
     elif [ $choice -eq 2 ]; then
-        protocol_1=0
         protocol_3=1
     elif [ $choice -eq 3 ]; then
         protocol_1=1
         protocol_3=1
-    else
-        protocol_1=0
-        protocol_3=0
+    elif [ $choice -eq 4 ]; then
+        # 全开启
+        protocol_1=1
+        protocol_2=1
+        protocol_3=1
     fi
 }
 
@@ -1846,6 +1868,7 @@ readPretend()
 }
 
 
+#读取域名 输入domain_list true_domain_list domain_config_list pretend_list subdomain_prefix_list
 readDomain()
 {
     check_domain()
@@ -1853,10 +1876,10 @@ readDomain()
         if [ -z "$1" ]; then
             return 1
         elif [ "${1%%.*}" == "www" ]; then
-            red "域名前面不要带www！"
+            red "域名前面不要带www!"
             return 1
         elif [ "$(echo -n "$1" | wc -c)" -gt 42 ]; then
-            red "域名过长！"
+            red "域名过长!"
             return 1
         else
             return 0
@@ -1875,14 +1898,14 @@ readDomain()
     do
         main_domain=""
         echo
-        tyblue '---------请输入主域名(前面不带"www."、"http://"或"https://")---------'
+        tyblue '---------请输入主域名(前面不带"www.""http://"或"https://")---------'
         tyblue "例如: example.com"
         while ! check_domain "$main_domain"
         do
-            read -p "请输入域名：" main_domain
+            read -p "请输入域名:" main_domain
         done
         echo
-        ask_if "您输入的域名是\"$main_domain\"，确认吗？[y/n]" && queren=1
+        ask_if "您输入的域名是\"$main_domain\",确认吗?[y/n]" && queren=1
     done
     
     # 根据协议配置子域名
@@ -1895,9 +1918,57 @@ readDomain()
     echo -e "\\n\\n"
     tyblue "--------------------子域名配置--------------------"
     
-    if [ $protocol_1 -ne 0 ] && [ $protocol_3 -ne 0 ]; then
-        # 同时使用 REALITY 和 XHTTP
-        tyblue "检测到同时启用 REALITY 和 XHTTP"
+    if [ $protocol_1 -ne 0 ] && [ $protocol_2 -ne 0 ] && [ $protocol_3 -ne 0 ]; then
+        # 全能模式: REALITY + Trojan + XHTTP
+        tyblue "检测到启用全能模式 (REALITY + Trojan + XHTTP)"
+        tyblue "将使用不同子域名区分各协议"
+        echo
+        
+        # REALITY 子域名
+        local reality_subdomain=""
+        tyblue "请输入 REALITY 使用的子域名前缀 [默认: reality]"
+        read -p "子域名前缀: " reality_subdomain
+        [ -z "$reality_subdomain" ] && reality_subdomain="reality"
+        local reality_domain="${reality_subdomain}.${main_domain}"
+        
+        # Trojan 子域名
+        local trojan_subdomain=""
+        echo
+        tyblue "请输入 Trojan 使用的子域名前缀 [默认: trojan]"
+        read -p "子域名前缀: " trojan_subdomain
+        [ -z "$trojan_subdomain" ] && trojan_subdomain="trojan"
+        local trojan_domain="${trojan_subdomain}.${main_domain}"
+        
+        # XHTTP 子域名
+        local xhttp_subdomain=""
+        echo
+        tyblue "请输入 XHTTP 使用的子域名前缀 [默认: cdn]"
+        read -p "子域名前缀: " xhttp_subdomain
+        [ -z "$xhttp_subdomain" ] && xhttp_subdomain="cdn"
+        local xhttp_domain="${xhttp_subdomain}.${main_domain}"
+        
+        echo
+        green "域名配置:"
+        green "  主域名:  $main_domain"
+        green "  REALITY: $reality_domain"
+        green "  Trojan:  $trojan_domain"
+        green "  XHTTP:   $xhttp_domain"
+        echo
+        
+        if ! ask_if "确认配置?[y/n]"; then
+            readDomain
+            return
+        fi
+        
+        # 存储域名配置
+        domain_list=("$reality_domain" "$trojan_domain" "$xhttp_domain")
+        true_domain_list=("$main_domain" "$main_domain" "$main_domain")
+        domain_config_list=(2 2 2)
+        subdomain_prefix_list=("$reality_subdomain" "$trojan_subdomain" "$xhttp_subdomain")
+        
+    elif [ $protocol_1 -ne 0 ] && [ $protocol_3 -ne 0 ]; then
+        # REALITY + XHTTP
+        tyblue "检测到启用双协议模式 (REALITY + XHTTP)"
         tyblue "将使用不同子域名区分各协议"
         echo
         
@@ -1917,26 +1988,25 @@ readDomain()
         local xhttp_domain="${xhttp_subdomain}.${main_domain}"
         
         echo
-        green "域名配置："
+        green "域名配置:"
         green "  主域名:  $main_domain"
         green "  REALITY: $reality_domain"
         green "  XHTTP:   $xhttp_domain"
         echo
         
-        if ! ask_if "确认配置？[y/n]"; then
+        if ! ask_if "确认配置?[y/n]"; then
             readDomain
             return
         fi
         
-        # 存储域名配置
         domain_list=("$reality_domain" "$xhttp_domain")
         true_domain_list=("$main_domain" "$main_domain")
-        domain_config_list=(2 2)  # 2表示子域名配置
+        domain_config_list=(2 2)
         subdomain_prefix_list=("$reality_subdomain" "$xhttp_subdomain")
         
     elif [ $protocol_1 -ne 0 ]; then
         # 仅 REALITY
-        tyblue "请选择 REALITY 域名配置："
+        tyblue "请选择 REALITY 域名配置:"
         tyblue " 1. 使用子域名 (推荐)"
         tyblue "    例如: reality.${main_domain}"
         tyblue " 2. 使用主域名"
@@ -1945,7 +2015,7 @@ readDomain()
         local choice=""
         while [[ ! "$choice" =~ ^[12]$ ]]
         do
-            read -p "您的选择是：" choice
+            read -p "您的选择是:" choice
         done
         
         if [ $choice -eq 1 ]; then
@@ -1964,10 +2034,40 @@ readDomain()
         
         true_domain_list=("$main_domain")
         
+    elif [ $protocol_2 -ne 0 ]; then
+        # 仅 Trojan
+        tyblue "请选择 Trojan 域名配置:"
+        tyblue " 1. 使用子域名 (推荐)"
+        tyblue "    例如: trojan.${main_domain}"
+        tyblue " 2. 使用主域名"
+        tyblue "    直接使用: ${main_domain}"
+        echo
+        local choice=""
+        while [[ ! "$choice" =~ ^[12]$ ]]
+        do
+            read -p "您的选择是:" choice
+        done
+        
+        if [ $choice -eq 1 ]; then
+            local subdomain=""
+            tyblue "请输入子域名前缀 [默认: trojan]"
+            read -p "子域名前缀: " subdomain
+            [ -z "$subdomain" ] && subdomain="trojan"
+            domain_list=("${subdomain}.${main_domain}")
+            domain_config_list=(2)
+            subdomain_prefix_list=("$subdomain")
+        else
+            domain_list=("$main_domain")
+            domain_config_list=(1)
+            subdomain_prefix_list=("")
+        fi
+        
+        true_domain_list=("$main_domain")
+        
     elif [ $protocol_3 -ne 0 ]; then
         # 仅 XHTTP
-        tyblue "请选择 XHTTP 域名配置："
-        tyblue " 1. 使用子域名 (推荐，便于CDN)"
+        tyblue "请选择 XHTTP 域名配置:"
+        tyblue " 1. 使用子域名 (推荐,便于CDN)"
         tyblue "    例如: cdn.${main_domain}"
         tyblue " 2. 使用主域名"
         tyblue "    直接使用: ${main_domain}"
@@ -1975,7 +2075,7 @@ readDomain()
         local choice=""
         while [[ ! "$choice" =~ ^[12]$ ]]
         do
-            read -p "您的选择是：" choice
+            read -p "您的选择是:" choice
         done
         
         if [ $choice -eq 1 ]; then
@@ -2842,8 +2942,8 @@ events {
 
 EOF
 
-    # 如果有协议需要配置，添加 stream 模块
-    if [ $protocol_1 -ne 0 ] || [ $protocol_3 -ne 0 ]; then
+    # 如果有协议需要配置,添加 stream 模块
+    if [ $protocol_1 -ne 0 ] || [ $protocol_2 -ne 0 ] || [ $protocol_3 -ne 0 ]; then
         cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
 # Stream 模块 - SNI 分流
 stream {
@@ -2859,13 +2959,21 @@ EOF
             ((sni_index++))
         fi
         
+        if [ $protocol_2 -ne 0 ]; then
+            cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
+        ${domain_list[$sni_index]} trojan;   # Trojan 域名
+EOF
+            ((sni_index++))
+        fi
+        
         if [ $protocol_3 -ne 0 ]; then
             cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
         ${domain_list[$sni_index]} xhttp;    # XHTTP 域名
 EOF
+            ((sni_index++))
         fi
 
-        # 默认规则（防止未匹配的SNI）
+        # 默认规则(防止未匹配的SNI)
         cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
         default web;
 EOF
@@ -2885,6 +2993,15 @@ EOF
 EOF
         fi
 
+        if [ $protocol_2 -ne 0 ]; then
+            cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
+    upstream trojan {
+        server unix:/dev/shm/xray/trojan.sock;
+    }
+    
+EOF
+        fi
+
         if [ $protocol_3 -ne 0 ]; then
             cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
     upstream xhttp {
@@ -2894,7 +3011,7 @@ EOF
 EOF
         fi
 
-        # 添加默认 upstream（处理未匹配的SNI）
+        # 添加默认 upstream(处理未匹配的SNI)
         cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
     upstream web {
         server unix:/dev/shm/nginx/default_web.sock;
@@ -2925,16 +3042,26 @@ http {
     sendfile        on;
     keepalive_timeout  65;
 
-    # HTTP 80 重定向
+EOF
+
+    # 确定主伪装域名 (用于 HTTP 80 重定向)
+    local main_pretend_domain="${true_domain_list[0]}"
+    
+    cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
+    # HTTP 80 重定向到主域名的伪装站
     server {
         listen 80 reuseport default_server;
         listen [::]:80 reuseport default_server;
-        return 301 https://$host$request_uri;
+        return 301 https://${main_pretend_domain}\$request_uri;
     }
 EOF
 
-    # XHTTP Web 服务器（用于处理伪装流量）
+    # XHTTP Web 服务器(用于处理伪装流量)
     if [ $protocol_3 -ne 0 ]; then
+        local xhttp_idx=0
+        [ $protocol_1 -ne 0 ] && ((xhttp_idx++))
+        [ $protocol_2 -ne 0 ] && ((xhttp_idx++))
+        
         cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
 
     # XHTTP Web 服务器
@@ -2944,7 +3071,7 @@ EOF
         set_real_ip_from unix:;
         real_ip_header proxy_protocol;
         
-        server_name ${domain_list[@]};
+        server_name ${domain_list[$xhttp_idx]};
         
         ssl_certificate ${nginx_prefix}/certs/${true_domain_list[0]}.cer;
         ssl_certificate_key ${nginx_prefix}/certs/${true_domain_list[0]}.key;
@@ -2976,7 +3103,7 @@ EOF
         set_real_ip_from unix:;
         real_ip_header proxy_protocol;
         
-        server_name ${domain_list[@]};
+        server_name ${domain_list[0]};
         
         ssl_certificate ${nginx_prefix}/certs/${true_domain_list[0]}.cer;
         ssl_certificate_key ${nginx_prefix}/certs/${true_domain_list[0]}.key;
@@ -2997,11 +3124,46 @@ EOF
 EOF
     fi
 
-    # 默认 Web 服务器（处理未匹配的SNI）
-    if [ $protocol_1 -ne 0 ] || [ $protocol_3 -ne 0 ]; then
+    # Trojan 回落 Web 服务器
+    if [ $protocol_2 -ne 0 ]; then
+        local trojan_idx=0
+        [ $protocol_1 -ne 0 ] && ((trojan_idx++))
+        
         cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
 
-    # 默认 Web 服务器（未匹配SNI）
+    # Trojan 回落 Web 服务器
+    server {
+        listen unix:/dev/shm/nginx/trojan_web.sock ssl proxy_protocol;
+        http2 on;
+        set_real_ip_from unix:;
+        real_ip_header proxy_protocol;
+        
+        server_name ${domain_list[$trojan_idx]};
+        
+        ssl_certificate ${nginx_prefix}/certs/${true_domain_list[0]}.cer;
+        ssl_certificate_key ${nginx_prefix}/certs/${true_domain_list[0]}.key;
+        
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305;
+        ssl_prefer_server_ciphers on;
+        
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+        include ${nginx_prefix}/custom.d/location.conf;
+        
+EOF
+        # 伪装网站配置
+        add_pretend_config
+        
+        cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
+    }
+EOF
+    fi
+
+    # 默认 Web 服务器(处理未匹配的SNI) - 重定向到主伪装站
+    if [ $protocol_1 -ne 0 ] || [ $protocol_2 -ne 0 ] || [ $protocol_3 -ne 0 ]; then
+        cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
+
+    # 默认 Web 服务器(未匹配SNI) - 重定向到主伪装站
     server {
         listen unix:/dev/shm/nginx/default_web.sock ssl proxy_protocol;
         http2 on;
@@ -3016,9 +3178,13 @@ EOF
         ssl_protocols TLSv1.2 TLSv1.3;
         ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305;
         ssl_prefer_server_ciphers on;
+
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+        include ${nginx_prefix}/custom.d/location.conf;
         
+        # 重定向到主伪装站,而不是返回 403
         location / {
-            return 403;
+            return 302 https://${main_pretend_domain}\$request_uri;
         }
     }
 EOF
@@ -3145,6 +3311,57 @@ EOF
                     "serverNames": [$(echo "$reality_server_names" | awk '{for(i=1;i<=NF;i++) printf "\"%s\"%s", $i, (i<NF?", ":"")}')],
                     "privateKey": "$reality_private_key",
                     "shortIds": [${reality_short_ids// /, }]
+                },
+                "rawSettings": {
+                    "acceptProxyProtocol": true
+                }
+            },
+            "sniffing": {
+                "enabled": true,
+                "destOverride": ["http", "tls", "quic"],
+                "routeOnly": true
+            }
+        }
+EOF
+        [ $protocol_2 -ne 0 ] || [ $protocol_3 -ne 0 ] && echo ',' >> $xray_config
+    fi
+
+    # Trojan 配置
+    if [ $protocol_2 -ne 0 ]; then
+        # 确定 Trojan 域名在 domain_list 中的索引,用于获取证书路径
+        local trojan_index=0
+        [ $protocol_1 -ne 0 ] && ((trojan_index++))
+        
+        cat >> $xray_config <<EOF
+        {
+            "listen": "/dev/shm/xray/trojan.sock,0666",
+            "protocol": "trojan",
+            "settings": {
+                "clients": [
+                    {
+                        "password": "$xid_2",
+                        "email": "trojan@local"
+                    }
+                ],
+                "fallbacks": [
+                    {
+                        "dest": "/dev/shm/nginx/trojan_web.sock",
+                        "xver": 1
+                    }
+                ]
+            },
+            "streamSettings": {
+                "network": "raw",
+                "security": "tls",
+                "tlsSettings": {
+                    "certificates": [
+                        {
+                            "certificateFile": "${nginx_prefix}/certs/${true_domain_list[$trojan_index]}.cer",
+                            "keyFile": "${nginx_prefix}/certs/${true_domain_list[$trojan_index]}.key"
+                        }
+                    ],
+                    "minVersion": "1.2",
+                    "cipherSuites": "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256:TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256"
                 },
                 "rawSettings": {
                     "acceptProxyProtocol": true
@@ -3402,32 +3619,60 @@ let_init_nextcloud()
 
 print_share_link()
 {
-    if [ $protocol_1 -ne 0 ]; then
-        local ip=""
-        while [ -z "$ip" ]
-        do
-            read -p "请输入您的服务器IP(用于生成分享链接)：" ip
-        done
-    fi
-    if [[ "$ip" =~ : ]] && ! [[ "$ip" =~ ^\[.*:.*\]$ ]]; then
-        ip="[$ip]"
-    fi
     echo
-    tyblue "分享链接："
-    if [ $protocol_1 -eq 0 ]; then
-        green  "============ VLESS-Vision-REALITY 直连 ============"
-        local first_short_id="${reality_short_ids%% *}"
-        first_short_id="${first_short_id//\"/}"
-        tyblue "vless://${xid_1}@${ip}:443?security=reality&sni=${reality_server_names}&fp=chrome&pbk=${reality_password}&sid=${first_short_id}&type=tcp&flow=xtls-rprx-vision#VLESS-REALITY"
+    tyblue "==================== 分享链接 ===================="
+    echo
+    
+    if [ $protocol_1 -ne 0 ]; then
+        green  "============ VLESS-Vision-REALITY ============"
+        tyblue "域名: ${domain_list[0]}"
+        echo
+        generate_vless_share_link 1
         echo
     fi
 
-    if [ $protocol_3 -eq 0 ]; then
-        green  "=========== VLESS-XHTTP-TLS 可过CDN ==========="
-        for i in "${domain_list[@]}"
-        do
-            tyblue "vless://${xid_3}@${i}:443?type=xhttp&security=tls&path=${path}#VLESS-XHTTP"
-        done
+    if [ $protocol_3 -ne 0 ]; then
+        local xhttp_domain_index=0
+        [ $protocol_1 -ne 0 ] && xhttp_domain_index=1
+        
+        green  "============ VLESS-XHTTP-TLS ============"
+        tyblue "域名: ${domain_list[$xhttp_domain_index]}"
+        echo
+        generate_vless_share_link 3
+        echo
+    fi
+
+
+    if [ $protocol_2 -ne 0 ]; then
+        local trojan_domain_index=0
+        [ $protocol_1 -ne 0 ] && ((trojan_domain_index++))
+        [ $protocol_3 -ne 0 ] && ((trojan_domain_index++))
+        
+        green  "============ Trojan-TLS ============"
+        tyblue "域名: ${domain_list[$trojan_domain_index]}"
+        echo
+        generate_trojan_share_link
+        echo
+    fi
+    
+    echo
+    yellow "注意事项:"
+    yellow "  1. 分享链接已按照标准草案生成"
+    yellow "  2. 使用域名而非IP,支持CDN和证书验证"
+    yellow "  3. Trojan 使用独立域名,采用传统 TLS"
+    yellow "  4. 详细配置信息已保存到: ${nginx_prefix}/share_links.txt"
+    echo
+    
+    # 保存分享链接
+    save_share_links
+    
+    # 询问是否生成二维码
+    if ask_if "是否生成二维码？[y/n]"; then
+        if ! command -v qrencode &> /dev/null; then
+            yellow "qrencode 未安装，正在安装..."
+            install_dependence qrencode
+        fi
+        generate_qrcode
     fi
 }
 
@@ -3439,8 +3684,14 @@ print_config_info()
     tyblue " 流量走向: 客户端 → Nginx SNI分流 → Xray → 回落Nginx"
     echo
     
-    if [ $protocol_1 -ne 0 ] && [ $protocol_3 -ne 0 ]; then
-        tyblue "当前配置："
+    if [ $protocol_1 -ne 0 ] && [ $protocol_3 -ne 0 ] && [ $protocol_2 -ne 0 ]; then
+        tyblue "当前配置:"
+        tyblue "  443端口(Nginx) → SNI分流"
+        tyblue "    ├─ ${domain_list[0]} → REALITY"
+        tyblue "    ├─ ${domain_list[1]} → XHTTP"
+        tyblue "    └─ ${domain_list[2]} → Trojan"
+    elif [ $protocol_1 -ne 0 ] && [ $protocol_3 -ne 0 ]; then
+        tyblue "当前配置:"
         tyblue "  443端口(Nginx) → SNI分流"
         tyblue "    ├─ ${domain_list[0]} → REALITY"
         tyblue "    └─ ${domain_list[1]} → XHTTP"
@@ -3448,34 +3699,35 @@ print_config_info()
     echo
 
 
+    # REALITY 配置输出
     if [ $protocol_1 -ne 0 ]; then
         tyblue "--------------------- VLESS-Vision-REALITY [直连] ---------------------"
-        tyblue " protocol传输协议    ：\\033[33mvless"
+        tyblue " protocol传输协议    :\\033[33mvless"
         purple "  V2RayN选择\"添加[VLESS]服务器\";V2RayNG选择\"手动输入[VLESS]\""
-        tyblue " address地址         ：\\033[33m服务器ip"
+        tyblue " address地址         :\\033[33m服务器ip"
         purple "  Qv2ray:主机"
-        tyblue " port端口            ：\\033[33m443"
-        tyblue " id用户ID/UUID       ：\\033[33m${xid_1}"
-        tyblue " flow流控            ：\\033[33mxtls-rprx-vision"
-        tyblue " encryption加密      ：\\033[33mnone"
+        tyblue " port端口            :\\033[33m443"
+        tyblue " id用户ID/UUID       :\\033[33m${xid_1}"
+        tyblue " flow流控            :\\033[33mxtls-rprx-vision"
+        tyblue " encryption加密      :\\033[33mnone"
         tyblue " ---Transport/StreamSettings[底层传输方式/流设置]---"
-        tyblue "  network传输方式             ：\\033[33mtcp"
-        tyblue "  security传输层加密          ：\\033[33mreality"
+        tyblue "  network传输方式             :\\033[33mtcp"
+        tyblue "  security传输层加密          :\\033[33mreality"
         tyblue " ---REALITY Settings---"
-        tyblue "  Password                    ：\\033[33m${reality_password}"
+        tyblue "  Password                    :\\033[33m${reality_password}"
         local first_short_id="${reality_short_ids%% *}"
         first_short_id="${first_short_id//\"/}"
-        tyblue "  Short ID                      ：\\033[33m${first_short_id} \\033[35m[可为空或列表中任一]"
-        tyblue "  serverName                    ：\\033[33m${reality_server_names}"
+        tyblue "  Short ID                      :\\033[33m${first_short_id} \\033[35m[可为空或列表中任一]"
+        tyblue "  serverName                    :\\033[33m${reality_server_names}"
         purple "   客户端填写此域名"
-        tyblue "  fingerprint                   ：\\033[33mchrome\\033[32m[推荐]\\033[36m/\\033[33mfirefox\\033[36m/\\033[33msafari\\033[36m/\\033[33medge"
-        purple "   浏览器指纹，REALITY必须设置"
-        tyblue "  spiderX                       ：\\033[33m/ \\033[35m 可选，爬虫路径 "
+        tyblue "  fingerprint                   :\\033[33mchrome\\033[32m[推荐]\\033[36m/\\033[33mfirefox\\033[36m/\\033[33msafari\\033[36m/\\033[33medge"
+        purple "   浏览器指纹,REALITY必须设置"
+        tyblue "  spiderX                       :\\033[33m/ \\033[35m 可选,爬虫路径 "
         tyblue " ------------------------其他-----------------------"
-        tyblue "  Mux[多路复用]                 ：建议关闭"
+        tyblue "  Mux[多路复用]                 :建议关闭"
         tyblue "------------------------------------------------------------------------"
         echo
-        yellow " REALITY 详细配置："
+        yellow " REALITY 详细配置:"
         yellow "  Dest: ${reality_dest}"
         yellow "  ServerNames: ${reality_server_names}"
         yellow "  ShortIds: ${reality_short_ids}"
@@ -3483,41 +3735,108 @@ print_config_info()
         yellow "  Password: ${reality_password}"
     fi
     
+    # XHTTP 配置输出
     if [ $protocol_3 -ne 0 ]; then
         echo
         tyblue "------------- VLESS-XHTTP-TLS [可过CDN] -------------"
-        tyblue " protocol传输协议    ：\\033[33mvless"
+        tyblue " protocol传输协议    :\\033[33mvless"
+        local xhttp_idx=0
+        [ $protocol_1 -ne 0 ] && xhttp_idx=1
         if [ ${#domain_list[@]} -eq 1 ]; then
-            tyblue " address[地址]         ：\\033[33m${domain_list[*]}"
+            tyblue " address[地址]         :\\033[33m${domain_list[*]}"
         else
-            tyblue " address地址         ：\\033[33m${domain_list[*]} \\033[35m(任选其一)"
+            tyblue " address地址         :\\033[33m${domain_list[$xhttp_idx]} \\033[35m(XHTTP域名)"
         fi
-        tyblue " port端口            ：\\033[33m443"
-        tyblue " id用户ID/UUID       ：\\033[33m${xid_3}"
-        tyblue " flow流控            ：\\033[33m空"
-        tyblue " encryption加密      ：\\033[33mnone"
+        tyblue " port端口            :\\033[33m443"
+        tyblue " id用户ID/UUID       :\\033[33m${xid_3}"
+        tyblue " flow流控            :\\033[33m空"
+        tyblue " encryption加密      :\\033[33mnone"
         tyblue " ---Transport/StreamSettings[底层传输方式/流设置]---"
-        tyblue "  network传输方式             ：\\033[33mxhttp"
-        tyblue "  path路径                    ：\\033[33m${path}"
-        tyblue "  Host                          ：\\033[33m空"
-        tyblue "  security传输层加密          ：\\033[33mtls"
-        tyblue "  serverName                    ：\\033[33m空"
-        tyblue "  allowInsecure                 ：\\033[33mfalse"
-        tyblue "  fingerprint                   ：\\033[33m空\\033[32m[推荐]\\033[36m/\\033[33mchrome"
+        tyblue "  network传输方式             :\\033[33mxhttp"
+        tyblue "  path路径                    :\\033[33m${path}"
+        tyblue "  Host                          :\\033[33m空"
+        tyblue "  security传输层加密          :\\033[33mtls"
+        tyblue "  serverName                    :\\033[33m空"
+        tyblue "  allowInsecure                 :\\033[33mfalse"
+        tyblue "  fingerprint                   :\\033[33m空\\033[32m[推荐]\\033[36m/\\033[33mchrome"
         tyblue "------------------------------------------------------------------------"
     fi
-      # 保存分享链接
+    
+    # Trojan 配置输出
+    if [ $protocol_2 -ne 0 ]; then
+        echo
+        tyblue "------------- Trojan-TLS [传统协议] -------------"
+        tyblue " protocol传输协议    :\\033[33mtrojan"
+        purple "  客户端选择\"添加[Trojan]服务器\""
+        
+        local trojan_idx=0
+        [ $protocol_1 -ne 0 ] && ((trojan_idx++))
+        [ $protocol_3 -ne 0 ] && ((trojan_idx++))
+        
+        tyblue " address地址         :\\033[33m${domain_list[$trojan_idx]}"
+        tyblue " port端口            :\\033[33m443"
+        tyblue " password密码        :\\033[33m${xid_2}"
+        purple "  Trojan使用password而非UUID"
+        tyblue " ---Transport/StreamSettings[底层传输方式/流设置]---"
+        tyblue "  network传输方式             :\\033[33mtcp"
+        tyblue "  security传输层加密          :\\033[33mtls"
+        tyblue "  serverName(SNI)             :\\033[33m${domain_list[$trojan_idx]}"
+        purple "   填写Trojan域名"
+        tyblue "  allowInsecure                 :\\033[33mfalse"
+        tyblue "  fingerprint                   :\\033[33m空\\033[32m[推荐]\\033[36m/\\033[33mchrome"
+        tyblue " ------------------------其他-----------------------"
+        tyblue "  Mux[多路复用]                 :建议关闭"
+        tyblue "------------------------------------------------------------------------"
+    fi
+
+    # 保存分享链接
     save_share_links
 
     echo
-    yellow "注：部分选项可能分享链接无法涉及，建议手动填写"
-    ask_if "是否生成分享链接？[y/n]" && print_share_link
+    yellow "注:部分选项可能分享链接无法涉及,建议手动填写"
+    ask_if "是否生成分享链接?[y/n]" && print_share_link
     echo
-    tyblue " 脚本最后更新时间：2025.1.1"
+    tyblue " 脚本最后更新时间:2025.1.4"
     echo
-    red    " 此脚本仅供交流学习使用，请勿使用此脚本行违法之事。"
+    red    " 此脚本仅供交流学习使用,请勿使用此脚本行违法之事。"
 }
 
+
+
+generate_trojan_share_link()
+{
+    # Trojan 标准格式: trojan://password@host:port?参数#描述
+    
+    local trojan_idx=0
+    [ $protocol_1 -ne 0 ] && ((trojan_idx++))
+    [ $protocol_3 -ne 0 ] && ((trojan_idx++))
+    
+    local trojan_domain="${domain_list[$trojan_idx]}"
+    
+    # 2. 对必要字段进行 URL 编码 (遵循提案约定 2)
+    # 注意：脚本中已有 urlencode 函数，直接调用
+    local encoded_pass=$(urlencode "$xid_2")
+    local encoded_hash=$(urlencode "Trojan-${domain}")
+
+
+    # 构建链接
+    local link="trojan://${xid_2}@${trojan_domain}:443"
+    
+    # 必需参数
+    link+="?type=tcp"                    # 传输方式
+    link+="&security=tls"                # 底层安全
+    link+="&sni=${trojan_domain}"        # SNI
+    
+    # 可选参数 (推荐添加)
+    link+="&allowInsecure=0"             # 不允许不安全连接
+    # fp=chrome (提案 4.4.0 - 推荐指纹)
+    link+="&fp=chrome"
+
+    # 描述文字
+    link+="#Trojan-${trojan_domain}"
+    
+    echo "$link"
+}
 
 install_update_xray_tls_web()
 {
@@ -3550,6 +3869,7 @@ install_update_xray_tls_web()
         fi
         path="/$(head -c 20 /dev/urandom | md5sum | head -c 10)"
         xid_1="$(cat /proc/sys/kernel/random/uuid)"
+        xid_2="$(cat /proc/sys/kernel/random/uuid)"
         xid_3="$(cat /proc/sys/kernel/random/uuid)"
     else
         get_config_info
@@ -4213,7 +4533,8 @@ change_xray_id()
     local flag=""
     tyblue "-------------请输入你要修改的id-------------"
     tyblue " 1. TCP的id"
-    tyblue " 2. XHTTP的id"
+    tyblue " 2. Trojan的id"
+    tyblue " 3. XHTTP的id"
     echo
     while [[ ! "$flag" =~ ^([1-9][0-9]*)$ ]] || ((flag>3))
     do
@@ -4240,6 +4561,8 @@ change_xray_id()
     done
     if [ $flag -eq 1 ]; then
         xid_1="$xid"
+    else if [ $flag -eq 2 ]; then
+        xid_2="$xid"
     else
         xid_3="$xid"
     fi
@@ -4523,382 +4846,403 @@ change_reality_config()
     print_config_info
 }
 
-# 生成 VLESS 分享链接
+# 生成 VLESS 分享链接（完全符合标准）
 generate_vless_share_link()
 {
     local protocol="$1"  # 1=REALITY, 3=XHTTP
-    local server_ip="$2"
-    local share_links=()
     
     if [ $protocol -eq 1 ]; then
-        # VLESS-Vision-REALITY
+        # ============ VLESS + Vision + REALITY ============
+        local reality_domain="${domain_list[0]}"
+        
+        # shortId: 取第一个（可能为空字符串）
         local first_short_id="${reality_short_ids%% *}"
         first_short_id="${first_short_id//\"/}"
         
+        # serverName: 取第一个
         local server_name="${reality_server_names%% *}"
         server_name="${server_name//\"/}"
         
-        # 构建分享链接
-        local link="vless://${xid_1}@${server_ip}:443"
-        link+="?security=reality"
-        link+="&sni=$(echo -n "$server_name" | jq -sRr @uri)"
-        link+="&fp=chrome"
-        link+="&pbk=$(echo -n "$reality_password" | jq -sRr @uri)"
-        link+="&sid=$(echo -n "$first_short_id" | jq -sRr @uri)"
-        link+="&type=tcp"
-        link+="&flow=xtls-rprx-vision"
-        link+="#$(echo -n "VLESS-REALITY-${server_name}" | jq -sRr @uri)"
+        # 构建链接（严格按照标准）
+        # vless://uuid@host:port?参数#描述
+        local link="vless://${xid_1}@${reality_domain}:443"
         
-        share_links+=("$link")
+        # 必需参数
+        link+="?type=tcp"                    # 传输方式
+        link+="&security=reality"            # 底层安全
+        link+="&fp=chrome"                   # 指纹（REALITY必需）
+        link+="&pbk=${reality_password}"     # PublicKey（REALITY必需）
+        link+="&sid=${first_short_id}"       # ShortId（可为空）
+        link+="&flow=xtls-rprx-vision"       # Flow（XTLS必需）
+        
+        # SNI（可选，但推荐）
+        if [ -n "$server_name" ]; then
+            link+="&sni=${server_name}"
+        fi
+        
+        # 描述文字（推荐）
+        link+="#REALITY-${reality_domain}"
+        
+        echo "$link"
         
     elif [ $protocol -eq 3 ]; then
-        # VLESS-XHTTP-TLS
-        for domain in "${domain_list[@]}"
-        do
-            local link="vless://${xid_3}@${domain}:443"
-            link+="?type=xhttp"
-            link+="&security=tls"
-            link+="&path=$(echo -n "$path" | jq -sRr @uri)"
-            link+="#$(echo -n "VLESS-XHTTP-${domain}" | jq -sRr @uri)"
-            
-            share_links+=("$link")
-        done
+        # ============ VLESS + XHTTP + TLS ============
+        local xhttp_domain_index=0
+        if [ $protocol_1 -ne 0 ]; then
+            xhttp_domain_index=1
+        fi
+        
+        local xhttp_domain="${domain_list[$xhttp_domain_index]}"
+        
+        # 构建链接（严格按照标准）
+        local link="vless://${xid_3}@${xhttp_domain}:443"
+        
+        # 必需参数
+        link+="?type=xhttp"                  # 传输方式
+        link+="&security=tls"                # 底层安全
+        
+        # path 必须 encodeURIComponent
+        local encoded_path=$(printf '%s' "$path" | jq -sRr @uri 2>/dev/null || printf '%s' "$path" | sed 's/\//%2F/g')
+        link+="&path=${encoded_path}"
+        
+        # 可选参数
+        # host: 省略时会复用 remote-host，所以可以不加
+        # sni: 省略时会复用 remote-host，所以可以不加
+        # fp: 省略时默认为 chrome，可以不加
+        
+        # 描述文字
+        link+="#XHTTP-${xhttp_domain}"
+        
+        echo "$link"
     fi
-    
-    printf '%s\n' "${share_links[@]}"
 }
 
-# 保存分享链接到文件
+
 save_share_links()
 {
     local share_file="${nginx_prefix}/share_links.txt"
     
-    echo "# Xray-REALITY+Web 分享链接" > "$share_file"
-    echo "# 生成时间: $(date '+%Y-%m-%d %H:%M:%S')" >> "$share_file"
-    echo "" >> "$share_file"
+    cat > "$share_file" << EOF
+# ==================== Xray-REALITY+Web 分享链接 ====================
+# 架构: Nginx 前置 + Xray 后置
+# 生成时间: $(date '+%Y-%m-%d %H:%M:%S')
+# ====================================================================
+
+EOF
     
-    if [ $protocol_1 -ne 0 ]; then
-        local ip=""
-        # 尝试自动获取服务器IP
-        ip=$(curl -s4m8 ip.sb) || ip=$(curl -s6m8 ip.sb) || ip=""
-        
-        if [ -z "$ip" ]; then
-            echo "# VLESS-Vision-REALITY (请手动替换 YOUR_SERVER_IP)" >> "$share_file"
-            ip="YOUR_SERVER_IP"
-        else
-            echo "# VLESS-Vision-REALITY" >> "$share_file"
-        fi
-        
-        echo "" >> "$share_file"
-        generate_vless_share_link 1 "$ip" >> "$share_file"
-        echo "" >> "$share_file"
-    fi
-    
-    if [ $protocol_3 -ne 0 ]; then
-        echo "# VLESS-XHTTP-TLS (可过CDN)" >> "$share_file"
-        echo "" >> "$share_file"
-        generate_vless_share_link 3 "" >> "$share_file"
-        echo "" >> "$share_file"
-    fi
-    
-    # 添加详细配置信息
-    echo "" >> "$share_file"
-    echo "# ==================== 详细配置信息 ====================" >> "$share_file"
-    echo "" >> "$share_file"
-    
+    # REALITY 分享链接
     if [ $protocol_1 -ne 0 ]; then
         cat >> "$share_file" << EOF
-# REALITY 配置
-Server: $ip:443
-UUID: $xid_1
+# ==================== VLESS-Vision-REALITY ====================
+# 特点: 无需证书,抗主动探测,推荐直连使用
+# 域名: ${domain_list[0]}
+# ================================================================
+
+EOF
+        generate_vless_share_link 1 >> "$share_file"
+        echo "" >> "$share_file"
+        echo "" >> "$share_file"
+    fi
+    
+    # XHTTP 分享链接
+    if [ $protocol_3 -ne 0 ]; then
+        local xhttp_domain_index=0
+        [ $protocol_1 -ne 0 ] && xhttp_domain_index=1
+        
+        cat >> "$share_file" << EOF
+# ==================== VLESS-XHTTP-TLS ====================
+# 特点: 支持CDN中转,可隐藏真实IP
+# 域名: ${domain_list[$xhttp_domain_index]}
+# =========================================================
+
+EOF
+        generate_vless_share_link 3 >> "$share_file"
+        echo "" >> "$share_file"
+        echo "" >> "$share_file"
+    fi
+    
+    # Trojan 分享链接
+    if [ $protocol_2 -ne 0 ]; then
+        local trojan_domain_index=0
+        [ $protocol_1 -ne 0 ] && ((trojan_domain_index++))
+        [ $protocol_3 -ne 0 ] && ((trojan_domain_index++))
+        
+        cat >> "$share_file" << EOF
+# ==================== Trojan-TLS ====================
+# 特点: 传统协议,兼容性好,支持CDN
+# 域名: ${domain_list[$trojan_domain_index]}
+# ====================================================
+
+EOF
+        generate_trojan_share_link >> "$share_file"
+        echo "" >> "$share_file"
+        echo "" >> "$share_file"
+    fi
+    
+    # 详细配置信息
+    cat >> "$share_file" << EOF
+# ==================== 详细配置信息 ====================
+
+EOF
+    
+    # REALITY 详细配置
+    if [ $protocol_1 -ne 0 ]; then
+        local first_short_id="${reality_short_ids%% *}"
+        first_short_id="${first_short_id//\"/}"
+        
+        cat >> "$share_file" << EOF
+# ---------- REALITY 配置 ----------
+协议: VLESS
+传输: TCP (RAW)
+安全: REALITY
+地址: ${domain_list[0]}
+端口: 443
+UUID: ${xid_1}
 Flow: xtls-rprx-vision
-Security: reality
-SNI: ${reality_server_names}
-Fingerprint: chrome
-PublicKey: $reality_password
-ShortId: ${reality_short_ids}
+
+REALITY 参数:
+  PublicKey (pbk): ${reality_password}
+  ShortId   (sid): ${first_short_id}
+  ServerName(sni): ${reality_server_names}
+  Fingerprint(fp): chrome
+
+客户端配置说明:
+  - 地址填写: ${domain_list[0]}
+  - 端口填写: 443
+  - 不要开启 allowInsecure
+  - 推荐使用 chrome 指纹
+
+架构说明:
+  客户端 → 443端口(Nginx SNI分流)
+         → 识别域名"${domain_list[0]}"
+         → Unix Socket → Xray REALITY
+         → 验证成功: 正常代理
+         → 验证失败: 回落到伪装网站
 
 EOF
     fi
     
+    # XHTTP 详细配置
     if [ $protocol_3 -ne 0 ]; then
+        local xhttp_domain_index=0
+        [ $protocol_1 -ne 0 ] && xhttp_domain_index=1
+        
         cat >> "$share_file" << EOF
-# XHTTP 配置
-Server: ${domain_list[*]}
-Port: 443
-UUID: $xid_3
-Type: xhttp
-Path: $path
-Security: tls
+# ---------- XHTTP 配置 ----------
+协议: VLESS
+传输: XHTTP
+安全: TLS
+地址: ${domain_list[$xhttp_domain_index]}
+端口: 443
+UUID: ${xid_3}
+路径: ${path}
+
+客户端配置说明:
+  - 地址填写: ${domain_list[$xhttp_domain_index]}
+  - 端口填写: 443
+  - Path填写: ${path}
+  - 不需要填写 Host(自动使用地址)
+  - 不需要填写 SNI(自动使用地址)
+
+架构说明:
+  客户端 → 443端口(Nginx SNI分流)
+         → 识别域名"${domain_list[$xhttp_domain_index]}"
+         → Unix Socket → Xray TLS终止
+         → 匹配路径"${path}": 进入XHTTP处理
+         → 不匹配路径: 回落到伪装网站
+
+CDN 配置(可选):
+  如需使用CDN隐藏真实IP:
+  1. 将 ${domain_list[$xhttp_domain_index]} 的DNS记录
+     从 A 记录改为 CNAME 记录
+  2. CNAME 指向 CDN 提供的域名
+  3. 客户端配置保持不变
+  
+  支持的CDN: Cloudflare, AWS CloudFront, 阿里云CDN等
 
 EOF
     fi
+    
+    # Trojan 详细配置
+    if [ $protocol_2 -ne 0 ]; then
+        local trojan_domain_index=0
+        [ $protocol_1 -ne 0 ] && ((trojan_domain_index++))
+        [ $protocol_3 -ne 0 ] && ((trojan_domain_index++))
+        
+        cat >> "$share_file" << EOF
+# ---------- Trojan 配置 ----------
+协议: Trojan
+传输: TCP
+安全: TLS
+地址: ${domain_list[$trojan_domain_index]}
+端口: 443
+密码: ${xid_2}
+
+客户端配置说明:
+  - 地址填写: ${domain_list[$trojan_domain_index]}
+  - 端口填写: 443
+  - 密码填写: ${xid_2}
+  - SNI填写: ${domain_list[$trojan_domain_index]}
+  - 不要开启 allowInsecure
+
+架构说明:
+  客户端 → 443端口(Nginx SNI分流)
+         → 识别域名"${domain_list[$trojan_domain_index]}"
+         → Unix Socket → Xray TLS终止
+         → 验证Trojan密码
+         → 验证成功: 正常代理
+         → 验证失败: 回落到伪装网站
+
+CDN 配置(可选):
+  Trojan 支持通过CDN,配置方法同XHTTP
+
+特点:
+  - 传统协议,客户端兼容性好
+  - 使用password而非UUID
+  - 支持CDN中转
+  - 回落机制保证隐蔽性
+
+EOF
+    fi
+    
+    # DNS 配置说明
+    cat >> "$share_file" << EOF
+# ==================== DNS 配置说明 ====================
+
+EOF
+    
+    if [ $protocol_1 -ne 0 ] && [ $protocol_3 -ne 0 ] && [ $protocol_2 -ne 0 ]; then
+        cat >> "$share_file" << EOF
+需要配置以下DNS解析:
+
+1. REALITY (直连):
+   ${domain_list[0]}  →  A记录  →  YOUR_SERVER_IP
+
+2. XHTTP (可选CDN):
+   直连方式:
+   ${domain_list[1]}  →  A记录  →  YOUR_SERVER_IP
+   
+   CDN方式:
+   ${domain_list[1]}  →  CNAME  →  your-cdn-domain.com
+
+3. Trojan (可选CDN):
+   直连方式:
+   ${domain_list[2]}  →  A记录  →  YOUR_SERVER_IP
+   
+   CDN方式:
+   ${domain_list[2]}  →  CNAME  →  your-cdn-domain.com
+
+注意:
+  - REALITY 必须直连,不能过CDN
+  - XHTTP 和 Trojan 可以直连,也可以过CDN
+  - 如果三个都用同一个域名,只能直连
+  - 推荐使用不同子域名区分不同协议
+
+EOF
+    elif [ $protocol_1 -ne 0 ] && [ $protocol_3 -ne 0 ]; then
+        cat >> "$share_file" << EOF
+需要配置以下DNS解析:
+
+1. REALITY (直连):
+   ${domain_list[0]}  →  A记录  →  YOUR_SERVER_IP
+
+2. XHTTP (可选CDN):
+   直连方式:
+   ${domain_list[1]}  →  A记录  →  YOUR_SERVER_IP
+   
+   CDN方式:
+   ${domain_list[1]}  →  CNAME  →  your-cdn-domain.com
+
+注意:
+  - REALITY 必须直连,不能过CDN
+  - XHTTP 可以直连,也可以过CDN
+
+EOF
+    fi
+    
+    # 客户端推荐
+    cat >> "$share_file" << EOF
+# ==================== 客户端推荐 ====================
+
+支持 VLESS、REALITY 和 Trojan 的客户端:
+  Windows: v2rayN, NekoRay, Furious
+  macOS:   V2Box, FoXray
+  iOS:     Shadowrocket, Streisand
+  Android: v2rayNG, NekoBox, Hiddify
+
+使用方法:
+  1. 复制上方的分享链接
+  2. 在客户端中选择 "从剪贴板导入"
+  3. 或手动填写上述配置参数
+
+EOF
     
     chmod 600 "$share_file"
     green "分享链接已保存到: $share_file"
 }
 
-# 生成 VLESS 分享链接
-generate_vless_share_link()
-{
-    local protocol="$1"  # 1=REALITY, 3=XHTTP
-    local server_ip="$2"
-    local share_links=()
-    
-    if [ $protocol -eq 1 ]; then
-        # VLESS-Vision-REALITY
-        local first_short_id="${reality_short_ids%% *}"
-        first_short_id="${first_short_id//\"/}"
-        
-        local server_name="${reality_server_names%% *}"
-        server_name="${server_name//\"/}"
-        
-        # 构建分享链接
-        local link="vless://${xid_1}@${server_ip}:443"
-        link+="?security=reality"
-        link+="&sni=$(echo -n "$server_name" | jq -sRr @uri)"
-        link+="&fp=chrome"
-        link+="&pbk=$(echo -n "$reality_password" | jq -sRr @uri)"
-        link+="&sid=$(echo -n "$first_short_id" | jq -sRr @uri)"
-        link+="&type=tcp"
-        link+="&flow=xtls-rprx-vision"
-        link+="#$(echo -n "VLESS-REALITY-${server_name}" | jq -sRr @uri)"
-        
-        share_links+=("$link")
-        
-    elif [ $protocol -eq 3 ]; then
-        # VLESS-XHTTP-TLS
-        for domain in "${domain_list[@]}"
-        do
-            local link="vless://${xid_3}@${domain}:443"
-            link+="?type=xhttp"
-            link+="&security=tls"
-            link+="&path=$(echo -n "$path" | jq -sRr @uri)"
-            link+="#$(echo -n "VLESS-XHTTP-${domain}" | jq -sRr @uri)"
-            
-            share_links+=("$link")
-        done
-    fi
-    
-    printf '%s\n' "${share_links[@]}"
-}
-
-# 保存分享链接到文件
-save_share_links()
-{
-    local share_file="${nginx_prefix}/share_links.txt"
-    
-    echo "# Xray-REALITY+Web 分享链接" > "$share_file"
-    echo "# 生成时间: $(date '+%Y-%m-%d %H:%M:%S')" >> "$share_file"
-    echo "" >> "$share_file"
-    
-    if [ $protocol_1 -ne 0 ]; then
-        local ip=""
-        # 尝试自动获取服务器IP
-        ip=$(curl -s4m8 ip.sb) || ip=$(curl -s6m8 ip.sb) || ip=""
-        
-        if [ -z "$ip" ]; then
-            echo "# VLESS-Vision-REALITY (请手动替换 YOUR_SERVER_IP)" >> "$share_file"
-            ip="YOUR_SERVER_IP"
-        else
-            echo "# VLESS-Vision-REALITY" >> "$share_file"
-        fi
-        
-        echo "" >> "$share_file"
-        generate_vless_share_link 1 "$ip" >> "$share_file"
-        echo "" >> "$share_file"
-    fi
-    
-    if [ $protocol_3 -ne 0 ]; then
-        echo "# VLESS-XHTTP-TLS (可过CDN)" >> "$share_file"
-        echo "" >> "$share_file"
-        generate_vless_share_link 3 "" >> "$share_file"
-        echo "" >> "$share_file"
-    fi
-    
-    # 添加详细配置信息
-    echo "" >> "$share_file"
-    echo "# ==================== 详细配置信息 ====================" >> "$share_file"
-    echo "" >> "$share_file"
-    
-    if [ $protocol_1 -ne 0 ]; then
-        cat >> "$share_file" << EOF
-# REALITY 配置
-Server: $ip:443
-UUID: $xid_1
-Flow: xtls-rprx-vision
-Security: reality
-SNI: ${reality_server_names}
-Fingerprint: chrome
-PublicKey: $reality_password
-ShortId: ${reality_short_ids}
-
-EOF
-    fi
-    
-    if [ $protocol_3 -ne 0 ]; then
-        cat >> "$share_file" << EOF
-# XHTTP 配置
-Server: ${domain_list[*]}
-Port: 443
-UUID: $xid_3
-Type: xhttp
-Path: $path
-Security: tls
-
-EOF
-    fi
-    
-    chmod 600 "$share_file"
-    green "分享链接已保存到: $share_file"
-}
-
-# 生成 VLESS 分享链接
-generate_vless_share_link()
-{
-    local protocol="$1"  # 1=REALITY, 3=XHTTP
-    local server_ip="$2"
-    local share_links=()
-    
-    if [ $protocol -eq 1 ]; then
-        # VLESS-Vision-REALITY
-        local first_short_id="${reality_short_ids%% *}"
-        first_short_id="${first_short_id//\"/}"
-        
-        local server_name="${reality_server_names%% *}"
-        server_name="${server_name//\"/}"
-        
-        # 构建分享链接
-        local link="vless://${xid_1}@${server_ip}:443"
-        link+="?security=reality"
-        link+="&sni=$(echo -n "$server_name" | jq -sRr @uri)"
-        link+="&fp=chrome"
-        link+="&pbk=$(echo -n "$reality_password" | jq -sRr @uri)"
-        link+="&sid=$(echo -n "$first_short_id" | jq -sRr @uri)"
-        link+="&type=tcp"
-        link+="&flow=xtls-rprx-vision"
-        link+="#$(echo -n "VLESS-REALITY-${server_name}" | jq -sRr @uri)"
-        
-        share_links+=("$link")
-        
-    elif [ $protocol -eq 3 ]; then
-        # VLESS-XHTTP-TLS
-        for domain in "${domain_list[@]}"
-        do
-            local link="vless://${xid_3}@${domain}:443"
-            link+="?type=xhttp"
-            link+="&security=tls"
-            link+="&path=$(echo -n "$path" | jq -sRr @uri)"
-            link+="#$(echo -n "VLESS-XHTTP-${domain}" | jq -sRr @uri)"
-            
-            share_links+=("$link")
-        done
-    fi
-    
-    printf '%s\n' "${share_links[@]}"
-}
-
-# 保存分享链接到文件
-save_share_links()
-{
-    local share_file="${nginx_prefix}/share_links.txt"
-    
-    echo "# Xray-REALITY+Web 分享链接" > "$share_file"
-    echo "# 生成时间: $(date '+%Y-%m-%d %H:%M:%S')" >> "$share_file"
-    echo "" >> "$share_file"
-    
-    if [ $protocol_1 -ne 0 ]; then
-        local ip=""
-        # 尝试自动获取服务器IP
-        ip=$(curl -s4m8 ip.sb) || ip=$(curl -s6m8 ip.sb) || ip=""
-        
-        if [ -z "$ip" ]; then
-            echo "# VLESS-Vision-REALITY (请手动替换 YOUR_SERVER_IP)" >> "$share_file"
-            ip="YOUR_SERVER_IP"
-        else
-            echo "# VLESS-Vision-REALITY" >> "$share_file"
-        fi
-        
-        echo "" >> "$share_file"
-        generate_vless_share_link 1 "$ip" >> "$share_file"
-        echo "" >> "$share_file"
-    fi
-    
-    if [ $protocol_3 -ne 0 ]; then
-        echo "# VLESS-XHTTP-TLS (可过CDN)" >> "$share_file"
-        echo "" >> "$share_file"
-        generate_vless_share_link 3 "" >> "$share_file"
-        echo "" >> "$share_file"
-    fi
-    
-    # 添加详细配置信息
-    echo "" >> "$share_file"
-    echo "# ==================== 详细配置信息 ====================" >> "$share_file"
-    echo "" >> "$share_file"
-    
-    if [ $protocol_1 -ne 0 ]; then
-        cat >> "$share_file" << EOF
-# REALITY 配置
-Server: $ip:443
-UUID: $xid_1
-Flow: xtls-rprx-vision
-Security: reality
-SNI: ${reality_server_names}
-Fingerprint: chrome
-PublicKey: $reality_password
-ShortId: ${reality_short_ids}
-
-EOF
-    fi
-    
-    if [ $protocol_3 -ne 0 ]; then
-        cat >> "$share_file" << EOF
-# XHTTP 配置
-Server: ${domain_list[*]}
-Port: 443
-UUID: $xid_3
-Type: xhttp
-Path: $path
-Security: tls
-
-EOF
-    fi
-    
-    chmod 600 "$share_file"
-    green "分享链接已保存到: $share_file"
-}
-
-# 生成二维码（可选）
+# 生成二维码
 generate_qrcode()
 {
     if ! command -v qrencode &> /dev/null; then
+        yellow "qrencode 未安装，跳过二维码生成"
         return 0
     fi
     
     local qr_dir="${nginx_prefix}/qrcodes"
     mkdir -p "$qr_dir"
     
-    local i=1
+    local count=0
+    
+    # REALITY 二维码
     if [ $protocol_1 -ne 0 ]; then
-        local ip=$(curl -s4m8 ip.sb) || ip=$(curl -s6m8 ip.sb) || ip="YOUR_SERVER_IP"
-        local link=$(generate_vless_share_link 1 "$ip" | head -n 1)
-        qrencode -o "${qr_dir}/reality_${i}.png" "$link" 2>/dev/null
-        ((i++))
+        local link=$(generate_vless_share_link 1)
+        if qrencode -o "${qr_dir}/reality.png" -s 10 -m 2 "$link" 2>/dev/null; then
+            ((count++))
+            green "REALITY 二维码: ${qr_dir}/reality.png"
+        fi
     fi
     
+    # XHTTP 二维码
     if [ $protocol_3 -ne 0 ]; then
-        while IFS= read -r link; do
-            qrencode -o "${qr_dir}/xhttp_${i}.png" "$link" 2>/dev/null
-            ((i++))
-        done < <(generate_vless_share_link 3 "")
+        local link=$(generate_vless_share_link 3)
+        if qrencode -o "${qr_dir}/xhttp.png" -s 10 -m 2 "$link" 2>/dev/null; then
+            ((count++))
+            green "XHTTP 二维码: ${qr_dir}/xhttp.png"
+        fi
     fi
     
-    if [ $i -gt 1 ]; then
-        green "二维码已保存到: $qr_dir"
+    if [ $count -gt 0 ]; then
+        echo
+        green "二维码已生成到: $qr_dir"
+        tyblue "使用方法: 客户端扫描二维码即可导入配置"
+    else
+        yellow "二维码生成失败"
     fi
 }
 
 
+urlencode()
+{
+    local string="$1"
+    local strlen=${#string}
+    local encoded=""
+    local pos c o
+    
+    for (( pos=0 ; pos<strlen ; pos++ )); do
+        c=${string:$pos:1}
+        case "$c" in
+            [-_.~a-zA-Z0-9] ) 
+                o="${c}" 
+                ;;
+            * )
+                printf -v o '%%%02x' "'$c"
+                ;;
+        esac
+        encoded+="${o}"
+    done
+    echo "${encoded}"
+}
 
 #开始菜单
 start_menu()
