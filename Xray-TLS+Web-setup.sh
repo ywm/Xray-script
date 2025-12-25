@@ -2737,50 +2737,148 @@ check_cert_valid()
 
 
 
+# 获取并保存 Cloudflare API 凭据
+read_cf_api()
+{
+    local cf_api_file="${nginx_prefix}/certs/cf_api.conf"
+    
+    # 如果文件已存在，加载变量并返回
+    if [ -f "$cf_api_file" ]; then
+        source "$cf_api_file"
+        export CF_Email && export CF_Key
+        return 0
+    fi
+
+    echo -e "\n"
+    tyblue "-------------------- Cloudflare API 配置 --------------------"
+    tyblue " 申请泛域名证书需要通过 DNS 验证，请提供您的 Global API Key。"
+    tyblue " 您可以在 CF 控制面板 -> 我的个人资料 -> API 令牌 中找到它。"
+    echo
+    
+    local cf_email=""
+    while [[ ! "$cf_email" =~ ^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,4}$ ]]
+    do
+        read -p "请输入 Cloudflare 注册邮箱: " cf_email
+    done
+    
+    local cf_key=""
+    while [ -z "$cf_key" ]
+    do
+        read -p "请输入 Cloudflare Global API Key: " cf_key
+    done
+
+    # 写入文件方便下次自动加载
+    mkdir -p "${nginx_prefix}/certs"
+    echo "export CF_Email='$cf_email'" > "$cf_api_file"
+    echo "export CF_Key='$cf_key'" >> "$cf_api_file"
+    chmod 600 "$cf_api_file"
+    
+    source "$cf_api_file"
+    export CF_Email && export CF_Key
+}
+
+
 #获取证书 参数: 域名位置
+# get_cert()
+# {
+
+#     local cert_file="${nginx_prefix}/certs/${true_domain_list[$1]}.cer"
+#     local key_file="${nginx_prefix}/certs/${true_domain_list[$1]}.key"
+
+#    # 如果证书或密钥不存在，直接申请
+#     if [ -f "$cert_file" ] && [ -f "$key_file" ]; then
+#         if check_cert_valid "$cert_file" 15; then
+#             green "证书 ${true_domain_list[$1]} 仍在有效期内，跳过 ACME 申请与安装"
+#             return 0
+#         fi
+#     else
+#         green "证书或密钥不存在，开始申请"
+#     fi
+#     if [ ${domain_config_list[$1]} -eq 1 ]; then
+#         green "正在获取 \"${domain_list[$1]}\"、\"${true_domain_list[$1]}\" 的域名证书"
+#     else
+#         green "正在获取 \"${domain_list[$1]}\" 的域名证书"
+#     fi
+#     mv $xray_config ${xray_config}.bak
+#     mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak2
+#     cp ${nginx_prefix}/conf/nginx.conf.default ${nginx_prefix}/conf/nginx.conf
+#     echo "{}" > $xray_config
+#     local temp=""
+#     [ ${domain_config_list[$1]} -eq 1 ] && temp="-d ${domain_list[$1]}"
+#     # 移除所有 --ocsp 参数
+#     if ! $HOME/.acme.sh/acme.sh --issue -d ${true_domain_list[$1]} $temp -w ${nginx_prefix}/html/issue_certs -k ec-256 -ak ec-256 --pre-hook "mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak && cp ${nginx_prefix}/conf/issue_certs.conf ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --post-hook "mv ${nginx_prefix}/conf/nginx.conf.bak ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" && ! $HOME/.acme.sh/acme.sh --issue -d ${true_domain_list[$1]} $temp -w ${nginx_prefix}/html/issue_certs -k ec-256 -ak ec-256 --server letsencrypt --pre-hook "mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak && cp ${nginx_prefix}/conf/issue_certs.conf ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --post-hook "mv ${nginx_prefix}/conf/nginx.conf.bak ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx"; then
+#         $HOME/.acme.sh/acme.sh --issue -d ${true_domain_list[$1]} $temp -w ${nginx_prefix}/html/issue_certs -k ec-256 -ak ec-256 --pre-hook "mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak && cp ${nginx_prefix}/conf/issue_certs.conf ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --post-hook "mv ${nginx_prefix}/conf/nginx.conf.bak ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --debug || $HOME/.acme.sh/acme.sh --issue -d ${true_domain_list[$1]} $temp -w ${nginx_prefix}/html/issue_certs -k ec-256 -ak ec-256 --server letsencrypt --pre-hook "mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak && cp ${nginx_prefix}/conf/issue_certs.conf ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --post-hook "mv ${nginx_prefix}/conf/nginx.conf.bak ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --debug
+#     fi
+#     if ! $HOME/.acme.sh/acme.sh --installcert -d ${true_domain_list[$1]} --key-file ${nginx_prefix}/certs/${true_domain_list[$1]}.key --fullchain-file ${nginx_prefix}/certs/${true_domain_list[$1]}.cer --reloadcmd "sleep 2s && systemctl restart xray" --ecc; then
+#         $HOME/.acme.sh/acme.sh --remove --domain ${true_domain_list[$1]} --ecc
+#         rm -rf $HOME/.acme.sh/${true_domain_list[$1]}_ecc
+#         rm -rf "${nginx_prefix}/certs/${true_domain_list[$1]}.key" "${nginx_prefix}/certs/${true_domain_list[$1]}.cer"
+#         mv ${xray_config}.bak $xray_config
+#         mv ${nginx_prefix}/conf/nginx.conf.bak2 ${nginx_prefix}/conf/nginx.conf
+#         return 1
+#     fi
+
+#     mv ${xray_config}.bak $xray_config
+#     mv ${nginx_prefix}/conf/nginx.conf.bak2 ${nginx_prefix}/conf/nginx.conf
+#     return 0
+# }
+
+# 获取泛域名证书 参数: 域名位置 (此时 $1 通常指向主域名)
 get_cert()
 {
+    # 在全能模式下，true_domain_list[$1] 存储的是主域名 zhuzhunian.cn
+    local main_domain="${true_domain_list[$1]}"
+    local cert_file="${nginx_prefix}/certs/${main_domain}.cer"
+    local key_file="${nginx_prefix}/certs/${main_domain}.key"
 
-    local cert_file="${nginx_prefix}/certs/${true_domain_list[$1]}.cer"
-    local key_file="${nginx_prefix}/certs/${true_domain_list[$1]}.key"
-
-   # 如果证书或密钥不存在，直接申请
+    # 1. 检查证书是否在有效期内 (保留你原有的逻辑)
     if [ -f "$cert_file" ] && [ -f "$key_file" ]; then
         if check_cert_valid "$cert_file" 15; then
-            green "证书 ${true_domain_list[$1]} 仍在有效期内，跳过 ACME 申请与安装"
+            green "泛域名证书 ${main_domain} 仍在有效期内，跳过申请。"
             return 0
         fi
     else
-        green "证书或密钥不存在，开始申请"
+        green "证书不存在或已过期，开始准备申请泛域名证书..."
     fi
-    if [ ${domain_config_list[$1]} -eq 1 ]; then
-        green "正在获取 \"${domain_list[$1]}\"、\"${true_domain_list[$1]}\" 的域名证书"
-    else
-        green "正在获取 \"${domain_list[$1]}\" 的域名证书"
-    fi
-    mv $xray_config ${xray_config}.bak
-    mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak2
-    cp ${nginx_prefix}/conf/nginx.conf.default ${nginx_prefix}/conf/nginx.conf
+
+    # 2. 获取 CF 凭据
+    read_cf_api
+
+    # 3. 准备申请环境 (清理 Nginx 占用)
+    mv ${xray_config} ${xray_config}.bak
     echo "{}" > $xray_config
-    local temp=""
-    [ ${domain_config_list[$1]} -eq 1 ] && temp="-d ${domain_list[$1]}"
-    # 移除所有 --ocsp 参数
-    if ! $HOME/.acme.sh/acme.sh --issue -d ${true_domain_list[$1]} $temp -w ${nginx_prefix}/html/issue_certs -k ec-256 -ak ec-256 --pre-hook "mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak && cp ${nginx_prefix}/conf/issue_certs.conf ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --post-hook "mv ${nginx_prefix}/conf/nginx.conf.bak ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" && ! $HOME/.acme.sh/acme.sh --issue -d ${true_domain_list[$1]} $temp -w ${nginx_prefix}/html/issue_certs -k ec-256 -ak ec-256 --server letsencrypt --pre-hook "mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak && cp ${nginx_prefix}/conf/issue_certs.conf ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --post-hook "mv ${nginx_prefix}/conf/nginx.conf.bak ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx"; then
-        $HOME/.acme.sh/acme.sh --issue -d ${true_domain_list[$1]} $temp -w ${nginx_prefix}/html/issue_certs -k ec-256 -ak ec-256 --pre-hook "mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak && cp ${nginx_prefix}/conf/issue_certs.conf ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --post-hook "mv ${nginx_prefix}/conf/nginx.conf.bak ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --debug || $HOME/.acme.sh/acme.sh --issue -d ${true_domain_list[$1]} $temp -w ${nginx_prefix}/html/issue_certs -k ec-256 -ak ec-256 --server letsencrypt --pre-hook "mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak && cp ${nginx_prefix}/conf/issue_certs.conf ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --post-hook "mv ${nginx_prefix}/conf/nginx.conf.bak ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --debug
-    fi
-    if ! $HOME/.acme.sh/acme.sh --installcert -d ${true_domain_list[$1]} --key-file ${nginx_prefix}/certs/${true_domain_list[$1]}.key --fullchain-file ${nginx_prefix}/certs/${true_domain_list[$1]}.cer --reloadcmd "sleep 2s && systemctl restart xray" --ecc; then
-        $HOME/.acme.sh/acme.sh --remove --domain ${true_domain_list[$1]} --ecc
-        rm -rf $HOME/.acme.sh/${true_domain_list[$1]}_ecc
-        rm -rf "${nginx_prefix}/certs/${true_domain_list[$1]}.key" "${nginx_prefix}/certs/${true_domain_list[$1]}.cer"
+
+    # 4. 调用 acme.sh 申请泛域名证书 (*.domain.com + domain.com)
+    green "正在申请泛域名证书: ${main_domain} 和 *.${main_domain}"
+    
+    if ! $HOME/.acme.sh/acme.sh --issue --dns dns_cf \
+        -d "${main_domain}" \
+        -d "*.${main_domain}" \
+        -k ec-256 --server letsencrypt --debug; then
+        
+        red "泛域名证书申请失败！"
+        red "请检查: 1. CF API Key/Email 是否正确; 2. 域名是否在当前 CF 账号下; 3. 网络是否通畅。"
         mv ${xray_config}.bak $xray_config
-        mv ${nginx_prefix}/conf/nginx.conf.bak2 ${nginx_prefix}/conf/nginx.conf
+        return 1
+    fi
+
+    # 5. 安装证书到 Nginx 目录
+    if ! $HOME/.acme.sh/acme.sh --installcert -d "${main_domain}" --ecc \
+        --key-file "$key_file" \
+        --fullchain-file "$cert_file" \
+        --reloadcmd "systemctl restart xray nginx"; then
+        
+        red "证书安装失败！"
+        mv ${xray_config}.bak $xray_config
         return 1
     fi
 
     mv ${xray_config}.bak $xray_config
-    mv ${nginx_prefix}/conf/nginx.conf.bak2 ${nginx_prefix}/conf/nginx.conf
+    green "泛域名证书部署成功！"
     return 0
 }
+
+
 get_all_certs()
 {
     local i
