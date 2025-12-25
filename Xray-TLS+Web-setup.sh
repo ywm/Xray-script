@@ -3665,6 +3665,8 @@ print_share_link()
     
     # 保存分享链接
     save_share_links
+
+    save_subscription_file
     
     # 询问是否生成二维码
     if ask_if "是否生成二维码？[y/n]"; then
@@ -3791,6 +3793,7 @@ print_config_info()
 
     # 保存分享链接
     save_share_links
+    save_subscription_file
 
     echo
     yellow "注:部分选项可能分享链接无法涉及,建议手动填写"
@@ -4915,6 +4918,47 @@ generate_vless_share_link()
         
         echo "$link"
     fi
+}
+
+
+save_subscription_file()
+{
+    # 1. 定义订阅目录 (存放在 Nginx 的 web 根目录下)
+    local sub_dir="${nginx_prefix}/html/subs"
+    mkdir -p "$sub_dir"
+    
+    # 2. 从 Nginx 配置或特定文件读取已有的随机后缀，如果没有则生成一个
+    # 这样可以保证每次更新脚本时，订阅链接地址保持不变
+    local token_file="${nginx_prefix}/sub_token.txt"
+    if [ ! -f "$token_file" ]; then
+        cat /proc/sys/kernel/random/uuid | head -c 16 > "$token_file"
+    fi
+    local sub_token=$(cat "$token_file")
+    local sub_file="${sub_dir}/${sub_token}"
+
+    # 3. 筛选已开启的协议
+    local temp_links=""
+    [ "${protocol_1:-0}" -ne 0 ] && temp_links+="$(generate_vless_share_link 1)\n"
+    [ "${protocol_3:-0}" -ne 0 ] && temp_links+="$(generate_vless_share_link 3)\n"
+    [ "${protocol_2:-0}" -ne 0 ] && temp_links+="$(generate_trojan_share_link)\n"
+
+    if [ -z "$temp_links" ]; then
+        return 1
+    fi
+
+    # 4. 转换为 Base64 并保存
+    echo -e "$temp_links" | sed '/^$/d' | base64 -w 0 > "$sub_file"
+    
+    # 5. 设置权限
+    chmod 644 "$sub_file"
+    
+    # 6. 获取当前主域名用于显示
+    local main_domain="${domain_list[0]}"
+    
+    green "=================================================="
+    green "订阅链接已生成 (请务必妥善保管):"
+    tyblue "https://${main_domain}/subs/${sub_token}"
+    green "=================================================="
 }
 
 
