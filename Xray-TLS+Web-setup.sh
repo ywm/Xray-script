@@ -4936,9 +4936,8 @@ EOF
 
 EOF
     generate_trojan_share_link >> "$share_file"
-    echo "" >> "$share_file"
-    echo "" >> "$share_file"
-    fi
+    echo -e "\n" >> "$share_file"
+    
     
     # 详细配置信息
     cat >> "$share_file" << EOF
