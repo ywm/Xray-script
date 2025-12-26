@@ -662,55 +662,38 @@ backup_domains_web()
 get_config_info()
 {
     [ $is_installed -eq 0 ] && return
-    local temp
     
-    # 检测 REALITY
-    if grep -q '"security"[ '$'\t]*:[ '$'\t]*"reality"' $xray_config; then
-        protocol_1=1
-        xid_1="$(grep '"id"' $xray_config | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
-        reality_private_key="$(grep '"privateKey"' $xray_config | cut -d : -f 2 | cut -d \" -f 2)"
-        reality_dest="$(grep '"target"' $xray_config | cut -d : -f 2 | cut -d \" -f 2)"
-        reality_server_names="$(grep '"serverNames"' $xray_config | sed 's/.*\[//;s/\].*//' | tr ',' ' ' | sed 's/"//g')"
-        reality_short_ids="$(grep '"shortIds"' $xray_config | sed 's/.*\[//;s/\].*//' | tr ',' ' ')"
-        
-        # 生成密码
-        reality_password=$(/usr/local/bin/xray x25519 -i "$reality_private_key" | awk '/^Password:/ {print $2}')
-    else
-        protocol_1=0
-    fi
-
-
-    # 检测 Trojan
-    if grep -q '"protocol"[ '$'\t]*:[ '$'\t]*"trojan"' $xray_config; then
-        protocol_2=1
-        # 读取 Trojan 的 password (相当于 UUID)
-        xid_2="$(grep -A10 '"protocol"[ '$'\t]*:[ '$'\t]*"trojan"' $xray_config | grep '"password"' | head -n1 | cut -d : -f 2 | cut -d \" -f 2)"
-    else
-        protocol_2=0
+    # 读取 UUID（固定三个）
+    xid_1="$(grep '"id"' $xray_config | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
+    xid_2="$(grep -A10 '"protocol"[ '$'\t]*:[ '$'\t]*"trojan"' $xray_config | grep '"password"' | head -n1 | cut -d : -f 2 | cut -d \" -f 2)"
+    xid_3="$(grep '"id"' $xray_config | tail -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
+    
+    # 读取 REALITY 配置
+    reality_private_key="$(grep '"privateKey"' $xray_config | cut -d : -f 2 | cut -d \" -f 2)"
+    reality_dest="$(grep '"target"' $xray_config | cut -d : -f 2 | cut -d \" -f 2)"
+    reality_server_names="$(grep '"serverNames"' $xray_config | sed 's/.*\[//;s/\].*//' | tr ',' ' ' | sed 's/"//g')"
+    reality_short_ids="$(grep '"shortIds"' $xray_config | sed 's/.*\[//;s/\].*//' | tr ',' ' ')"
+    
+    # 生成 PublicKey
+    if [ -n "$reality_private_key" ] && [ -f "/usr/local/bin/xray" ]; then
+        reality_password=$(/usr/local/bin/xray x25519 -i "$reality_private_key" 2>/dev/null | awk '/^Public[Kk]ey:/ {print $2}')
+        # 兼容旧版本输出
+        [ -z "$reality_password" ] && reality_password=$(/usr/local/bin/xray x25519 -i "$reality_private_key" 2>/dev/null | grep -i "public" | awk '{print $2}')
     fi
     
-    # 检测 XHTTP
-    if grep -q '"network"[ '$'\t]*:[ '$'\t]*"xhttp"' $xray_config; then
-        protocol_3=1
-        path="$(grep '"path"' $xray_config | tail -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
-        xid_3="$(grep '"id"' $xray_config | grep -A5 '"xhttp"' | grep '"id"' | cut -d : -f 2 | cut -d \" -f 2)"
-    else
-        protocol_3=0
-    fi
+    # 读取 XHTTP path
+    path="$(grep '"path"' $xray_config | tail -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
     
     # 读取域名配置
-    unset domain_list
-    unset true_domain_list
-    unset domain_config_list
-    unset pretend_list
-    unset subdomain_prefix_list
-    
     domain_list=($(grep "^#domain_list=" $nginx_config | cut -d = -f 2))
     true_domain_list=($(grep "^#true_domain_list=" $nginx_config | cut -d = -f 2))
     domain_config_list=($(grep "^#domain_config_list=" $nginx_config | cut -d = -f 2))
     pretend_list=($(grep "^#pretend_list=" $nginx_config | cut -d = -f 2))
     subdomain_prefix_list=($(grep "^#subdomain_prefix_list=" $nginx_config | cut -d = -f 2))
 }
+
+
+
 gen_cflags()
 {
     cflags=('-g0' '-O3')
@@ -1868,7 +1851,6 @@ readPretend()
 }
 
 
-#读取域名 输入domain_list true_domain_list domain_config_list pretend_list subdomain_prefix_list
 readDomain()
 {
     check_domain()
@@ -1889,7 +1871,7 @@ readDomain()
     local main_domain=""
     local pretend
     
-    echo -e "\\n\\n\\n"
+    echo -e "\n\n\n"
     tyblue "--------------------域名配置--------------------"
     
     # 读取主域名
@@ -1898,8 +1880,7 @@ readDomain()
     do
         main_domain=""
         echo
-        tyblue '---------请输入主域名(前面不带"www.""http://"或"https://")---------'
-        tyblue "例如: example.com"
+        tyblue '请输入主域名(例如: example.com)'
         while ! check_domain "$main_domain"
         do
             read -p "请输入域名:" main_domain
@@ -1908,202 +1889,87 @@ readDomain()
         ask_if "您输入的域名是\"$main_domain\",确认吗?[y/n]" && queren=1
     done
     
-    # 根据协议配置子域名
-    unset domain_list
-    unset true_domain_list
-    unset domain_config_list
-    unset pretend_list
-    unset subdomain_prefix_list
-    
-    echo -e "\\n\\n"
+    echo -e "\n\n"
     tyblue "--------------------子域名配置--------------------"
+    tyblue "脚本将配置三个协议，推荐每个协议使用独立子域名"
+    tyblue "推荐配置: reality.${main_domain}, trojan.${main_domain}, cdn.${main_domain}"
+    tyblue "也可以全部使用主域名 ${main_domain} (所有协议共用)"
+    echo
     
-    if [ $protocol_1 -ne 0 ] && [ $protocol_2 -ne 0 ] && [ $protocol_3 -ne 0 ]; then
-        # 全能模式: REALITY + Trojan + XHTTP
-        tyblue "检测到启用全能模式 (REALITY + Trojan + XHTTP)"
-        tyblue "将使用不同子域名区分各协议"
-        echo
-        
-        # REALITY 子域名
-        local reality_subdomain=""
-        tyblue "请输入 REALITY 使用的子域名前缀 [默认: reality]"
-        read -p "子域名前缀: " reality_subdomain
-        [ -z "$reality_subdomain" ] && reality_subdomain="reality"
-        local reality_domain="${reality_subdomain}.${main_domain}"
-        
-        # Trojan 子域名
-        local trojan_subdomain=""
-        echo
-        tyblue "请输入 Trojan 使用的子域名前缀 [默认: trojan]"
-        read -p "子域名前缀: " trojan_subdomain
-        [ -z "$trojan_subdomain" ] && trojan_subdomain="trojan"
-        local trojan_domain="${trojan_subdomain}.${main_domain}"
-        
-        # XHTTP 子域名
-        local xhttp_subdomain=""
-        echo
-        tyblue "请输入 XHTTP 使用的子域名前缀 [默认: cdn]"
-        read -p "子域名前缀: " xhttp_subdomain
-        [ -z "$xhttp_subdomain" ] && xhttp_subdomain="cdn"
-        local xhttp_domain="${xhttp_subdomain}.${main_domain}"
-        
-        echo
-        green "域名配置:"
-        green "  主域名:  $main_domain"
-        green "  REALITY: $reality_domain"
-        green "  Trojan:  $trojan_domain"
-        green "  XHTTP:   $xhttp_domain"
-        echo
-        
-        if ! ask_if "确认配置?[y/n]"; then
-            readDomain
-            return
-        fi
-        
-        # 存储域名配置
-        domain_list=("$reality_domain" "$trojan_domain" "$xhttp_domain")
-        true_domain_list=("$main_domain" "$main_domain" "$main_domain")
-        domain_config_list=(2 2 2)
-        subdomain_prefix_list=("$reality_subdomain" "$trojan_subdomain" "$xhttp_subdomain")
-        
-    elif [ $protocol_1 -ne 0 ] && [ $protocol_3 -ne 0 ]; then
-        # REALITY + XHTTP
-        tyblue "检测到启用双协议模式 (REALITY + XHTTP)"
-        tyblue "将使用不同子域名区分各协议"
-        echo
-        
-        # REALITY 子域名
-        local reality_subdomain=""
-        tyblue "请输入 REALITY 使用的子域名前缀 [默认: reality]"
-        read -p "子域名前缀: " reality_subdomain
-        [ -z "$reality_subdomain" ] && reality_subdomain="reality"
-        local reality_domain="${reality_subdomain}.${main_domain}"
-        
-        # XHTTP 子域名
-        local xhttp_subdomain=""
-        echo
-        tyblue "请输入 XHTTP 使用的子域名前缀 [默认: cdn]"
-        read -p "子域名前缀: " xhttp_subdomain
-        [ -z "$xhttp_subdomain" ] && xhttp_subdomain="cdn"
-        local xhttp_domain="${xhttp_subdomain}.${main_domain}"
-        
-        echo
-        green "域名配置:"
-        green "  主域名:  $main_domain"
-        green "  REALITY: $reality_domain"
-        green "  XHTTP:   $xhttp_domain"
-        echo
-        
-        if ! ask_if "确认配置?[y/n]"; then
-            readDomain
-            return
-        fi
-        
-        domain_list=("$reality_domain" "$xhttp_domain")
-        true_domain_list=("$main_domain" "$main_domain")
-        domain_config_list=(2 2)
-        subdomain_prefix_list=("$reality_subdomain" "$xhttp_subdomain")
-        
-    elif [ $protocol_1 -ne 0 ]; then
-        # 仅 REALITY
-        tyblue "请选择 REALITY 域名配置:"
-        tyblue " 1. 使用子域名 (推荐)"
-        tyblue "    例如: reality.${main_domain}"
-        tyblue " 2. 使用主域名"
-        tyblue "    直接使用: ${main_domain}"
-        echo
-        local choice=""
-        while [[ ! "$choice" =~ ^[12]$ ]]
-        do
-            read -p "您的选择是:" choice
-        done
-        
-        if [ $choice -eq 1 ]; then
-            local subdomain=""
-            tyblue "请输入子域名前缀 [默认: reality]"
-            read -p "子域名前缀: " subdomain
-            [ -z "$subdomain" ] && subdomain="reality"
-            domain_list=("${subdomain}.${main_domain}")
-            domain_config_list=(2)
-            subdomain_prefix_list=("$subdomain")
-        else
-            domain_list=("$main_domain")
-            domain_config_list=(1)
-            subdomain_prefix_list=("")
-        fi
-        
-        true_domain_list=("$main_domain")
-        
-    elif [ $protocol_2 -ne 0 ]; then
-        # 仅 Trojan
-        tyblue "请选择 Trojan 域名配置:"
-        tyblue " 1. 使用子域名 (推荐)"
-        tyblue "    例如: trojan.${main_domain}"
-        tyblue " 2. 使用主域名"
-        tyblue "    直接使用: ${main_domain}"
-        echo
-        local choice=""
-        while [[ ! "$choice" =~ ^[12]$ ]]
-        do
-            read -p "您的选择是:" choice
-        done
-        
-        if [ $choice -eq 1 ]; then
-            local subdomain=""
-            tyblue "请输入子域名前缀 [默认: trojan]"
-            read -p "子域名前缀: " subdomain
-            [ -z "$subdomain" ] && subdomain="trojan"
-            domain_list=("${subdomain}.${main_domain}")
-            domain_config_list=(2)
-            subdomain_prefix_list=("$subdomain")
-        else
-            domain_list=("$main_domain")
-            domain_config_list=(1)
-            subdomain_prefix_list=("")
-        fi
-        
-        true_domain_list=("$main_domain")
-        
-    elif [ $protocol_3 -ne 0 ]; then
-        # 仅 XHTTP
-        tyblue "请选择 XHTTP 域名配置:"
-        tyblue " 1. 使用子域名 (推荐,便于CDN)"
-        tyblue "    例如: cdn.${main_domain}"
-        tyblue " 2. 使用主域名"
-        tyblue "    直接使用: ${main_domain}"
-        echo
-        local choice=""
-        while [[ ! "$choice" =~ ^[12]$ ]]
-        do
-            read -p "您的选择是:" choice
-        done
-        
-        if [ $choice -eq 1 ]; then
-            local subdomain=""
-            tyblue "请输入子域名前缀 [默认: cdn]"
-            read -p "子域名前缀: " subdomain
-            [ -z "$subdomain" ] && subdomain="cdn"
-            domain_list=("${subdomain}.${main_domain}")
-            domain_config_list=(2)
-            subdomain_prefix_list=("$subdomain")
-        else
-            domain_list=("$main_domain")
-            domain_config_list=(1)
-            subdomain_prefix_list=("")
-        fi
-        
-        true_domain_list=("$main_domain")
-        
+    # REALITY 子域名
+    local reality_subdomain=""
+    tyblue "请输入 REALITY 使用的子域名前缀 [默认: reality, 留空则使用主域名]"
+    read -p "子域名前缀: " reality_subdomain
+    [ -z "$reality_subdomain" ] && reality_subdomain="reality"
+    
+    local reality_domain
+    if [ "$reality_subdomain" == "none" ]; then
+        reality_domain="$main_domain"
+        reality_subdomain=""
     else
-        # 仅 Web
-        domain_list=("$main_domain")
-        true_domain_list=("$main_domain")
-        domain_config_list=(1)
-        subdomain_prefix_list=("")
+        reality_domain="${reality_subdomain}.${main_domain}"
     fi
     
+    # Trojan 子域名
+    local trojan_subdomain=""
+    echo
+    tyblue "请输入 Trojan 使用的子域名前缀 [默认: trojan, 输入 none 使用主域名]"
+    read -p "子域名前缀: " trojan_subdomain
+    [ -z "$trojan_subdomain" ] && trojan_subdomain="trojan"
+    
+    local trojan_domain
+    if [ "$trojan_subdomain" == "none" ]; then
+        trojan_domain="$main_domain"
+        trojan_subdomain=""
+    else
+        trojan_domain="${trojan_subdomain}.${main_domain}"
+    fi
+    
+    # XHTTP 子域名
+    local xhttp_subdomain=""
+    echo
+    tyblue "请输入 XHTTP 使用的子域名前缀 [默认: cdn, 输入 none 使用主域名]"
+    read -p "子域名前缀: " xhttp_subdomain
+    [ -z "$xhttp_subdomain" ] && xhttp_subdomain="cdn"
+    
+    local xhttp_domain
+    if [ "$xhttp_subdomain" == "none" ]; then
+        xhttp_domain="$main_domain"
+        xhttp_subdomain=""
+    else
+        xhttp_domain="${xhttp_subdomain}.${main_domain}"
+    fi
+    
+    echo
+    green "域名配置:"
+    green "  主域名:  $main_domain"
+    green "  REALITY: $reality_domain"
+    green "  Trojan:  $trojan_domain"
+    green "  XHTTP:   $xhttp_domain"
+    echo
+    
+    if ! ask_if "确认配置?[y/n]"; then
+        readDomain
+        return
+    fi
+    
+    # 存储域名配置
+    domain_list=("$reality_domain" "$trojan_domain" "$xhttp_domain")
+    true_domain_list=("$main_domain" "$main_domain" "$main_domain")
+    
+    # domain_config_list: 1=主域名, 2=子域名
+    local reality_config=1
+    local trojan_config=1
+    local xhttp_config=1
+    [ -n "$reality_subdomain" ] && reality_config=2
+    [ -n "$trojan_subdomain" ] && trojan_config=2
+    [ -n "$xhttp_subdomain" ] && xhttp_config=2
+    
+    domain_config_list=($reality_config $trojan_config $xhttp_config)
+    subdomain_prefix_list=("$reality_subdomain" "$trojan_subdomain" "$xhttp_subdomain")
+    
     # 选择伪装网站类型
-    readPretend "${true_domain_list[0]}"
+    readPretend "$main_domain"
     pretend_list=("$pretend")
 }
 
@@ -2714,6 +2580,7 @@ check_cert_valid()
 {
     local cert_file="$1"
     local renew_before_days="${2:-15}"
+    local is_wildcard="${3:-0}"  # 新增：是否为泛域名证书
 
     [ ! -f "$cert_file" ] && return 1
 
@@ -2722,6 +2589,14 @@ check_cert_valid()
     not_after="$(openssl x509 -in "$cert_file" -noout -enddate 2>/dev/null | cut -d= -f2)"
 
     [ -z "$not_before" ] || [ -z "$not_after" ] && return 1
+
+    # 检查证书中的 SAN 是否为泛域名
+    if [ $is_wildcard -eq 1 ]; then
+        if ! openssl x509 -in "$cert_file" -noout -text 2>/dev/null | grep -q "DNS:\*\."; then
+            yellow "证书不是泛域名证书，需要重新申请"
+            return 1
+        fi
+    fi
 
     local now_ts nb_ts na_ts renew_ts
     now_ts="$(date +%s)"
@@ -2778,77 +2653,39 @@ read_cf_api()
 }
 
 
-#获取证书 参数: 域名位置
-# get_cert()
-# {
-
-#     local cert_file="${nginx_prefix}/certs/${true_domain_list[$1]}.cer"
-#     local key_file="${nginx_prefix}/certs/${true_domain_list[$1]}.key"
-
-#    # 如果证书或密钥不存在，直接申请
-#     if [ -f "$cert_file" ] && [ -f "$key_file" ]; then
-#         if check_cert_valid "$cert_file" 15; then
-#             green "证书 ${true_domain_list[$1]} 仍在有效期内，跳过 ACME 申请与安装"
-#             return 0
-#         fi
-#     else
-#         green "证书或密钥不存在，开始申请"
-#     fi
-#     if [ ${domain_config_list[$1]} -eq 1 ]; then
-#         green "正在获取 \"${domain_list[$1]}\"、\"${true_domain_list[$1]}\" 的域名证书"
-#     else
-#         green "正在获取 \"${domain_list[$1]}\" 的域名证书"
-#     fi
-#     mv $xray_config ${xray_config}.bak
-#     mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak2
-#     cp ${nginx_prefix}/conf/nginx.conf.default ${nginx_prefix}/conf/nginx.conf
-#     echo "{}" > $xray_config
-#     local temp=""
-#     [ ${domain_config_list[$1]} -eq 1 ] && temp="-d ${domain_list[$1]}"
-#     # 移除所有 --ocsp 参数
-#     if ! $HOME/.acme.sh/acme.sh --issue -d ${true_domain_list[$1]} $temp -w ${nginx_prefix}/html/issue_certs -k ec-256 -ak ec-256 --pre-hook "mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak && cp ${nginx_prefix}/conf/issue_certs.conf ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --post-hook "mv ${nginx_prefix}/conf/nginx.conf.bak ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" && ! $HOME/.acme.sh/acme.sh --issue -d ${true_domain_list[$1]} $temp -w ${nginx_prefix}/html/issue_certs -k ec-256 -ak ec-256 --server letsencrypt --pre-hook "mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak && cp ${nginx_prefix}/conf/issue_certs.conf ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --post-hook "mv ${nginx_prefix}/conf/nginx.conf.bak ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx"; then
-#         $HOME/.acme.sh/acme.sh --issue -d ${true_domain_list[$1]} $temp -w ${nginx_prefix}/html/issue_certs -k ec-256 -ak ec-256 --pre-hook "mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak && cp ${nginx_prefix}/conf/issue_certs.conf ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --post-hook "mv ${nginx_prefix}/conf/nginx.conf.bak ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --debug || $HOME/.acme.sh/acme.sh --issue -d ${true_domain_list[$1]} $temp -w ${nginx_prefix}/html/issue_certs -k ec-256 -ak ec-256 --server letsencrypt --pre-hook "mv ${nginx_prefix}/conf/nginx.conf ${nginx_prefix}/conf/nginx.conf.bak && cp ${nginx_prefix}/conf/issue_certs.conf ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --post-hook "mv ${nginx_prefix}/conf/nginx.conf.bak ${nginx_prefix}/conf/nginx.conf && sleep 2s && systemctl restart nginx" --debug
-#     fi
-#     if ! $HOME/.acme.sh/acme.sh --installcert -d ${true_domain_list[$1]} --key-file ${nginx_prefix}/certs/${true_domain_list[$1]}.key --fullchain-file ${nginx_prefix}/certs/${true_domain_list[$1]}.cer --reloadcmd "sleep 2s && systemctl restart xray" --ecc; then
-#         $HOME/.acme.sh/acme.sh --remove --domain ${true_domain_list[$1]} --ecc
-#         rm -rf $HOME/.acme.sh/${true_domain_list[$1]}_ecc
-#         rm -rf "${nginx_prefix}/certs/${true_domain_list[$1]}.key" "${nginx_prefix}/certs/${true_domain_list[$1]}.cer"
-#         mv ${xray_config}.bak $xray_config
-#         mv ${nginx_prefix}/conf/nginx.conf.bak2 ${nginx_prefix}/conf/nginx.conf
-#         return 1
-#     fi
-
-#     mv ${xray_config}.bak $xray_config
-#     mv ${nginx_prefix}/conf/nginx.conf.bak2 ${nginx_prefix}/conf/nginx.conf
-#     return 0
-# }
 
 # 获取泛域名证书 参数: 域名位置 (此时 $1 通常指向主域名)
 get_cert()
 {
-    # 在全能模式下，true_domain_list[$1]
-    local main_domain="${true_domain_list[$1]}"
+    local main_domain="${true_domain_list[0]}"
     local cert_file="${nginx_prefix}/certs/${main_domain}.cer"
     local key_file="${nginx_prefix}/certs/${main_domain}.key"
+    local wildcard_marker="${nginx_prefix}/certs/.wildcard_cert"
 
-    # 1. 检查证书是否在有效期内 (保留你原有的逻辑)
-    if [ -f "$cert_file" ] && [ -f "$key_file" ]; then
-        if check_cert_valid "$cert_file" 15; then
+    # 检查是否需要申请证书
+    if [ -f "$cert_file" ] && [ -f "$key_file" ] && [ -f "$wildcard_marker" ]; then
+        if check_cert_valid "$cert_file" 15 1; then
             green "泛域名证书 ${main_domain} 仍在有效期内，跳过申请。"
             return 0
         fi
-    else
-        green "证书不存在或已过期，开始准备申请泛域名证书..."
     fi
 
-    # 2. 获取 CF 凭据
+    # 如果存在旧的单域名证书，提示用户
+    if [ -f "$cert_file" ] && [ ! -f "$wildcard_marker" ]; then
+        yellow "检测到旧的单域名证书，将替换为泛域名证书"
+        rm -f "$cert_file" "$key_file"
+    fi
+
+    green "证书不存在或已过期，开始申请泛域名证书..."
+
+    # 获取 CF 凭据
     read_cf_api
 
-    # 3. 准备申请环境 (清理 Nginx 占用)
-    mv ${xray_config} ${xray_config}.bak
+    # 准备申请环境
+    mv ${xray_config} ${xray_config}.bak 2>/dev/null
     echo "{}" > $xray_config
 
-    # 4. 调用 acme.sh 申请泛域名证书 (*.domain.com + domain.com)
+    # 申请泛域名证书
     green "正在申请泛域名证书: ${main_domain} 和 *.${main_domain}"
     
     if ! $HOME/.acme.sh/acme.sh --issue --dns dns_cf \
@@ -2858,22 +2695,26 @@ get_cert()
         
         red "泛域名证书申请失败！"
         red "请检查: 1. CF API Key/Email 是否正确; 2. 域名是否在当前 CF 账号下; 3. 网络是否通畅。"
-        mv ${xray_config}.bak $xray_config
+        mv ${xray_config}.bak $xray_config 2>/dev/null
         return 1
     fi
 
-    # 5. 安装证书到 Nginx 目录
+    # 安装证书
     if ! $HOME/.acme.sh/acme.sh --installcert -d "${main_domain}" --ecc \
         --key-file "$key_file" \
         --fullchain-file "$cert_file" \
         --reloadcmd "systemctl restart xray nginx"; then
         
         red "证书安装失败！"
-        mv ${xray_config}.bak $xray_config
+        mv ${xray_config}.bak $xray_config 2>/dev/null
         return 1
     fi
 
-    mv ${xray_config}.bak $xray_config
+    # 创建泛域名证书标记文件
+    touch "$wildcard_marker"
+    echo "Wildcard certificate for *.${main_domain}" > "$wildcard_marker"
+
+    mv ${xray_config}.bak $xray_config 2>/dev/null
     green "泛域名证书部署成功！"
     return 0
 }
@@ -3779,127 +3620,142 @@ print_share_link()
 print_config_info()
 {
     echo -e "\\n\\n\\n"
-    tyblue "==================== 架构信息 ===================="
-    green  " 架构模式: Nginx 前置 + Xray 后置"
-    tyblue " 流量走向: 客户端 → Nginx SNI分流 → Xray → 回落Nginx"
+    tyblue "==================== 配置信息 ===================="
+    
+    local main_domain="${true_domain_list[0]}"
+    
+    green "架构说明："
+    tyblue "  Nginx 前置 + Xray 后置 (SNI 分流)"
+    tyblue "  443端口 → Nginx → 根据域名分流到不同协议"
     echo
     
-    if [ $protocol_1 -ne 0 ] && [ $protocol_3 -ne 0 ] && [ $protocol_2 -ne 0 ]; then
-        tyblue "当前配置:"
-        tyblue "  443端口(Nginx) → SNI分流"
-        tyblue "    ├─ ${domain_list[0]} → REALITY"
-        tyblue "    ├─ ${domain_list[1]} → XHTTP"
-        tyblue "    └─ ${domain_list[2]} → Trojan"
-    elif [ $protocol_1 -ne 0 ] && [ $protocol_3 -ne 0 ]; then
-        tyblue "当前配置:"
-        tyblue "  443端口(Nginx) → SNI分流"
-        tyblue "    ├─ ${domain_list[0]} → REALITY"
-        tyblue "    └─ ${domain_list[1]} → XHTTP"
-    fi
+    green "已安装协议："
+    tyblue "  1. REALITY: ${domain_list[0]}"
+    purple "     特点: 无需证书，抗主动探测，直连使用"
+    tyblue "  2. Trojan:  ${domain_list[1]}"
+    purple "     特点: 传统协议，兼容性好，支持CDN"
+    tyblue "  3. XHTTP:   ${domain_list[2]}"
+    purple "     特点: 支持CDN中转，可隐藏真实IP"
     echo
-
-
-    # REALITY 配置输出
-    if [ $protocol_1 -ne 0 ]; then
-        tyblue "--------------------- VLESS-Vision-REALITY [直连] ---------------------"
-        tyblue " protocol传输协议    :\\033[33mvless"
-        purple "  V2RayN选择\"添加[VLESS]服务器\";V2RayNG选择\"手动输入[VLESS]\""
-        tyblue " address地址         :\\033[33m服务器ip"
-        purple "  Qv2ray:主机"
-        tyblue " port端口            :\\033[33m443"
-        tyblue " id用户ID/UUID       :\\033[33m${xid_1}"
-        tyblue " flow流控            :\\033[33mxtls-rprx-vision"
-        tyblue " encryption加密      :\\033[33mnone"
-        tyblue " ---Transport/StreamSettings[底层传输方式/流设置]---"
-        tyblue "  network传输方式             :\\033[33mtcp"
-        tyblue "  security传输层加密          :\\033[33mreality"
-        tyblue " ---REALITY Settings---"
-        tyblue "  Password                    :\\033[33m${reality_password}"
-        local first_short_id="${reality_short_ids%% *}"
-        first_short_id="${first_short_id//\"/}"
-        tyblue "  Short ID                      :\\033[33m${first_short_id} \\033[35m[可为空或列表中任一]"
-        tyblue "  serverName                    :\\033[33m${reality_server_names}"
-        purple "   客户端填写此域名"
-        tyblue "  fingerprint                   :\\033[33mchrome\\033[32m[推荐]\\033[36m/\\033[33mfirefox\\033[36m/\\033[33msafari\\033[36m/\\033[33medge"
-        purple "   浏览器指纹,REALITY必须设置"
-        tyblue "  spiderX                       :\\033[33m/ \\033[35m 可选,爬虫路径 "
-        tyblue " ------------------------其他-----------------------"
-        tyblue "  Mux[多路复用]                 :建议关闭"
-        tyblue "------------------------------------------------------------------------"
-        echo
-        yellow " REALITY 详细配置:"
-        yellow "  Dest: ${reality_dest}"
-        yellow "  ServerNames: ${reality_server_names}"
-        yellow "  ShortIds: ${reality_short_ids}"
-        yellow "  Private Key: ${reality_private_key}"
-        yellow "  Password: ${reality_password}"
-    fi
     
-    # XHTTP 配置输出
-    if [ $protocol_3 -ne 0 ]; then
-        echo
-        tyblue "------------- VLESS-XHTTP-TLS [可过CDN] -------------"
-        tyblue " protocol传输协议    :\\033[33mvless"
-        local xhttp_idx=0
-        [ $protocol_1 -ne 0 ] && xhttp_idx=1
-        if [ ${#domain_list[@]} -eq 1 ]; then
-            tyblue " address[地址]         :\\033[33m${domain_list[*]}"
-        else
-            tyblue " address地址         :\\033[33m${domain_list[$xhttp_idx]} \\033[35m(XHTTP域名)"
+    yellow "证书信息："
+    yellow "  类型: 泛域名证书"
+    yellow "  覆盖: *.${main_domain} + ${main_domain}"
+    yellow "  所有子域名共用同一张证书"
+    echo
+    
+    yellow "DNS 配置说明："
+    yellow "  请在DNS提供商处添加以下 A 记录："
+    
+    # 输出需要配置的域名
+    local domains_to_config=()
+    local i
+    for i in "${!domain_list[@]}"; do
+        local domain="${domain_list[$i]}"
+        # 检查是否已经在列表中
+        local found=0
+        local j
+        for j in "${domains_to_config[@]}"; do
+            if [ "$j" == "$domain" ]; then
+                found=1
+                break
+            fi
+        done
+        if [ $found -eq 0 ]; then
+            domains_to_config+=("$domain")
         fi
-        tyblue " port端口            :\\033[33m443"
-        tyblue " id用户ID/UUID       :\\033[33m${xid_3}"
-        tyblue " flow流控            :\\033[33m空"
-        tyblue " encryption加密      :\\033[33mnone"
-        tyblue " ---Transport/StreamSettings[底层传输方式/流设置]---"
-        tyblue "  network传输方式             :\\033[33mxhttp"
-        tyblue "  path路径                    :\\033[33m${path}"
-        tyblue "  Host                          :\\033[33m空"
-        tyblue "  security传输层加密          :\\033[33mtls"
-        tyblue "  serverName                    :\\033[33m空"
-        tyblue "  allowInsecure                 :\\033[33mfalse"
-        tyblue "  fingerprint                   :\\033[33m空\\033[32m[推荐]\\033[36m/\\033[33mchrome"
-        tyblue "------------------------------------------------------------------------"
-    fi
+    done
     
-    # Trojan 配置输出
-    if [ $protocol_2 -ne 0 ]; then
-        echo
-        tyblue "------------- Trojan-TLS [传统协议] -------------"
-        tyblue " protocol传输协议    :\\033[33mtrojan"
-        purple "  客户端选择\"添加[Trojan]服务器\""
-        
-        local trojan_idx=0
-        [ $protocol_1 -ne 0 ] && ((trojan_idx++))
-        [ $protocol_3 -ne 0 ] && ((trojan_idx++))
-        
-        tyblue " address地址         :\\033[33m${domain_list[$trojan_idx]}"
-        tyblue " port端口            :\\033[33m443"
-        tyblue " password密码        :\\033[33m${xid_2}"
-        purple "  Trojan使用password而非UUID"
-        tyblue " ---Transport/StreamSettings[底层传输方式/流设置]---"
-        tyblue "  network传输方式             :\\033[33mtcp"
-        tyblue "  security传输层加密          :\\033[33mtls"
-        tyblue "  serverName(SNI)             :\\033[33m${domain_list[$trojan_idx]}"
-        purple "   填写Trojan域名"
-        tyblue "  allowInsecure                 :\\033[33mfalse"
-        tyblue "  fingerprint                   :\\033[33m空\\033[32m[推荐]\\033[36m/\\033[33mchrome"
-        tyblue " ------------------------其他-----------------------"
-        tyblue "  Mux[多路复用]                 :建议关闭"
-        tyblue "------------------------------------------------------------------------"
+    for i in "${domains_to_config[@]}"; do
+        yellow "    $i  →  A  →  YOUR_SERVER_IP"
+    done
+    
+    yellow "  提示: XHTTP 域名可选 CNAME 到 CDN 以隐藏真实IP"
+    echo
+    
+    # REALITY 详细配置
+    echo
+    tyblue "==================== REALITY 配置 ===================="
+    tyblue " 协议: VLESS"
+    tyblue " 传输: TCP (RAW)"
+    tyblue " 安全: REALITY"
+    tyblue " 域名: ${domain_list[0]}"
+    tyblue " 端口: 443"
+    tyblue " UUID: ${xid_1}"
+    tyblue " Flow: xtls-rprx-vision"
+    echo
+    tyblue " REALITY 参数:"
+    local first_short_id="${reality_short_ids%% *}"
+    first_short_id="${first_short_id//\"/}"
+    tyblue "   PublicKey (pbk): ${reality_password}"
+    tyblue "   ShortId   (sid): ${first_short_id}"
+    tyblue "   ServerName(sni): ${reality_server_names}"
+    tyblue "   Fingerprint(fp): chrome"
+    echo
+    
+    # Trojan 详细配置
+    echo
+    tyblue "==================== Trojan 配置 ===================="
+    tyblue " 协议: Trojan"
+    tyblue " 传输: TCP"
+    tyblue " 安全: TLS"
+    tyblue " 域名: ${domain_list[1]}"
+    tyblue " 端口: 443"
+    tyblue " 密码: ${xid_2}"
+    tyblue " SNI:  ${domain_list[1]}"
+    echo
+    
+    # XHTTP 详细配置
+    echo
+    tyblue "==================== XHTTP 配置 ===================="
+    tyblue " 协议: VLESS"
+    tyblue " 传输: XHTTP"
+    tyblue " 安全: TLS"
+    tyblue " 域名: ${domain_list[2]}"
+    tyblue " 端口: 443"
+    tyblue " UUID: ${xid_3}"
+    tyblue " Path: ${path}"
+    echo
+    
+    # 伪装网站信息
+    echo
+    tyblue "==================== 伪装网站 ===================="
+    if [ "${pretend_list[0]}" == "1" ]; then
+        tyblue " 类型: Cloudreve 个人网盘"
+        tyblue " 访问: https://${domain_list[2]}"
+    elif [ "${pretend_list[0]}" == "2" ]; then
+        tyblue " 类型: Nextcloud 个人网盘"
+        tyblue " 访问: https://${domain_list[2]}"
+    elif [ "${pretend_list[0]}" == "3" ]; then
+        tyblue " 类型: 403 页面"
+    elif [ "${pretend_list[0]}" == "4" ]; then
+        tyblue " 类型: 自定义静态网站"
+        tyblue " 目录: ${nginx_prefix}/html/${true_domain_list[0]}"
+    else
+        tyblue " 类型: 反向代理"
+        tyblue " 目标: ${pretend_list[0]}"
     fi
-
-    # 保存分享链接
+    echo
+    
+    # 保存分享链接和订阅
     save_share_links
     save_subscription_file
-
+    
     echo
-    yellow "注:部分选项可能分享链接无法涉及,建议手动填写"
-    ask_if "是否生成分享链接?[y/n]" && print_share_link
+    tyblue "==================== 客户端配置 ===================="
+    if ask_if "是否生成分享链接和二维码?[y/n]"; then
+        print_share_link
+    else
+        yellow "分享链接已保存到: ${nginx_prefix}/share_links.txt"
+        yellow "订阅链接已生成，详见上方输出"
+    fi
+    
     echo
-    tyblue " 脚本最后更新时间:2025.1.4"
+    tyblue " 脚本最后更新时间: 2025.1.4"
+    tyblue " 项目地址: https://github.com/ywm/Xray-script"
     echo
-    red    " 此脚本仅供交流学习使用,请勿使用此脚本行违法之事。"
+    red    " 此脚本仅供交流学习使用，请勿使用此脚本行违法之事。"
+    echo
 }
 
 
@@ -3961,13 +3817,12 @@ install_update_xray_tls_web()
     install_bbr
     $apt_no_install_recommends -y -f install
 
-    #读取信息
+    # 读取信息
     if [ $update -eq 0 ]; then
-        readProtocolConfig
         readDomain
-        if [ $protocol_1 -ne 0 ]; then
-            readRealityConfig
-        fi
+        # 先安装 xray 再生成 REALITY 配置
+        install_update_xray
+        readRealityConfig
         path="/$(head -c 20 /dev/urandom | md5sum | head -c 10)"
         xid_1="$(cat /proc/sys/kernel/random/uuid)"
         xid_2="$(cat /proc/sys/kernel/random/uuid)"
@@ -3976,25 +3831,14 @@ install_update_xray_tls_web()
         get_config_info
     fi
 
-    # 判断是否需要证书
-    local need_certificate=0
-    if [ $protocol_3 -ne 0 ]; then
-        need_certificate=1
-        tyblue "检测到使用gRPC或XHTTP协议，需要申请SSL证书"
-    fi
-    
-    if [ $protocol_1 -ne 0 ] && [ $need_certificate -eq 0 ]; then
-        tyblue "仅使用REALITY协议，无需申请证书"
-    fi
-
-    local choice
-
-    local install_php
+    # 判断是否需要 PHP
+    local install_php=0
     if [ $update -eq 0 ]; then
-        [ "${pretend_list[0]}" == "2" ] && install_php=1 || install_php=0
+        [ "${pretend_list[0]}" == "2" ] && install_php=1
     else
         install_php=$php_is_installed
     fi
+    
     local use_existed_php=0
     if [ $install_php -eq 1 ]; then
         if [ $update -eq 1 ]; then
@@ -4009,7 +3853,7 @@ install_update_xray_tls_web()
             tyblue " 1. 使用现有php"
             tyblue " 2. 卸载现有php并重新编译安装"
             echo
-            choice=""
+            local choice=""
             while [ "$choice" != "1" ] && [ "$choice" != "2" ]
             do
                 read -p "您的选择是：" choice
@@ -4031,14 +3875,14 @@ install_update_xray_tls_web()
         tyblue " 1. 使用现有Nginx"
         tyblue " 2. 卸载现有Nginx并重新编译安装"
         echo
-        choice=""
+        local choice=""
         while [ "$choice" != "1" ] && [ "$choice" != "2" ]
         do
             read -p "您的选择是：" choice
         done
         [ $choice -eq 1 ] && use_existed_nginx=1
     fi
-    #此参数只在[ $update -eq 0 ]时有效
+
     local temp_remove_cloudreve=1
     if [ $update -eq 0 ] && [ "${pretend_list[0]}" == "1" ] && [ $cloudreve_is_installed -eq 1 ]; then
         tyblue "----------------- Cloudreve已存在 -----------------"
@@ -4046,7 +3890,7 @@ install_update_xray_tls_web()
         tyblue " 2. 卸载并重新安装"
         echo
         red    "警告：卸载Cloudreve将删除网盘中所有文件和用户信息"
-        choice=""
+        local choice=""
         while [ "$choice" != "1" ] && [ "$choice" != "2" ]
         do
             read -p "您的选择是：" choice
@@ -4055,7 +3899,7 @@ install_update_xray_tls_web()
     fi
 
     if [ $update -eq 0 ]; then
-        green "即将开始安装Xray-TLS+Web，可能需要10-20分钟。。。"
+        green "即将开始安装Xray-REALITY+Web (三协议模式)，可能需要10-20分钟..."
         sleep 3s
     fi
 
@@ -4066,11 +3910,7 @@ install_update_xray_tls_web()
         install_php_dependence
     fi
     
-    # 只有需要证书时才安装acme.sh依赖
-    if [ $need_certificate -eq 1 ]; then
-        install_acme_dependence
-    fi
-    
+    install_acme_dependence
     if [ $update -eq 0 ]; then
         install_web_dependence ""
     else
@@ -4079,7 +3919,7 @@ install_update_xray_tls_web()
     $apt clean
     $dnf clean all
 
-    #编译&&安装php
+    # 编译安装 PHP
     if [ $install_php -eq 1 ]; then
         if [ $use_existed_php -eq 0 ]; then
             compile_php
@@ -4093,12 +3933,12 @@ install_update_xray_tls_web()
         [ $update -eq 1 ] && turn_on_off_php
     fi
 
-    #编译&&安装Nginx
+    # 编译安装 Nginx
     if [ $use_existed_nginx -eq 0 ]; then
         compile_nginx
         [ $update -eq 1 ] && backup_domains_web
         
-        # 修改：备份证书而不是直接删除
+        # 备份证书
         if [ -d "${nginx_prefix}/certs" ]; then
             green "备份现有证书..."
             mkdir -p "${temp_dir}/certs_backup"
@@ -4111,21 +3951,13 @@ install_update_xray_tls_web()
         systemctl stop nginx
         systemctl disable nginx
         rm -rf ${nginx_prefix}/conf.d
-        if [ $need_certificate -eq 1 ]; then
-            # 需要证书时保留证书目录
-            :
-        else
-            # 不需要证书时可以删除
-            rm -rf ${nginx_prefix}/certs
-        fi
-        
         rm -rf ${nginx_prefix}/html/issue_certs
         rm -rf ${nginx_prefix}/conf/issue_certs.conf
         cp ${nginx_prefix}/conf/nginx.conf.default ${nginx_prefix}/conf/nginx.conf
     fi
     install_nginx_part2
     
-    # 修改：恢复备份的证书
+    # 恢复证书
     if [ $use_existed_nginx -eq 0 ] && [ -d "${temp_dir}/certs_backup" ]; then
         green "恢复备份的证书..."
         mkdir -p "${nginx_prefix}/certs"
@@ -4134,33 +3966,29 @@ install_update_xray_tls_web()
 
     [ $update -eq 1 ] && [ $use_existed_nginx -eq 0 ] && mv "${temp_dir}/domain_backup/"* ${nginx_prefix}/html 2>/dev/null
 
-    #安装Xray
-    remove_xray
-    install_update_xray
-
-    # 证书申请逻辑
-    if [ $need_certificate -eq 1 ]; then
-        if [ $update -eq 0 ]; then
-            # 首次安装，安装acme.sh
-            [ -e $HOME/.acme.sh/acme.sh ] && $HOME/.acme.sh/acme.sh --uninstall
-            rm -rf $HOME/.acme.sh
-            curl https://get.acme.sh | sh
-            $HOME/.acme.sh/acme.sh --register-account -ak ec-256 --server zerossl -m "my@example.com"
-        fi
-        $HOME/.acme.sh/acme.sh --upgrade --auto-upgrade
-        get_all_certs
-    else
-        green "仅使用REALITY协议，跳过证书申请"
-        # 创建证书目录(即使不申请证书，某些配置可能需要这个目录存在)
-        mkdir -p ${nginx_prefix}/certs
+    # 安装/更新 Xray (如果还没安装)
+    if [ $update -eq 1 ] || [ $xray_is_installed -eq 0 ]; then
+        remove_xray
+        install_update_xray
     fi
+
+    # 证书申请
+    if [ $update -eq 0 ]; then
+        [ -e $HOME/.acme.sh/acme.sh ] && $HOME/.acme.sh/acme.sh --uninstall
+        rm -rf $HOME/.acme.sh
+        curl https://get.acme.sh | sh
+        $HOME/.acme.sh/acme.sh --register-account -ak ec-256 --server zerossl -m "my@example.com"
+    fi
+    $HOME/.acme.sh/acme.sh --upgrade --auto-upgrade
+    get_cert
     
-    #配置Nginx和Xray
+    # 配置 Nginx 和 Xray
     config_nginx
     config_xray
     sleep 2s
     systemctl stop cloudreve
     systemctl restart xray nginx
+    
     if [ $update -eq 0 ]; then
         [ "${pretend_list[0]}" == "1" ] && [ $temp_remove_cloudreve -eq 1 ] && remove_cloudreve
         init_web 0
@@ -4171,6 +3999,7 @@ install_update_xray_tls_web()
         turn_on_off_cloudreve
         green "-------------------更新完成-------------------"
     fi
+    
     cd /
     rm -rf "$temp_dir"
     in_install_update_xray_tls_web=0
@@ -4333,6 +4162,9 @@ restart_xray_tls_web()
         green "重启/启动成功！！"
     fi
 }
+
+
+
 reinit_domain()
 {
     [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
@@ -4344,63 +4176,123 @@ reinit_domain()
     check_important_dependence_installed wget wget
     install_acme_dependence
     ask_update_script
-    yellow "重置域名将删除所有现有域名[包括域名证书、伪装网站等]"
-    ! ask_if "是否继续？[y/n]" && return 0
+    
+    echo -e "\\n\\n"
+    red    "==================== 警告 ===================="
+    yellow "重置域名将执行以下操作："
+    yellow "  1. 删除所有现有域名配置"
+    yellow "  2. 删除所有证书（包括泛域名证书）"
+    yellow "  3. 删除所有伪装网站数据"
+    yellow "  4. 重新配置三个协议的域名"
+    yellow "  5. 重新申请泛域名证书"
+    echo
+    red    "此操作不可逆！"
+    echo
+    
+    ! ask_if "确定要继续？[y/n]" && return 0
+    
     get_config_info
+    
+    # 读取新域名配置
     readDomain
-    if [ "${pretend_list[-1]}" == "2" ] && [ $php_is_installed -eq 0 ]; then
+    
+    # 确保 xray 已安装（用于生成 REALITY 密钥）
+    if [ ! -f "/usr/local/bin/xray" ]; then
+        yellow "检测到 xray 未安装，将先安装 xray..."
+        install_update_xray
+    fi
+    
+    # 生成新的 REALITY 配置
+    readRealityConfig
+    
+    # 生成新的 UUID 和 path
+    path="/$(head -c 20 /dev/urandom | md5sum | head -c 10)"
+    xid_1="$(cat /proc/sys/kernel/random/uuid)"
+    xid_2="$(cat /proc/sys/kernel/random/uuid)"
+    xid_3="$(cat /proc/sys/kernel/random/uuid)"
+    
+    # 检查是否需要安装 PHP
+    if [ "${pretend_list[0]}" == "2" ] && [ $php_is_installed -eq 0 ]; then
         check_SELinux
         check_important_dependence_installed "procps" "procps-ng"
         install_epel
-        install_web_dependence "${pretend_list[-1]}"
+        install_web_dependence "2"
         in_install_update_xray_tls_web=1
         check_ssh_timeout
         in_install_update_xray_tls_web=0
         full_install_php
     else
-        [ "${pretend_list[-1]}" == "1" ] && check_SELinux
-        install_web_dependence "${pretend_list[-1]}"
+        [ "${pretend_list[0]}" == "1" ] && check_SELinux
+        install_web_dependence "${pretend_list[0]}"
     fi
-    green "重置域名中。。。"
-    local temp_domain="${domain_list[-1]}"
-    local temp_true_domain="${true_domain_list[-1]}"
-    local temp_domain_config="${domain_config_list[-1]}"
-    local temp_pretend="${pretend_list[-1]}"
-    systemctl stop xray
-    systemctl stop nginx
-    systemctl stop php-fpm
-    systemctl disable php-fpm
-    systemctl stop cloudreve
-    systemctl disable cloudreve
+    
+    green "正在重置域名配置..."
+    echo
+    
+    # 停止所有服务
+    systemctl stop xray nginx php-fpm cloudreve 2>/dev/null
+    systemctl disable php-fpm cloudreve 2>/dev/null
+    
+    # 清理旧配置
+    green "清理旧域名配置..."
     local i
     for i in "${true_domain_list[@]}"
     do
-        rm -rf "${nginx_prefix}/html/${i}"
+        rm -rf "${nginx_prefix}/html/${i}" 2>/dev/null
     done
+    
+    # 清理旧证书和 acme.sh
+    green "清理旧证书..."
     rm -rf "${nginx_prefix}/certs"
-    mkdir "${nginx_prefix}/certs"
-    $HOME/.acme.sh/acme.sh --uninstall
+    mkdir -p "${nginx_prefix}/certs"
+    
+    $HOME/.acme.sh/acme.sh --uninstall 2>/dev/null
     rm -rf $HOME/.acme.sh
+    
+    # 重新安装 acme.sh
+    green "重新安装 acme.sh..."
     curl https://get.acme.sh | sh
     $HOME/.acme.sh/acme.sh --register-account -ak ec-256 --server zerossl -m "my@example.com"
     $HOME/.acme.sh/acme.sh --upgrade --auto-upgrade
-    unset domain_list
-    unset true_domain_list
-    unset domain_config_list
-    unset pretend_list
-    domain_list+=("$temp_domain")
-    domain_config_list+=("$temp_domain_config")
-    true_domain_list+=("$temp_true_domain")
-    pretend_list+=("$temp_pretend")
-    get_all_certs
+    
+    # 申请新证书
+    green "申请泛域名证书..."
+    if ! get_cert; then
+        red "证书申请失败！"
+        yellow "请检查："
+        yellow "  1. 域名是否正确解析到本服务器"
+        yellow "  2. Cloudflare API 凭据是否正确"
+        yellow "  3. 网络连接是否正常"
+        echo
+        yellow "按回车键继续配置（将使用自签名证书）..."
+        read -s
+    fi
+    
+    # 重新生成配置
+    green "生成新配置..."
     config_nginx
     config_xray
+    
     sleep 2s
+    
+    # 启动服务
+    green "启动服务..."
     systemctl restart xray nginx
+    
+    # 初始化伪装网站
     init_web 0
-    green "域名重置完成！！"
+    
+    echo
+    green "==================== 域名重置完成 ===================="
+    echo
+    sleep 1s
+    
     print_config_info
 }
+
+
+
+
 add_domain()
 {
     [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
@@ -4628,50 +4520,87 @@ change_xray_protocol()
     green "更换成功！！"
     print_config_info
 }
+
+
 change_xray_id()
 {
     get_config_info
-    local flag=""
-    tyblue "-------------请输入你要修改的id-------------"
-    tyblue " 1. TCP的id"
-    tyblue " 2. Trojan的id"
-    tyblue " 3. XHTTP的id"
+    
+    echo -e "\\n\\n"
+    tyblue "-------------请选择要修改的协议-------------"
+    tyblue " 1. REALITY 的 UUID"
+    tyblue " 2. Trojan 的密码"
+    tyblue " 3. XHTTP 的 UUID"
+    yellow " 0. 返回"
     echo
-    while [[ ! "$flag" =~ ^([1-9][0-9]*)$ ]] || ((flag>3))
+    
+    local flag=""
+    while [[ ! "$flag" =~ ^(0|[1-3])$ ]]
     do
         read -p "您的选择是：" flag
     done
-    local temp_protocol="protocol_$flag"
-    if [ ${!temp_protocol} -eq 0 ]; then
-        red "没有使用该协议！"
-        return 1
+    
+    [ $flag -eq 0 ] && return 0
+    
+    # 显示当前值
+    local current_id
+    local protocol_name
+    if [ $flag -eq 1 ]; then
+        current_id="$xid_1"
+        protocol_name="REALITY UUID"
+    elif [ $flag -eq 2 ]; then
+        current_id="$xid_2"
+        protocol_name="Trojan 密码"
+    else
+        current_id="$xid_3"
+        protocol_name="XHTTP UUID"
     fi
-    local xid="xid_$flag"
-    tyblue "您现在的id是：${!xid}"
-    ! ask_if "是否要继续?[y/n]" && return 0
+    
+    echo
+    tyblue "当前 ${protocol_name}: ${current_id}"
+    echo
+    ! ask_if "是否要继续修改?[y/n]" && return 0
+    
+    # 输入新值
+    local new_id=""
     while true
     do
-        xid=""
-        while [ -z "$xid" ]
-        do
-            tyblue "-------------请输入新的id-------------"
-            read xid
-        done
-        tyblue "您输入的id是：$xid"
+        new_id=""
+        echo
+        tyblue "-------------请输入新的 ${protocol_name}-------------"
+        tyblue "提示: 留空则自动生成UUID"
+        read new_id
+        
+        # 如果留空，自动生成UUID
+        if [ -z "$new_id" ]; then
+            new_id="$(cat /proc/sys/kernel/random/uuid)"
+            tyblue "已自动生成: $new_id"
+        fi
+        
+        echo
+        tyblue "您输入的值是：$new_id"
         ask_if "是否确定?[y/n]" && break
     done
+    
+    # 更新配置
     if [ $flag -eq 1 ]; then
-        xid_1="$xid"
+        xid_1="$new_id"
     elif [ $flag -eq 2 ]; then
-        xid_2="$xid"
+        xid_2="$new_id"
     else
-        xid_3="$xid"
+        xid_3="$new_id"
     fi
+    
     config_xray
     systemctl -q is-active xray && systemctl restart xray
-    green "更换成功！！"
+    
+    green "更换成功！"
+    echo
+    sleep 1s
     print_config_info
 }
+
+
 change_xray_path()
 {
     get_config_info
@@ -4840,7 +4769,13 @@ change_dns()
 # 读取REALITY配置
 readRealityConfig()
 {
-    echo -e "\\n\\n\\n"
+    # 检查 xray 是否已安装
+    if [ ! -f "/usr/local/bin/xray" ]; then
+        yellow "检测到 xray 未安装，将先安装 xray..."
+        install_update_xray
+    fi
+
+    echo -e "\n\n\n"
     tyblue "---------------------配置 REALITY---------------------"
     
     # 自动使用第一个域名作为 serverName
@@ -4854,18 +4789,26 @@ readRealityConfig()
     # 生成密钥对
     green "正在生成REALITY密钥对..."
     local key_output=$(/usr/local/bin/xray x25519)
-    reality_private_key=$(echo "$key_output" | awk '/^PrivateKey:/ {print $2}')
-    reality_password=$(echo "$key_output" | awk '/^Password:/ {print $2}')
-    reality_hash32=$(echo "$key_output" | awk '/^Hash32:/ {print $2}')
+    reality_private_key=$(echo "$key_output" | awk '/^Private[Kk]ey:/ {print $2}')
+    reality_password=$(echo "$key_output" | awk '/^Public[Kk]ey:/ {print $2}')
+    
+    # 兼容不同版本的输出格式
+    if [ -z "$reality_private_key" ]; then
+        reality_private_key=$(echo "$key_output" | grep -i "private" | awk '{print $2}')
+    fi
+    if [ -z "$reality_password" ]; then
+        reality_password=$(echo "$key_output" | grep -i "public" | awk '{print $2}')
+    fi
 
     if [ -z "$reality_private_key" ] || [ -z "$reality_password" ]; then
-        red "密钥生成失败！"
+        red "密钥生成失败！xray 输出："
+        echo "$key_output"
         exit 1
     fi
     
     green "密钥生成成功！"
     tyblue "PrivateKey: $reality_private_key"
-    tyblue "Password: $reality_password"
+    tyblue "PublicKey: $reality_password"
     
     # 生成shortIds
     tyblue "请输入shortIds [多个用空格分隔，留空则自动生成]"
@@ -4874,7 +4817,7 @@ readRealityConfig()
     
     if [ -z "$reality_short_ids" ]; then
         # 自动生成：空字符串和随机hex
-        local random_id=$(head -c 8 /dev/urandom | xxd -p)
+        local random_id=$(head -c 8 /dev/urandom | xxd -p 2>/dev/null || openssl rand -hex 8)
         reality_short_ids="\"\" \"${random_id}\""
         green "已自动生成shortIds: $reality_short_ids"
     fi
@@ -4890,24 +4833,22 @@ readRealityConfig()
 change_reality_config()
 {
     get_config_info
-    if [ $protocol_1 -eq 0 ]; then
-        red "没有使用REALITY协议"
-        return 1
-    fi
-    
-    tyblue "当前REALITY配置："
+
+    echo -e "\\n\\n"
+    tyblue "==================== 当前 REALITY 配置 ===================="
+    yellow "  Dest:        $reality_dest"
     yellow "  ServerNames: $reality_server_names"
-    yellow "  Dest: $reality_dest"
-    yellow "  ShortIds: $reality_short_ids"
-    yellow "  PrivateKey: $reality_private_key"
-    yellow "  Password: $reality_password"
+    yellow "  ShortIds:    $reality_short_ids"
+    yellow "  PrivateKey:  $reality_private_key"
+    yellow "  PublicKey:   $reality_password"
     echo
     
-    tyblue "请选择要修改的项："
-    tyblue " 1. 重新生成密钥对"
-    tyblue " 2. 重新生成ShortIds"
-    tyblue " 3. 修改ServerNames"
-    tyblue " 0. 返回"
+    tyblue "-------------请选择要修改的项-------------"
+    tyblue " 1. 重新生成密钥对 (PrivateKey + PublicKey)"
+    tyblue " 2. 重新生成 ShortIds"
+    tyblue " 3. 修改 ServerNames"
+    yellow " 0. 返回"
+    echo
     
     local choice=""
     while [[ ! "$choice" =~ ^(0|[1-3])$ ]]
@@ -4918,33 +4859,90 @@ change_reality_config()
     [ $choice -eq 0 ] && return 0
     
     if [ $choice -eq 1 ]; then
+        # 重新生成密钥对
+        echo
         green "正在生成新的密钥对..."
-        local key_output=$(/usr/local/bin/xray x25519)
-        reality_private_key=$(echo "$key_output" | awk '/^PrivateKey:/ {print $2}')
-        reality_password=$(echo "$key_output" | awk '/^Password:/ {print $2}')
-        green "新密钥生成成功！"
-        yellow "PrivateKey: $reality_private_key"
-        yellow "Password: $reality_password"
-    elif [ $choice -eq 2 ]; then
-        reality_short_ids='""'
-        reality_short_ids+=" $(head -c 8 /dev/urandom | xxd -p)"
-        green "ShortIds已重新生成"
-        yellow "ShortIds: $reality_short_ids"
-    elif [ $choice -eq 3 ]; then
-        tyblue "当前ServerNames: $reality_server_names"
-        tyblue "请输入新的ServerNames [多个用空格分隔]："
-        read -p "ServerNames: " reality_server_names
-        if [ -z "$reality_server_names" ]; then
-            red "ServerNames不能为空"
+        
+        if [ ! -f "/usr/local/bin/xray" ]; then
+            red "xray 未安装，无法生成密钥！"
             return 1
         fi
-        green "ServerNames已修改"
+        
+        local key_output=$(/usr/local/bin/xray x25519)
+        reality_private_key=$(echo "$key_output" | awk '/^Private[Kk]ey:/ {print $2}')
+        reality_password=$(echo "$key_output" | awk '/^Public[Kk]ey:/ {print $2}')
+        
+        # 兼容不同版本的输出格式
+        if [ -z "$reality_private_key" ]; then
+            reality_private_key=$(echo "$key_output" | grep -i "private" | awk '{print $2}')
+        fi
+        if [ -z "$reality_password" ]; then
+            reality_password=$(echo "$key_output" | grep -i "public" | awk '{print $2}')
+        fi
+        
+        if [ -z "$reality_private_key" ] || [ -z "$reality_password" ]; then
+            red "密钥生成失败！"
+            yellow "xray 输出："
+            echo "$key_output"
+            return 1
+        fi
+        
+        green "新密钥生成成功！"
+        yellow "PrivateKey: $reality_private_key"
+        yellow "PublicKey:  $reality_password"
+        echo
+        
+    elif [ $choice -eq 2 ]; then
+        # 重新生成 ShortIds
+        echo
+        green "正在生成新的 ShortIds..."
+        
+        local random_id=$(head -c 8 /dev/urandom | xxd -p 2>/dev/null || openssl rand -hex 8)
+        reality_short_ids="\"\" \"${random_id}\""
+        
+        green "ShortIds 已重新生成"
+        yellow "ShortIds: $reality_short_ids"
+        echo
+        
+    elif [ $choice -eq 3 ]; then
+        # 修改 ServerNames
+        echo
+        tyblue "当前 ServerNames: $reality_server_names"
+        echo
+        tyblue "请输入新的 ServerNames [多个用空格分隔]："
+        tyblue "建议使用当前域名: ${domain_list[0]}"
+        echo
+        
+        local new_server_names=""
+        read -p "ServerNames: " new_server_names
+        
+        if [ -z "$new_server_names" ]; then
+            red "ServerNames 不能为空！"
+            return 1
+        fi
+        
+        reality_server_names="$new_server_names"
+        green "ServerNames 已修改"
+        yellow "新 ServerNames: $reality_server_names"
+        echo
     fi
-    
+
+    green "更新配置文件..."
     config_xray
-    systemctl -q is-active xray && systemctl restart xray
-    green "REALITY配置已更新！"
-    print_config_info
+
+    if systemctl -q is-active xray; then
+        green "重启 Xray 服务..."
+        systemctl restart xray
+        sleep 2s
+        
+        if systemctl -q is-active xray; then
+            green "Xray 重启成功！"
+        else
+            red "Xray 重启失败！请检查配置"
+            yellow "可以运行: journalctl -u xray -n 50 查看日志"
+            return 1
+        fi
+    fi
 }
 
 # 生成 VLESS 分享链接（完全符合标准）
@@ -5392,16 +5390,20 @@ start_menu()
     local xray_status
     [ $xray_is_installed -eq 1 ] && xray_status="\\033[32m已安装" || xray_status="\\033[31m未安装"
     systemctl -q is-active xray && xray_status+="                \\033[32m运行中" || xray_status+="                \\033[31m未运行"
+    
     local nginx_status
     [ $nginx_is_installed -eq 1 ] && nginx_status="\\033[32m已安装" || nginx_status="\\033[31m未安装"
     systemctl -q is-active nginx && nginx_status+="                \\033[32m运行中" || nginx_status+="                \\033[31m未运行"
+    
     local php_status
     [ $php_is_installed -eq 1 ] && php_status="\\033[32m已安装" || php_status="\\033[31m未安装"
     systemctl -q is-active php-fpm && php_status+="                \\033[32m运行中" || php_status+="                \\033[31m未运行"
+    
     local cloudreve_status
     [ $cloudreve_is_installed -eq 1 ] && cloudreve_status="\\033[32m已安装" || cloudreve_status="\\033[31m未安装"
     systemctl -q is-active cloudreve && cloudreve_status+="                \\033[32m运行中" || cloudreve_status+="                \\033[31m未运行"
-    tyblue "------------------------ Xray-REALITY+Web 搭建/管理脚本 ------------------------"
+    
+    tyblue "------------------------ Xray-REALITY+Web 一键安装脚本 ------------------------"
     echo
     tyblue "           Xray   ：           ${xray_status}"
     echo
@@ -5414,27 +5416,27 @@ start_menu()
     tyblue "       官网：https://github.com/ywm/Xray-script"
     echo
     tyblue "----------------------------------注意事项----------------------------------"
-    yellow " 1. 此脚本需要一个解析到本服务器的域名"
-    yellow " 2. REALITY协议无需证书，可直连使用"
-    green  " 3. 建议在纯净的系统上使用此脚本 [VPS控制台-重置系统]"
+    yellow " 1. 此脚本需要一个解析到本服务器的域名（推荐使用 Cloudflare 托管）"
+    yellow " 2. 脚本默认安装三个协议：REALITY、Trojan、XHTTP"
+    yellow " 3. 使用泛域名证书，支持所有子域名"
+    green  " 4. 建议在纯净的系统上使用此脚本"
     tyblue "----------------------------------------------------------------------------"
     echo
     echo
     tyblue " -----------安装/更新/卸载-----------"
     if [ $is_installed -eq 0 ]; then
-        green  "   1. 安装Xray-REALITY+Web"
+        green  "   1. 安装Xray-REALITY+Web (三协议)"
     else
         green  "   1. 重新安装Xray-REALITY+Web"
     fi
-    purple "         流程：[更新系统组件]->[安装bbr]->[安装php]->安装Nginx->安装Xray->申请证书->配置文件->[安装/配置Cloudreve]"
+    purple "         默认安装：REALITY + Trojan + XHTTP"
     green  "   2. 更新Xray-REALITY+Web"
-    purple "         流程：更新脚本->[更新系统组件]->[更新bbr]->[更新php]->[更新Nginx]->更新Xray->更新证书->更新配置文件->[更新Cloudreve]"
     tyblue "   3. 检查更新/更新脚本"
     tyblue "   4. 更新系统组件"
-    tyblue "   5. 安装/检查更新/更新bbr"
+    tyblue "   5. 安装/更新bbr"
     purple "         包含：bbr2/bbrplus/bbr魔改版/暴力bbr魔改版/锐速"
-    tyblue "   6. 安装/检查更新/更新php"
-    tyblue "   7. 检查更新/更新Nginx"
+    tyblue "   6. 安装/更新php"
+    tyblue "   7. 更新Nginx"
     tyblue "   8. 更新Cloudreve"
     tyblue "   9. 更新Xray"
     red    "  10. 卸载Xray-REALITY+Web"
@@ -5448,152 +5450,176 @@ start_menu()
     tyblue " ----------------管理----------------"
     tyblue "  15. 查看配置信息"
     tyblue "  16. 重置域名"
-    purple "         将删除所有域名配置，安装过程中域名输错了造成Xray无法启动可以用此选项修复"
-    tyblue "  17. 添加域名"
-    tyblue "  18. 删除域名"
-    tyblue "  19. 修改伪装网站类型"
-    tyblue "  20. 重新安装Cloudreve"
-    purple "         将删除所有Cloudreve网盘的文件和帐户信息，管理员密码忘记可用此选项恢复"
-    tyblue "  21. 修改传输协议"
-    tyblue "  22. 修改id[用户ID/UUID]"
-    tyblue "  23. 修改XHTTP的path[路径]"
-    tyblue "  24. 修改REALITY配置"
+    purple "         将删除所有域名配置，重新配置三个协议的域名"
+    tyblue "  17. 修改伪装网站类型"
+    tyblue "  18. 重新安装Cloudreve"
+    purple "         将删除所有Cloudreve网盘的文件和帐户信息"
+    tyblue "  19. 修改id[UUID/密码]"
+    tyblue "  20. 修改XHTTP的path"
+    tyblue "  21. 修改REALITY配置"
     echo
     tyblue " ----------------其它----------------"
-    tyblue "  25. 精简系统"
-    purple "         删除不必要的系统组件，即使已经安装 Xray-REALITY+Web 仍然可以使用此功能"
-    tyblue "  26. 尝试修复退格键无法使用的问题"
-    purple "         部分ssh工具[如Xshell]可能有这类问题"
-    tyblue "  27. 修改dns"
+    tyblue "  22. 精简系统"
+    purple "         删除不必要的系统组件"
+    tyblue "  23. 修复退格键问题"
+    tyblue "  24. 修改dns"
     yellow "  0. 退出脚本"
     echo
     echo
+    
     local choice=""
-    while [[ ! "$choice" =~ ^(0|[1-9][0-9]*)$ ]] || ((choice>28))
+    while [[ ! "$choice" =~ ^(0|[1-9][0-9]*)$ ]] || ((choice>24))
     do
         read -p "您的选择是：" choice
     done
-    if (( choice==2 || (7<=choice&&choice<=9) || choice==13 || (15<=choice&&choice<=25) )) && [ $is_installed -eq 0 ]; then
-        red "请先安装Xray-REALITY+Web！！"
+    
+    # 权限检查
+    if (( choice==2 || (7<=choice&&choice<=9) || choice==13 || (15<=choice&&choice<=21) )) && [ $is_installed -eq 0 ]; then
+        red "请先安装Xray-REALITY+Web！"
         return 1
     fi
-    if (( 17<=choice&&choice<=20 )) && ! (systemctl -q is-active nginx && systemctl -q is-active xray); then
-        red "请先启动Xray-REALITY+Web！！"
+    if (( 17<=choice&&choice<=18 )) && ! (systemctl -q is-active nginx && systemctl -q is-active xray); then
+        red "请先启动Xray-REALITY+Web！"
         return 1
     fi
-    if [ $choice -eq 1 ]; then
-        install_update_xray_tls_web
-    elif [ $choice -eq 2 ]; then
-        [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
-        check_important_dependence_installed ca-certificates ca-certificates
-        check_important_dependence_installed wget wget
-        ask_update_script_force
-        bash "${BASH_SOURCE[0]}" --update
-    elif [ $choice -eq 3 ]; then
-        [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
-        check_important_dependence_installed ca-certificates ca-certificates
-        check_important_dependence_installed wget wget
-        ask_update_script
-    elif [ $choice -eq 4 ]; then
-        [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
-        check_important_dependence_installed tzdata tzdata
-        get_system_info
-        check_ssh_timeout
-        check_important_dependence_installed "procps" "procps-ng"
-        doupdate
-        green "更新完成！"
-    elif [ $choice -eq 5 ]; then
-        [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
-        check_important_dependence_installed ca-certificates ca-certificates
-        check_important_dependence_installed wget wget
-        check_important_dependence_installed "procps" "procps-ng"
-        enter_temp_dir
-        install_bbr
-        $apt_no_install_recommends -y -f install
-        rm -rf "$temp_dir"
-    elif [ $choice -eq 6 ]; then
-        install_check_update_update_php
-    elif [ $choice -eq 7 ]; then
-        check_update_update_nginx
-    elif [ $choice -eq 8 ]; then
-        if [ $cloudreve_is_installed -eq 0 ]; then
-            red    "请先安装Cloudreve！"
-            tyblue "在 修改伪装网站类型/重置域名/添加域名 里选择Cloudreve"
-            return 1
-        fi
-        [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
-        check_SELinux
-        install_web_dependence "1"
-        ask_update_script_force
-        enter_temp_dir
-        update_cloudreve
-        cd /
-        rm -rf "$temp_dir"
-        green "Cloudreve更新完成！"
-    elif [ $choice -eq 9 ]; then
-        [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
-        check_SELinux
-        check_important_dependence_installed ca-certificates ca-certificates
-        check_important_dependence_installed curl curl
-        install_update_xray
-        green "Xray更新完成！"
-    elif [ $choice -eq 10 ]; then
-        ! ask_if "确定要删除吗?[y/n]" && return 0
-        [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
-        check_important_dependence_installed ca-certificates ca-certificates
-        check_important_dependence_installed curl curl
-        remove_xray
-        remove_nginx
-        remove_php
-        remove_cloudreve
-        $HOME/.acme.sh/acme.sh --uninstall
-        rm -rf $HOME/.acme.sh
-        green "删除完成！"
-    elif [ $choice -eq 11 ]; then
-        get_config_info
-        [ $is_installed -eq 1 ] && check_need_php && red "有域名正在使用php" && return 1
-        ! ask_if "确定要删除php吗?[y/n]" && return 0
-        remove_php && green "删除完成！"
-    elif [ $choice -eq 12 ]; then
-        get_config_info
-        [ $is_installed -eq 1 ] && check_need_cloudreve && red "有域名正在使用Cloudreve" && return 1
-        ! ask_if "确定要删除cloudreve吗?[y/n]" && return 0
-        remove_cloudreve && green "删除完成！"
-    elif [ $choice -eq 13 ]; then
-        restart_xray_tls_web
-    elif [ $choice -eq 14 ]; then
-        systemctl stop xray nginx
-        [ $php_is_installed -eq 1 ] && systemctl stop php-fpm
-        [ $cloudreve_is_installed -eq 1 ] && systemctl stop cloudreve
-        green "已停止！"
-    elif [ $choice -eq 15 ]; then
-        get_config_info
-        print_config_info
-    elif [ $choice -eq 16 ]; then
-        reinit_domain
-    elif [ $choice -eq 17 ]; then
-        add_domain
-    elif [ $choice -eq 18 ]; then
-        delete_domain
-    elif [ $choice -eq 19 ]; then
-        change_pretend
-    elif [ $choice -eq 20 ]; then
-        reinstall_cloudreve
-    elif [ $choice -eq 21 ]; then
-        change_xray_protocol
-    elif [ $choice -eq 22 ]; then
-        change_xray_id
-    elif [ $choice -eq 23 ]; then
-        change_xray_path
-    elif [ $choice -eq 24 ]; then
-        change_reality_config
-    elif [ $choice -eq 25 ]; then
-        simplify_system
-    elif [ $choice -eq 26 ]; then
-        repair_tuige
-    elif [ $choice -eq 27 ]; then
-        change_dns
-    fi
+    
+    # 执行对应功能
+    case $choice in
+        1)
+            install_update_xray_tls_web
+            ;;
+        2)
+            [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
+            check_important_dependence_installed ca-certificates ca-certificates
+            check_important_dependence_installed wget wget
+            ask_update_script_force
+            bash "${BASH_SOURCE[0]}" --update
+            ;;
+        3)
+            [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
+            check_important_dependence_installed ca-certificates ca-certificates
+            check_important_dependence_installed wget wget
+            ask_update_script
+            ;;
+        4)
+            [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
+            check_important_dependence_installed tzdata tzdata
+            get_system_info
+            check_ssh_timeout
+            check_important_dependence_installed "procps" "procps-ng"
+            doupdate
+            green "更新完成！"
+            ;;
+        5)
+            [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
+            check_important_dependence_installed ca-certificates ca-certificates
+            check_important_dependence_installed wget wget
+            check_important_dependence_installed "procps" "procps-ng"
+            enter_temp_dir
+            install_bbr
+            $apt_no_install_recommends -y -f install
+            cd /
+            rm -rf "$temp_dir"
+            ;;
+        6)
+            install_check_update_update_php
+            ;;
+        7)
+            check_update_update_nginx
+            ;;
+        8)
+            if [ $cloudreve_is_installed -eq 0 ]; then
+                red "请先安装Cloudreve！"
+                tyblue "在 修改伪装网站类型/重置域名 里选择Cloudreve"
+                return 1
+            fi
+            [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
+            check_SELinux
+            install_web_dependence "1"
+            ask_update_script_force
+            enter_temp_dir
+            update_cloudreve
+            cd /
+            rm -rf "$temp_dir"
+            green "Cloudreve更新完成！"
+            ;;
+        9)
+            [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
+            check_SELinux
+            check_important_dependence_installed ca-certificates ca-certificates
+            check_important_dependence_installed curl curl
+            install_update_xray
+            green "Xray更新完成！"
+            ;;
+        10)
+            ! ask_if "确定要删除吗?[y/n]" && return 0
+            [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
+            check_important_dependence_installed ca-certificates ca-certificates
+            check_important_dependence_installed curl curl
+            remove_xray
+            remove_nginx
+            remove_php
+            remove_cloudreve
+            $HOME/.acme.sh/acme.sh --uninstall 2>/dev/null
+            rm -rf $HOME/.acme.sh
+            green "删除完成！"
+            ;;
+        11)
+            get_config_info
+            [ $is_installed -eq 1 ] && [ "${pretend_list[0]}" == "2" ] && red "当前正在使用php" && return 1
+            ! ask_if "确定要删除php吗?[y/n]" && return 0
+            remove_php && green "删除完成！"
+            ;;
+        12)
+            get_config_info
+            [ $is_installed -eq 1 ] && [ "${pretend_list[0]}" == "1" ] && red "当前正在使用Cloudreve" && return 1
+            ! ask_if "确定要删除cloudreve吗?[y/n]" && return 0
+            remove_cloudreve && green "删除完成！"
+            ;;
+        13)
+            restart_xray_tls_web
+            ;;
+        14)
+            systemctl stop xray nginx
+            [ $php_is_installed -eq 1 ] && systemctl stop php-fpm
+            [ $cloudreve_is_installed -eq 1 ] && systemctl stop cloudreve
+            green "已停止！"
+            ;;
+        15)
+            get_config_info
+            print_config_info
+            ;;
+        16)
+            reinit_domain
+            ;;
+        17)
+            change_pretend
+            ;;
+        18)
+            reinstall_cloudreve
+            ;;
+        19)
+            change_xray_id
+            ;;
+        20)
+            change_xray_path
+            ;;
+        21)
+            change_reality_config
+            ;;
+        22)
+            simplify_system
+            ;;
+        23)
+            repair_tuige
+            ;;
+        24)
+            change_dns
+            ;;
+        0)
+            exit 0
+            ;;
+    esac
 }
 
 if [ "$1" == "--update" ]; then
