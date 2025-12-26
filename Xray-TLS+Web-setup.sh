@@ -3444,7 +3444,6 @@ print_share_link()
     echo
     generate_trojan_share_link
     echo
-    fi
     
     echo
     yellow "注意事项:"
