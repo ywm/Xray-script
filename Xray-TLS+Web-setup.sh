@@ -4980,7 +4980,6 @@ REALITY 参数:
          → 验证失败: 回落到伪装网站
 
 EOF
-    fi
     
     # XHTTP 详细配置
 
@@ -5020,7 +5019,6 @@ CDN 配置(可选):
   支持的CDN: Cloudflare, AWS CloudFront, 阿里云CDN等
 
 EOF
-    fi
     
     # Trojan 详细配置
 
@@ -5061,7 +5059,6 @@ CDN 配置(可选):
   - 回落机制保证隐蔽性
 
 EOF
-    fi
     
     # DNS 配置说明
     cat >> "$share_file" << EOF
