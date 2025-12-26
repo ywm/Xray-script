@@ -674,11 +674,9 @@ get_config_info()
     reality_server_names="$(grep '"serverNames"' $xray_config | sed 's/.*\[//;s/\].*//' | tr ',' ' ' | sed 's/"//g')"
     reality_short_ids="$(grep '"shortIds"' $xray_config | sed 's/.*\[//;s/\].*//' | tr ',' ' ')"
     
-    # 生成 PublicKey
+    # 生成 Password
     if [ -n "$reality_private_key" ] && [ -f "/usr/local/bin/xray" ]; then
-        reality_password=$(/usr/local/bin/xray x25519 -i "$reality_private_key" 2>/dev/null | awk '/^Public[Kk]ey:/ {print $2}')
-        # 兼容旧版本输出
-        [ -z "$reality_password" ] && reality_password=$(/usr/local/bin/xray x25519 -i "$reality_private_key" 2>/dev/null | grep -i "public" | awk '{print $2}')
+        reality_password=$(/usr/local/bin/xray x25519 -i "$reality_private_key" 2>/dev/null | awk '/^Password:/ {print $2}')
     fi
     
     # 读取 XHTTP path
@@ -3687,7 +3685,7 @@ print_config_info()
     tyblue " REALITY 参数:"
     local first_short_id="${reality_short_ids%% *}"
     first_short_id="${first_short_id//\"/}"
-    tyblue "   PublicKey (pbk): ${reality_password}"
+    tyblue "   Password (pbk): ${reality_password}"
     tyblue "   ShortId   (sid): ${first_short_id}"
     tyblue "   ServerName(sni): ${reality_server_names}"
     tyblue "   Fingerprint(fp): chrome"
@@ -4787,29 +4785,23 @@ readRealityConfig()
     tyblue "REALITY dest: $reality_dest [回落到Nginx]"
     
     # 生成密钥对
-    green "正在生成REALITY密钥对..."
-    local key_output=$(/usr/local/bin/xray x25519)
-    reality_private_key=$(echo "$key_output" | awk '/^Private[Kk]ey:/ {print $2}')
-    reality_password=$(echo "$key_output" | awk '/^Public[Kk]ey:/ {print $2}')
-    
-    # 兼容不同版本的输出格式
-    if [ -z "$reality_private_key" ]; then
-        reality_private_key=$(echo "$key_output" | grep -i "private" | awk '{print $2}')
-    fi
-    if [ -z "$reality_password" ]; then
-        reality_password=$(echo "$key_output" | grep -i "public" | awk '{print $2}')
-    fi
+    green "正在生成 REALITY 密钥对..."
+    local key_output=""
+    key_output=$(/usr/local/bin/xray x25519 2>/dev/null)
+
+    reality_private_key=$(echo "$key_output" | awk '/^PrivateKey:/ {print $2}')
+    reality_password=$(echo "$key_output" | awk '/^Password:/ {print $2}')
 
     if [ -z "$reality_private_key" ] || [ -z "$reality_password" ]; then
-        red "密钥生成失败！xray 输出："
+        red "密钥生成失败！xray 输出如下："
         echo "$key_output"
         exit 1
     fi
-    
-    green "密钥生成成功！"
+
+    green "密钥生成成功!"
     tyblue "PrivateKey: $reality_private_key"
-    tyblue "PublicKey: $reality_password"
-    
+    tyblue "Password : $reality_password"
+
     # 生成shortIds
     tyblue "请输入shortIds [多个用空格分隔，留空则自动生成]"
     tyblue "格式: 空字符串和随机hex，例如: \"\" \"abc123\""
@@ -4840,11 +4832,11 @@ change_reality_config()
     yellow "  ServerNames: $reality_server_names"
     yellow "  ShortIds:    $reality_short_ids"
     yellow "  PrivateKey:  $reality_private_key"
-    yellow "  PublicKey:   $reality_password"
+    yellow "  Password:   $reality_password"
     echo
     
     tyblue "-------------请选择要修改的项-------------"
-    tyblue " 1. 重新生成密钥对 (PrivateKey + PublicKey)"
+    tyblue " 1. 重新生成密钥对 (PrivateKey + Password)"
     tyblue " 2. 重新生成 ShortIds"
     tyblue " 3. 修改 ServerNames"
     yellow " 0. 返回"
@@ -4869,16 +4861,8 @@ change_reality_config()
         fi
         
         local key_output=$(/usr/local/bin/xray x25519)
-        reality_private_key=$(echo "$key_output" | awk '/^Private[Kk]ey:/ {print $2}')
-        reality_password=$(echo "$key_output" | awk '/^Public[Kk]ey:/ {print $2}')
-        
-        # 兼容不同版本的输出格式
-        if [ -z "$reality_private_key" ]; then
-            reality_private_key=$(echo "$key_output" | grep -i "private" | awk '{print $2}')
-        fi
-        if [ -z "$reality_password" ]; then
-            reality_password=$(echo "$key_output" | grep -i "public" | awk '{print $2}')
-        fi
+        reality_private_key=$(awk '/^PrivateKey:/ {print $2}' <<<"$key_output")
+        reality_password=$(awk '/^Password:/ {print $2}' <<<"$key_output")
         
         if [ -z "$reality_private_key" ] || [ -z "$reality_password" ]; then
             red "密钥生成失败！"
@@ -4889,9 +4873,9 @@ change_reality_config()
         
         green "新密钥生成成功！"
         yellow "PrivateKey: $reality_private_key"
-        yellow "PublicKey:  $reality_password"
+        yellow "Password:  $reality_password"
         echo
-        
+        green "正在生成 REALITY 密钥对..."
     elif [ $choice -eq 2 ]; then
         # 重新生成 ShortIds
         echo
@@ -4970,7 +4954,7 @@ generate_vless_share_link()
         link+="?type=tcp"                    # 传输方式
         link+="&security=reality"            # 底层安全
         link+="&fp=chrome"                   # 指纹（REALITY必需）
-        link+="&pbk=${reality_password}"     # PublicKey（REALITY必需）
+        link+="&pbk=${reality_password}"     # Password（REALITY必需）
         link+="&sid=${first_short_id}"       # ShortId（可为空）
         link+="&flow=xtls-rprx-vision"       # Flow（XTLS必需）
         
@@ -5141,7 +5125,7 @@ UUID: ${xid_1}
 Flow: xtls-rprx-vision
 
 REALITY 参数:
-  PublicKey (pbk): ${reality_password}
+  Password (pbk): ${reality_password}
   ShortId   (sid): ${first_short_id}
   ServerName(sni): ${reality_server_names}
   Fingerprint(fp): chrome
