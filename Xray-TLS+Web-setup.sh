@@ -2977,9 +2977,9 @@ EOF
         add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
         include ${nginx_prefix}/custom.d/location.conf;
 
-EOF   
+EOF
     add_pretend_config_to_file
-    cat >> ${nginx_prefix}/conf/nginx.conf <<EOF      
+    cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
     }
 }
 
