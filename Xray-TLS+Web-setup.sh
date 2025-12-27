@@ -2833,6 +2833,8 @@ stream {
         ${domain_list[0]} reality;  # REALITY 域名
         ${domain_list[1]} trojan;   # Trojan 域名
         ${domain_list[2]} xhttp;    # XHTTP 域名
+        www.${true_domain_list[0]} web;
+        ${true_domain_list[0]} web;
         default web;
     }
     
@@ -2961,16 +2963,23 @@ EOF
         set_real_ip_from unix:;
         real_ip_header proxy_protocol;
         
-        server_name _;
+       # 同时处理 www、主域名和其他未匹配的域名
+        server_name ${true_domain_list[0]} www.${true_domain_list[0]} _;
         
-        # 使用自签名证书
-        ssl_certificate ${nginx_prefix}/certs/self-signed.crt;
-        ssl_certificate_key ${nginx_prefix}/certs/self-signed.key;
+        # 使用正式证书(支持泛域名)
+        ssl_certificate ${nginx_prefix}/certs/${true_domain_list[0]}.cer;
+        ssl_certificate_key ${nginx_prefix}/certs/${true_domain_list[0]}.key;
         
         ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305;
+        ssl_prefer_server_ciphers on;
         
-        # 返回 403 或重定向到主域名
-        return 403;
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+        include ${nginx_prefix}/custom.d/location.conf;
+
+EOF   
+    add_pretend_config_to_file
+    cat >> ${nginx_prefix}/conf/nginx.conf <<EOF      
     }
 }
 
