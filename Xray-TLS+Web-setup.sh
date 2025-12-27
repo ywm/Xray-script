@@ -2815,8 +2815,8 @@ config_nginx()
 {
     config_nginx_init
     
-    # 生成主配置文件
-    cat > ${nginx_prefix}/conf/nginx.conf <<'EOF'
+    # 一次性生成完整的 Nginx 配置,避免多次 cat 拼接导致的问题
+    cat > ${nginx_prefix}/conf/nginx.conf <<EOF
 user  root root;
 worker_processes  auto;
 
@@ -2827,87 +2827,40 @@ events {
     worker_connections  1024;
 }
 
-EOF
-
-    # 如果有协议需要配置,添加 stream 模块
-
-    cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
 # Stream 模块 - SNI 分流
 stream {
-    map $ssl_preread_server_name $backend_name {
-EOF
-
-        # 配置 SNI 分流规则
-        cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
+    map \$ssl_preread_server_name \$backend_name {
         ${domain_list[0]} reality;  # REALITY 域名
-EOF               
-        cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
         ${domain_list[1]} trojan;   # Trojan 域名
-EOF
-        cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
         ${domain_list[2]} xhttp;    # XHTTP 域名
-EOF
-        # 默认规则(防止未匹配的SNI)
-        cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
         default web;
-EOF
-
-        cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
     }
     
-EOF
-
-        # 配置 upstream
-
-        cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
-        upstream reality {
-            server unix:/dev/shm/xray/reality.sock;
-        }
+    upstream reality {
+        server unix:/dev/shm/xray/reality.sock;
+    }
     
-EOF
-        
-
-
-        cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
-        upstream trojan {
-            server unix:/dev/shm/xray/trojan.sock;
-        }
+    upstream trojan {
+        server unix:/dev/shm/xray/trojan.sock;
+    }
     
-EOF
-   
-
-
-        cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
-        upstream xhttp {
-            server unix:/dev/shm/xray/xhttp_entry.sock;
-        }
+    upstream xhttp {
+        server unix:/dev/shm/xray/xhttp_entry.sock;
+    }
     
-EOF
-        
-
-        # 添加默认 upstream(处理未匹配的SNI)
-        cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
-        upstream web {
-            server unix:/dev/shm/nginx/default_web.sock;
-        }
+    upstream web {
+        server unix:/dev/shm/nginx/default_web.sock;
+    }
     
-EOF
-
-        # Stream 服务器配置
-        cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
     server {
         listen 443;
         listen [::]:443;
         ssl_preread on;
         proxy_protocol on;
-        proxy_pass $backend_name;
+        proxy_pass \$backend_name;
     }
 }
 
-EOF
-
-    # HTTP 模块
-    cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
 http {
     include       mime.types;
     default_type  application/octet-stream;
@@ -2915,51 +2868,95 @@ http {
     sendfile        on;
     keepalive_timeout  65;
 
-EOF
-
-    # 确定主伪装域名 (用于 HTTP 80 重定向)
-    local main_pretend_domain="${true_domain_list[0]}"
-    
-    cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
     # HTTP 80 重定向到主域名的伪装站
     server {
         listen 80 reuseport default_server;
         listen [::]:80 reuseport default_server;
-        return 301 https://${main_pretend_domain}\$request_uri;
+        return 301 https://${true_domain_list[0]}\$request_uri;
     }
+
+    # XHTTP Web 服务器
+    server {
+        listen unix:/dev/shm/nginx/xhttp_web.sock ssl proxy_protocol;
+        http2 on;
+        set_real_ip_from unix:;
+        real_ip_header proxy_protocol;
+        
+        server_name ${domain_list[2]};
+        
+        ssl_certificate ${nginx_prefix}/certs/${true_domain_list[0]}.cer;
+        ssl_certificate_key ${nginx_prefix}/certs/${true_domain_list[0]}.key;
+        
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305;
+        ssl_prefer_server_ciphers on;
+        
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+        include ${nginx_prefix}/custom.d/location.conf;
+        
 EOF
 
-    # 添加各域名的 Web 服务器配置
-    # 生成三个 Web 服务器配置（XHTTP, REALITY, Trojan）
-    generate_web_server_config "xhttp_web" 2
-    generate_web_server_config "reality_web" 0
-    generate_web_server_config "trojan_web" 1
-    generate_default_web_server
-
-     
-    cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
-}
-EOF
-
-    # 添加配置信息注释
+    # 添加伪装网站配置 (三个域名都用同一个伪装配置)
+    add_pretend_config_to_file
+    
     cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
+    }
 
-#-----------------不要修改以下内容----------------
-#domain_list=${domain_list[@]}
-#true_domain_list=${true_domain_list[@]}
-#domain_config_list=${domain_config_list[@]}
-#pretend_list=${pretend_list[@]}
-#subdomain_prefix_list=${subdomain_prefix_list[@]}
+    # REALITY Web 服务器
+    server {
+        listen unix:/dev/shm/nginx/reality_web.sock ssl proxy_protocol;
+        http2 on;
+        set_real_ip_from unix:;
+        real_ip_header proxy_protocol;
+        
+        server_name ${domain_list[0]};
+        
+        ssl_certificate ${nginx_prefix}/certs/${true_domain_list[0]}.cer;
+        ssl_certificate_key ${nginx_prefix}/certs/${true_domain_list[0]}.key;
+        
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305;
+        ssl_prefer_server_ciphers on;
+        
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+        include ${nginx_prefix}/custom.d/location.conf;
+        
 EOF
-}
 
-generate_default_web_server()
-{
-    cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
+    add_pretend_config_to_file
+    
+    cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
+    }
+
+    # Trojan Web 服务器
+    server {
+        listen unix:/dev/shm/nginx/trojan_web.sock ssl proxy_protocol;
+        http2 on;
+        set_real_ip_from unix:;
+        real_ip_header proxy_protocol;
+        
+        server_name ${domain_list[1]};
+        
+        ssl_certificate ${nginx_prefix}/certs/${true_domain_list[0]}.cer;
+        ssl_certificate_key ${nginx_prefix}/certs/${true_domain_list[0]}.key;
+        
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305;
+        ssl_prefer_server_ciphers on;
+        
+        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+        include ${nginx_prefix}/custom.d/location.conf;
+        
+EOF
+
+    add_pretend_config_to_file
+    
+    cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
+    }
 
     # 默认 Web 服务器(处理未匹配的SNI)
     server {
-        listen unix:/dev/shm/nginx/default_web.sock proxy_protocol;
+        listen unix:/dev/shm/nginx/default_web.sock ssl proxy_protocol;
         http2 on;
         set_real_ip_from unix:;
         real_ip_header proxy_protocol;
@@ -2975,17 +2972,24 @@ generate_default_web_server()
         # 返回 403 或重定向到主域名
         return 403;
     }
+}
+
+#-----------------不要修改以下内容----------------
+#domain_list=${domain_list[@]}
+#true_domain_list=${true_domain_list[@]}
+#domain_config_list=${domain_config_list[@]}
+#pretend_list=${pretend_list[@]}
+#subdomain_prefix_list=${subdomain_prefix_list[@]}
 EOF
 }
 
-# 添加伪装网站配置的辅助函数
-add_pretend_config()
+add_pretend_config_to_file()
 {
-    local i
-    for ((i=0;i<${#pretend_list[@]};i++))
-    do
-        if [ "${pretend_list[$i]}" == "1" ]; then
-            cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
+    # 因为 pretend_list 只有一个元素,所以固定使用索引 0
+    local index=0
+    
+    if [ "${pretend_list[$index]}" == "1" ]; then
+        cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
         location / {
             proxy_set_header X-Forwarded-For 127.0.0.1;
             proxy_set_header Host $http_host;
@@ -2994,71 +2998,30 @@ add_pretend_config()
             client_max_body_size 0;
         }
 EOF
-        elif [ "${pretend_list[$i]}" == "2" ]; then
-            cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
-        root ${nginx_prefix}/html/${true_domain_list[$i]};
+    elif [ "${pretend_list[$index]}" == "2" ]; then
+        cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
+        root ${nginx_prefix}/html/${true_domain_list[$index]};
         include ${nginx_prefix}/conf.d/nextcloud.conf;
 EOF
-        elif [ "${pretend_list[$i]}" == "3" ]; then
-            cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
+    elif [ "${pretend_list[$index]}" == "3" ]; then
+        cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
         location / {
             return 403;
         }
 EOF
-        elif [ "${pretend_list[$i]}" == "4" ]; then
-            cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
-        root ${nginx_prefix}/html/${true_domain_list[$i]};
+    elif [ "${pretend_list[$index]}" == "4" ]; then
+        cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
+        root ${nginx_prefix}/html/${true_domain_list[$index]};
 EOF
-        else
-            cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
+    else
+        cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
         location / {
-            proxy_pass ${pretend_list[$i]};
-            proxy_set_header referer "${pretend_list[$i]}";
+            proxy_pass ${pretend_list[$index]};
+            proxy_set_header referer "${pretend_list[$index]}";
         }
 EOF
-        fi
-        break
-    done
+    fi
 }
-
-
-
-
-
-# 生成 Web 服务器配置的辅助函数
-generate_web_server_config()
-{
-    local socket_name="$1"
-    local domain_index="$2"
-    
-    cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
-
-    server {
-        listen unix:/dev/shm/nginx/${socket_name}.sock ssl proxy_protocol;
-        http2 on;
-        set_real_ip_from unix:;
-        real_ip_header proxy_protocol;
-        
-        server_name ${domain_list[$domain_index]};
-        
-        ssl_certificate ${nginx_prefix}/certs/${true_domain_list[0]}.cer;
-        ssl_certificate_key ${nginx_prefix}/certs/${true_domain_list[0]}.key;
-        
-        ssl_protocols TLSv1.2 TLSv1.3;
-        ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305;
-        ssl_prefer_server_ciphers on;
-        
-        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
-        include ${nginx_prefix}/custom.d/location.conf;
-        
-EOF
-    add_pretend_config
-    cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
-    }
-EOF
-}
-
-
 
 # 生成自签名证书(仅用于REALITY回落，实际不会被验证)
 generate_self_signed_cert()
