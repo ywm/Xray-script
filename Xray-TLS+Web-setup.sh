@@ -2831,7 +2831,7 @@ EOF
 
     # 如果有协议需要配置,添加 stream 模块
 
-    cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
+    cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
 # Stream 模块 - SNI 分流
 stream {
     map $ssl_preread_server_name $backend_name {
