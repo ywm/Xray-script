@@ -2953,6 +2953,31 @@ EOF
 EOF
 }
 
+generate_default_web_server()
+{
+    cat >> ${nginx_prefix}/conf/nginx.conf <<'EOF'
+
+    # 默认 Web 服务器(处理未匹配的SNI)
+    server {
+        listen unix:/dev/shm/nginx/default_web.sock proxy_protocol;
+        http2 on;
+        set_real_ip_from unix:;
+        real_ip_header proxy_protocol;
+        
+        server_name _;
+        
+        # 使用自签名证书
+        ssl_certificate ${nginx_prefix}/certs/self-signed.crt;
+        ssl_certificate_key ${nginx_prefix}/certs/self-signed.key;
+        
+        ssl_protocols TLSv1.2 TLSv1.3;
+        
+        # 返回 403 或重定向到主域名
+        return 403;
+    }
+EOF
+}
+
 # 添加伪装网站配置的辅助函数
 add_pretend_config()
 {
@@ -3425,24 +3450,17 @@ print_share_link()
     echo
     generate_vless_share_link 1
     echo
-
-    local xhttp_domain_index=1
-        
-    green  "============ VLESS-XHTTP-TLS ============"
-    tyblue "域名: ${domain_list[$xhttp_domain_index]}"
-    echo
-    generate_vless_share_link 3
-    echo
-
-
-
-    local trojan_domain_index=3
-
-        
+    
     green  "============ Trojan-TLS ============"
-    tyblue "域名: ${domain_list[$trojan_domain_index]}"
+    tyblue "域名: ${domain_list[1]}"
     echo
     generate_trojan_share_link
+    echo
+    
+    green  "============ VLESS-XHTTP-TLS ============"
+    tyblue "域名: ${domain_list[2]}"
+    echo
+    generate_vless_share_link 3
     echo
     
     echo
@@ -3455,13 +3473,12 @@ print_share_link()
     
     # 保存分享链接
     save_share_links
-
     save_subscription_file
     
     # 询问是否生成二维码
-    if ask_if "是否生成二维码？[y/n]"; then
+    if ask_if "是否生成二维码?[y/n]"; then
         if ! command -v qrencode &> /dev/null; then
-            yellow "qrencode 未安装，正在安装..."
+            yellow "qrencode 未安装,正在安装..."
             install_dependence qrencode
         fi
         generate_qrcode
@@ -3475,30 +3492,30 @@ print_config_info()
     
     local main_domain="${true_domain_list[0]}"
     
-    green "架构说明："
+    green "架构说明:"
     tyblue "  Nginx 前置 + Xray 后置 (SNI 分流)"
     tyblue "  443端口 → Nginx → 根据域名分流到不同协议"
     echo
     
-    green "已安装协议："
+    green "已安装协议:"
     tyblue "  1. REALITY: ${domain_list[0]}"
-    purple "     特点: 无需证书，抗主动探测，直连使用"
+    purple "     特点: 无需证书,抗主动探测,直连使用"
     tyblue "  2. Trojan:  ${domain_list[1]}"
-    purple "     特点: 传统协议，兼容性好，支持CDN"
+    purple "     特点: 传统协议,兼容性好,支持CDN"
     tyblue "  3. XHTTP:   ${domain_list[2]}"
-    purple "     特点: 支持CDN中转，可隐藏真实IP"
+    purple "     特点: 支持CDN中转,可隐藏真实IP"
     echo
     
-    yellow "证书信息："
+    yellow "证书信息:"
     yellow "  类型: 泛域名证书"
     yellow "  覆盖: *.${main_domain} + ${main_domain}"
     yellow "  所有子域名共用同一张证书"
     echo
     
-    yellow "DNS 配置说明："
-    yellow "  请在DNS提供商处添加以下 A 记录："
+    yellow "DNS 配置说明:"
+    yellow "  请在DNS提供商处添加以下 A 记录:"
     
-    # 输出需要配置的域名
+    # 输出需要配置的域名(去重)
     local domains_to_config=()
     local i
     for i in "${!domain_list[@]}"; do
@@ -3598,14 +3615,14 @@ print_config_info()
         print_share_link
     else
         yellow "分享链接已保存到: ${nginx_prefix}/share_links.txt"
-        yellow "订阅链接已生成，详见上方输出"
+        yellow "订阅链接已生成,详见上方输出"
     fi
     
     echo
     tyblue " 脚本最后更新时间: 2025.1.4"
     tyblue " 项目地址: https://github.com/ywm/Xray-script"
     echo
-    red    " 此脚本仅供交流学习使用，请勿使用此脚本行违法之事。"
+    red    " 此脚本仅供交流学习使用,请勿使用此脚本行违法之事。"
     echo
 }
 
@@ -3613,18 +3630,11 @@ print_config_info()
 
 generate_trojan_share_link()
 {
-    # Trojan 标准格式: trojan://password@host:port?参数#描述
+  # Trojan 标准格式: trojan://password@host:port?参数#描述
     
-    local trojan_idx=3
+    # Trojan 固定在索引 1
+    local trojan_domain="${domain_list[1]}"
     
-    local trojan_domain="${domain_list[$trojan_idx]}"
-    
-    # 2. 对必要字段进行 URL 编码 (遵循提案约定 2)
-    # 注意：脚本中已有 urlencode 函数，直接调用
-    local encoded_pass=$(urlencode "$xid_2")
-    local encoded_hash=$(urlencode "Trojan-${domain}")
-
-
     # 构建链接
     local link="trojan://${xid_2}@${trojan_domain}:443"
     
@@ -3635,9 +3645,8 @@ generate_trojan_share_link()
     
     # 可选参数 (推荐添加)
     link+="&allowInsecure=0"             # 不允许不安全连接
-    # fp=chrome (提案 4.4.0 - 推荐指纹)
-    link+="&fp=chrome"
-
+    link+="&fp=chrome"                   # 指纹
+    
     # 描述文字
     link+="#Trojan-${trojan_domain}"
     
@@ -4345,29 +4354,44 @@ change_xray_protocol()
 {
     get_config_info
     
-    readProtocolConfig
-    # ===== 确保 REALITY 参数存在 =====
-    if [ -z "$xid_1" ]; then
-        xid_1=$(cat /proc/sys/kernel/random/uuid)
-    fi
-
-    # REALITY 配置（始终可调用，内部可自行判断是否已存在）
-    readRealityConfig
+    echo -e "\n\n\n"
+    tyblue "==================== 修改协议配置 ===================="
+    yellow "当前已配置三个协议:"
+    yellow "  1. REALITY (${domain_list[0]})"
+    yellow "  2. Trojan  (${domain_list[1]})"
+    yellow "  3. XHTTP   (${domain_list[2]})"
+    echo
     
-    # ===== 确保 XHTTP 参数存在 =====
-    if [ -z "$path" ]; then
-        path="/$(head -c 20 /dev/urandom | md5sum | head -c 10)"
-    fi
-
-    if [ -z "$xid_3" ]; then
-        xid_3=$(cat /proc/sys/kernel/random/uuid)
-    fi
-    config_xray
-    config_nginx
-    systemctl -q is-active xray && systemctl restart xray
-    systemctl -q is-active nginx && systemctl restart nginx
-    green "更换成功！！"
-    print_config_info
+    tyblue "可修改选项:"
+    tyblue " 1. 重新生成 UUID/密码"
+    tyblue " 2. 修改 REALITY 配置"
+    tyblue " 3. 修改 XHTTP Path"
+    yellow " 0. 返回"
+    echo
+    
+    local choice=""
+    while [[ ! "$choice" =~ ^(0|[1-3])$ ]]
+    do
+        read -p "您的选择是:" choice
+    done
+    
+    case $choice in
+        0)
+            return 0
+            ;;
+        1)
+            change_xray_id
+            return
+            ;;
+        2)
+            change_reality_config
+            return
+            ;;
+        3)
+            change_xray_path
+            return
+            ;;
+    esac
 }
 
 
@@ -4849,42 +4873,54 @@ generate_vless_share_link()
 
 save_subscription_file()
 {
-    # 1. 定义订阅目录 (存放在 Nginx 的 web 根目录下)
+    # 1. 定义订阅目录
     local sub_dir="${nginx_prefix}/html/subs"
     mkdir -p "$sub_dir"
     
-    # 2. 从 Nginx 配置或特定文件读取已有的随机后缀，如果没有则生成一个
-    # 这样可以保证每次更新脚本时，订阅链接地址保持不变
+    # 2. 读取或生成订阅token(保持订阅地址不变)
     local token_file="${nginx_prefix}/sub_token.txt"
     if [ ! -f "$token_file" ]; then
-        cat /proc/sys/kernel/random/uuid | head -c 16 > "$token_file"
+        head -c 16 /proc/sys/kernel/random/uuid | tr -d '-' > "$token_file"
     fi
     local sub_token=$(cat "$token_file")
     local sub_file="${sub_dir}/${sub_token}"
-
-    # 3. 筛选已开启的协议
-    local temp_links=""
-    temp_links+="$(generate_vless_share_link 1)\n"
-    temp_links+="$(generate_vless_share_link 3)\n"
-    temp_links+="$(generate_trojan_share_link)\n"
-
-    if [ -z "$temp_links" ]; then
-        return 1
-    fi
-
+    
+    # 3. 按固定顺序生成三个协议的分享链接
+    # 顺序: REALITY → Trojan → XHTTP
+    local reality_link=$(generate_vless_share_link 1)
+    local trojan_link=$(generate_trojan_share_link)
+    local xhttp_link=$(generate_vless_share_link 3)
+    
     # 4. 转换为 Base64 并保存
-    echo -e "$temp_links" | sed '/^$/d' | base64 -w 0 > "$sub_file"
+    cat > "$sub_file" << EOF
+${reality_link}
+${trojan_link}
+${xhttp_link}
+EOF
+    
+    # 去除空行并 base64 编码
+    sed -i '/^$/d' "$sub_file"
+    base64 -w 0 "$sub_file" > "${sub_file}.tmp"
+    mv "${sub_file}.tmp" "$sub_file"
     
     # 5. 设置权限
     chmod 644 "$sub_file"
     
-    # 6. 获取当前主域名用于显示
+    # 6. 显示订阅地址
     local main_domain="${domain_list[0]}"
     
+    echo
     green "=================================================="
     green "订阅链接已生成 (请务必妥善保管):"
     tyblue "https://${main_domain}/subs/${sub_token}"
     green "=================================================="
+    echo
+    purple "订阅说明:"
+    purple "  - 包含 3 个协议: REALITY + Trojan + XHTTP"
+    purple "  - 客户端会自动选择最优协议"
+    purple "  - 订阅地址不会变化,可长期使用"
+    purple "  - 配置更新后,客户端会自动获取新配置"
+    echo
 }
 
 
@@ -4892,7 +4928,7 @@ save_share_links()
 {
     local share_file="${nginx_prefix}/share_links.txt"
     
-    cat > "$share_file" << EOF
+ cat > "$share_file" << EOF
 # ==================== Xray-REALITY+Web 分享链接 ====================
 # 架构: Nginx 前置 + Xray 后置
 # 生成时间: $(date '+%Y-%m-%d %H:%M:%S')
@@ -4901,7 +4937,6 @@ save_share_links()
 EOF
     
     # REALITY 分享链接
-
     cat >> "$share_file" << EOF
 # ==================== VLESS-Vision-REALITY ====================
 # 特点: 无需证书,抗主动探测,推荐直连使用
@@ -4911,33 +4946,28 @@ EOF
 EOF
     generate_vless_share_link 1 >> "$share_file"
     echo -e "\n" >> "$share_file"
-
-    
-    # XHTTP 分享链接
-
-    cat >> "$share_file" << EOF
-    
-# ==================== VLESS-XHTTP-TLS ====================
-# 特点: 支持CDN中转,可隐藏真实IP
-# 域名: ${domain_list[$xhttp_domain_index]}
-# =========================================================
-
-EOF
-    generate_vless_share_link 3 >> "$share_file"
-    echo -e "\n" >> "$share_file"
     
     # Trojan 分享链接
-      
     cat >> "$share_file" << EOF
 # ==================== Trojan-TLS ====================
 # 特点: 传统协议,兼容性好,支持CDN
-# 域名: ${domain_list[$trojan_domain_index]}
+# 域名: ${domain_list[1]}
 # ====================================================
 
 EOF
     generate_trojan_share_link >> "$share_file"
     echo -e "\n" >> "$share_file"
     
+    # XHTTP 分享链接
+    cat >> "$share_file" << EOF
+# ==================== VLESS-XHTTP-TLS ====================
+# 特点: 支持CDN中转,可隐藏真实IP
+# 域名: ${domain_list[2]}
+# =========================================================
+
+EOF
+    generate_vless_share_link 3 >> "$share_file"
+    echo -e "\n" >> "$share_file"
     
     # 详细配置信息
     cat >> "$share_file" << EOF
@@ -4946,7 +4976,6 @@ EOF
 EOF
     
     # REALITY 详细配置
-
     local first_short_id="${reality_short_ids%% *}"
     first_short_id="${first_short_id//\"/}"
         
@@ -4966,12 +4995,6 @@ REALITY 参数:
   ServerName(sni): ${reality_server_names}
   Fingerprint(fp): chrome
 
-客户端配置说明:
-  - 地址填写: ${domain_list[0]}
-  - 端口填写: 443
-  - 不要开启 allowInsecure
-  - 推荐使用 chrome 指纹
-
 架构说明:
   客户端 → 443端口(Nginx SNI分流)
          → 识别域名"${domain_list[0]}"
@@ -4981,82 +5004,50 @@ REALITY 参数:
 
 EOF
     
-    # XHTTP 详细配置
+    # Trojan 详细配置
+    cat >> "$share_file" << EOF
+# ---------- Trojan 配置 ----------
+协议: Trojan
+传输: TCP
+安全: TLS
+地址: ${domain_list[1]}
+端口: 443
+密码: ${xid_2}
 
-    local xhttp_domain_index=1
-        
+架构说明:
+  客户端 → 443端口(Nginx SNI分流)
+         → 识别域名"${domain_list[1]}"
+         → Unix Socket → Xray TLS终止
+         → 验证Trojan密码
+         → 验证成功: 正常代理
+         → 验证失败: 回落到伪装网站
+
+EOF
+    
+    # XHTTP 详细配置
     cat >> "$share_file" << EOF
 # ---------- XHTTP 配置 ----------
 协议: VLESS
 传输: XHTTP
 安全: TLS
-地址: ${domain_list[$xhttp_domain_index]}
+地址: ${domain_list[2]}
 端口: 443
 UUID: ${xid_3}
 路径: ${path}
 
-客户端配置说明:
-  - 地址填写: ${domain_list[$xhttp_domain_index]}
-  - 端口填写: 443
-  - Path填写: ${path}
-  - 不需要填写 Host(自动使用地址)
-  - 不需要填写 SNI(自动使用地址)
-
 架构说明:
   客户端 → 443端口(Nginx SNI分流)
-         → 识别域名"${domain_list[$xhttp_domain_index]}"
+         → 识别域名"${domain_list[2]}"
          → Unix Socket → Xray TLS终止
          → 匹配路径"${path}": 进入XHTTP处理
          → 不匹配路径: 回落到伪装网站
 
 CDN 配置(可选):
   如需使用CDN隐藏真实IP:
-  1. 将 ${domain_list[$xhttp_domain_index]} 的DNS记录
+  1. 将 ${domain_list[2]} 的DNS记录
      从 A 记录改为 CNAME 记录
   2. CNAME 指向 CDN 提供的域名
   3. 客户端配置保持不变
-  
-  支持的CDN: Cloudflare, AWS CloudFront, 阿里云CDN等
-
-EOF
-    
-    # Trojan 详细配置
-
-    local trojan_domain_index=2
-
-        
-    cat >> "$share_file" << EOF
-# ---------- Trojan 配置 ----------
-协议: Trojan
-传输: TCP
-安全: TLS
-地址: ${domain_list[$trojan_domain_index]}
-端口: 443
-密码: ${xid_2}
-
-客户端配置说明:
-  - 地址填写: ${domain_list[$trojan_domain_index]}
-  - 端口填写: 443
-  - 密码填写: ${xid_2}
-  - SNI填写: ${domain_list[$trojan_domain_index]}
-  - 不要开启 allowInsecure
-
-架构说明:
-  客户端 → 443端口(Nginx SNI分流)
-         → 识别域名"${domain_list[$trojan_domain_index]}"
-         → Unix Socket → Xray TLS终止
-         → 验证Trojan密码
-         → 验证成功: 正常代理
-         → 验证失败: 回落到伪装网站
-
-CDN 配置(可选):
-  Trojan 支持通过CDN,配置方法同XHTTP
-
-特点:
-  - 传统协议,客户端兼容性好
-  - 使用password而非UUID
-  - 支持CDN中转
-  - 回落机制保证隐蔽性
 
 EOF
     
@@ -5064,23 +5055,19 @@ EOF
     cat >> "$share_file" << EOF
 # ==================== DNS 配置说明 ====================
 
-EOF
-    
-
-    cat >> "$share_file" << EOF
 需要配置以下DNS解析:
 
 1. REALITY (直连):
    ${domain_list[0]}  →  A记录  →  YOUR_SERVER_IP
 
-2. XHTTP (可选CDN):
+2. Trojan (可选CDN):
    直连方式:
    ${domain_list[1]}  →  A记录  →  YOUR_SERVER_IP
    
    CDN方式:
    ${domain_list[1]}  →  CNAME  →  your-cdn-domain.com
 
-3. Trojan (可选CDN):
+3. XHTTP (可选CDN):
    直连方式:
    ${domain_list[2]}  →  A记录  →  YOUR_SERVER_IP
    
@@ -5089,26 +5076,9 @@ EOF
 
 注意:
   - REALITY 必须直连,不能过CDN
-  - XHTTP 和 Trojan 可以直连,也可以过CDN
+  - Trojan 和 XHTTP 可以直连,也可以过CDN
   - 如果三个都用同一个域名,只能直连
   - 推荐使用不同子域名区分不同协议
-
-EOF
-    
-    # 客户端推荐
-    cat >> "$share_file" << EOF
-# ==================== 客户端推荐 ====================
-
-支持 VLESS、REALITY 和 Trojan 的客户端:
-  Windows: v2rayN, NekoRay, Furious
-  macOS:   V2Box, FoXray
-  iOS:     Shadowrocket, Streisand
-  Android: v2rayNG, NekoBox, Hiddify
-
-使用方法:
-  1. 复制上方的分享链接
-  2. 在客户端中选择 "从剪贴板导入"
-  3. 或手动填写上述配置参数
 
 EOF
     
@@ -5120,38 +5090,90 @@ EOF
 generate_qrcode()
 {
     if ! command -v qrencode &> /dev/null; then
-        yellow "qrencode 未安装，跳过二维码生成"
+        yellow "qrencode 未安装,跳过二维码生成"
         return 0
     fi
     
     local qr_dir="${nginx_prefix}/qrcodes"
     mkdir -p "$qr_dir"
     
-    local count=0
-    
-    # REALITY 二维码
-
-    local link=$(generate_vless_share_link 1)
-    if qrencode -o "${qr_dir}/reality.png" -s 10 -m 2 "$link" 2>/dev/null; then
-        ((count++))
-        green "REALITY 二维码: ${qr_dir}/reality.png"
-    fi
-  
-    # XHTTP 二维码
-
-    local link=$(generate_vless_share_link 3)
-    if qrencode -o "${qr_dir}/xhttp.png" -s 10 -m 2 "$link" 2>/dev/null; then
-        ((count++))
-        green "XHTTP 二维码: ${qr_dir}/xhttp.png"
+    # 读取订阅token
+    local token_file="${nginx_prefix}/sub_token.txt"
+    if [ ! -f "$token_file" ]; then
+        red "订阅token文件不存在,请先生成订阅"
+        return 1
     fi
     
-    if [ $count -gt 0 ]; then
+    local sub_token=$(cat "$token_file")
+    local main_domain="${domain_list[0]}"
+    local sub_url="https://${main_domain}/subs/${sub_token}"
+    
+    echo
+    tyblue "==================== 订阅二维码 ===================="
+    echo
+    
+    # 生成订阅URL的二维码
+    if qrencode -o "${qr_dir}/subscription.png" -s 10 -m 2 "$sub_url" 2>/dev/null; then
+        green "✓ 订阅二维码已生成"
         echo
-        green "二维码已生成到: $qr_dir"
-        tyblue "使用方法: 客户端扫描二维码即可导入配置"
+        tyblue "订阅地址: $sub_url"
+        tyblue "二维码位置: ${qr_dir}/subscription.png"
+        echo
+        purple "使用方法:"
+        purple "  1. 在客户端中选择 '从二维码导入订阅'"
+        purple "  2. 或手动添加订阅地址"
+        purple "  3. 订阅包含所有三个协议配置"
+        echo
+        
+        # 同时生成终端显示的二维码(如果支持)
+        tyblue "终端二维码(可直接扫描):"
+        echo
+        qrencode -t ANSIUTF8 "$sub_url" 2>/dev/null || tyblue "  (终端不支持UTF8二维码显示)"
+        echo
     else
-        yellow "二维码生成失败"
+        red "订阅二维码生成失败"
+        return 1
     fi
+    
+    # 可选:也生成单个协议的二维码
+    if ask_if "是否同时生成各协议的单独二维码?[y/n]"; then
+        echo
+        tyblue "生成单独协议二维码..."
+        
+        local count=0
+        
+        # REALITY 二维码
+        local link=$(generate_vless_share_link 1)
+        if qrencode -o "${qr_dir}/reality.png" -s 10 -m 2 "$link" 2>/dev/null; then
+            ((count++))
+            green "  ✓ REALITY: ${qr_dir}/reality.png"
+        fi
+        
+        # Trojan 二维码
+        local link=$(generate_trojan_share_link)
+        if qrencode -o "${qr_dir}/trojan.png" -s 10 -m 2 "$link" 2>/dev/null; then
+            ((count++))
+            green "  ✓ Trojan:  ${qr_dir}/trojan.png"
+        fi
+        
+        # XHTTP 二维码
+        local link=$(generate_vless_share_link 3)
+        if qrencode -o "${qr_dir}/xhttp.png" -s 10 -m 2 "$link" 2>/dev/null; then
+            ((count++))
+            green "  ✓ XHTTP:   ${qr_dir}/xhttp.png"
+        fi
+        
+        echo
+        if [ $count -gt 0 ]; then
+            green "所有二维码已生成到: $qr_dir"
+        fi
+    fi
+    
+    echo
+    yellow "提示:"
+    yellow "  - 推荐使用订阅方式,可自动更新配置"
+    yellow "  - 单个协议二维码适合临时分享"
+    yellow "  - 请妥善保管订阅地址,避免泄露"
 }
 
 
