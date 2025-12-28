@@ -43,6 +43,13 @@ reality_server_names=""
 reality_dest=""
 reality_hash32=""
 
+# XHTTP 高级参数（服务端默认值，可根据需要调整）
+xhttp_mode="auto"                          # auto / packet-up / stream-up / stream-one
+xhttp_padding="100-1000"                   # header padding 随机字节范围
+xhttp_grpc_header=false                    # false=启用 gRPC 伪装，true=关闭
+xhttp_sse_header=false                     # false=启用 SSE 伪装，true=关闭
+xhttp_streamup_keepalive="20-80"           # stream-up 模式保活间隔秒（随机范围）
+
 
 unset cloudreve_is_installed
 
@@ -3305,7 +3312,14 @@ generate_xhttp_inbound()
             "streamSettings": {
                 "network": "xhttp",
                 "xhttpSettings": {
-                    "path": "$path"
+                    "path": "$path",
+                    "mode": "$xhttp_mode",
+                    "extra": {
+                      "xPaddingBytes": "$xhttp_padding",
+                      "noGRPCHeader": $xhttp_grpc_header,
+                      "noSSEHeader": $xhttp_sse_header,
+                      "scStreamUpServerSecs": "$xhttp_streamup_keepalive"
+    }
                 }
             },
             "sniffing": {
@@ -4858,31 +4872,44 @@ generate_vless_share_link()
         echo "$link"
         
     elif [ $protocol -eq 3 ]; then
-        # ============ VLESS + XHTTP + TLS ============
-
-            
         local xhttp_domain="${domain_list[2]}"
-        
-        # 构建链接（严格按照标准）
-        local link="vless://${xid_3}@${xhttp_domain}:443"
-        
-        # 必需参数
-        link+="?type=xhttp"                  # 传输方式
-        link+="&security=tls"                # 底层安全
-        
-        # path 必须 encodeURIComponent
         local encoded_path=$(printf '%s' "$path" | jq -sRr @uri 2>/dev/null || printf '%s' "$path" | sed 's/\//%2F/g')
-        link+="&path=${encoded_path}"
         
-        # 可选参数
-        # host: 省略时会复用 remote-host，所以可以不加
-        # sni: 省略时会复用 remote-host，所以可以不加
-        # fp: 省略时默认为 chrome，可以不加
+        # 第一条：普通 XHTTP（上下行同线路）
+        local link_normal="vless://${xid_3}@${xhttp_domain}:443"
+        link_normal+="?type=xhttp&security=tls&fp=chrome&alpn=h2&path=${encoded_path}"
+        link_normal+="#XHTTP-${xhttp_domain}"
         
-        # 描述文字
-        link+="#XHTTP-${xhttp_domain}"
+        # 第二条：上下行分离（上行 IPv4，下行 IPv6 示例节点）
+        # 注意：这里用一个常见的公共 IPv6 测试节点作为示例，用户可自行替换
+        local link_split="vless://${xid_3}@${xhttp_domain}:443"
+        link_split+="?type=xhttp&security=tls&fp=chrome&alpn=h2&path=${encoded_path}"
+        link_split+="&extra=" # 开始 extra 参数（URI 编码）
         
-        echo "$link"
+        # extra JSON 编码（简单方式：base64 编码整个 extra）
+        local extra_json='{
+  "downloadSettings": {
+    "address": "[2606:4700:4700::1111]",
+    "port": 443,
+    "network": "xhttp",
+    "security": "tls",
+    "tlsSettings": {
+      "serverName": "'${xhttp_domain}'",
+      "alpn": ["h2"],
+      "fingerprint": "chrome"
+    },
+    "xhttpSettings": {
+      "path": "'${path}'"
+    }
+  }
+}'
+        local extra_b64=$(echo -n "$extra_json" | base64 -w 0)
+        link_split+="$(printf '%s' "$extra_b64" | sed 's/+/%2B/g;s/\//%2F/g;s/=/%3D/g')"
+        
+        link_split+="#XHTTP-IPv6下行-${xhttp_domain}"
+        # 输出两条链接
+        echo "$link_normal"
+        echo "$link_split"
     fi
 }
 
@@ -4980,12 +5007,17 @@ EOF
 # 特点: 支持CDN中转,可隐藏真实IP
 # 域名: ${domain_list[2]}
 # =========================================================
+1. 普通 XHTTP（上下行同线路，最稳定推荐）：
+EOF
+    generate_vless_share_link 3 | head -n1 >> "$share_file"
+    
+    cat >> "$share_file" << EOF
+
+2. 上下行分离 XHTTP（上行 IPv4 自己的服务器，下行 IPv6 公共节点）：
 
 EOF
-    generate_vless_share_link 3 >> "$share_file"
-    echo -e "\n" >> "$share_file"
+    generate_vless_share_link 3 | tail -n1 >> "$share_file"
     
-    # 详细配置信息
     cat >> "$share_file" << EOF
 # ==================== 详细配置信息 ====================
 
@@ -5064,6 +5096,68 @@ CDN 配置(可选):
      从 A 记录改为 CNAME 记录
   2. CNAME 指向 CDN 提供的域名
   3. 客户端配置保持不变
+# ---------- 高级用法示例 ----------
+
+1. 低延迟多路复用（日常推荐）：
+   "xmux": { "maxConcurrency": "16-32" }
+
+2. 单线程测速（大文件下载）：
+   "xmux": { "maxConcurrency": 1 }
+
+3. 过 CDN 隐藏源 IP：
+   - DNS 将 ${domain_list[2]} 改为 CNAME 指向 CDN 域名
+   - 客户端 address 填优选 IP，serverName 填 ${domain_list[2]}
+
+# ---------- 上下行分离完整配置（直接复制使用） ----------
+# 场景：上行走延迟低的线路，下行走带宽大的线路（如 IPv6 优选节点）
+
+# 将以下内容添加到客户端 outbound 的 streamSettings.xhttpSettings 中
+
+"extra": {
+  "downloadSettings": {
+    "address": "downlink.example.com",        # ← 修改为你的下行域名或 IP
+    "port": 443,
+    "network": "xhttp",
+    "security": "tls",
+    "tlsSettings": {
+      "serverName": "downlink.example.com",    # ← 下行域名（用于 SNI）
+      "alpn": ["h2"],
+      "fingerprint": "chrome",
+      "allowInsecure": false
+    },
+    "xhttpSettings": {
+      "path": "$path",                         # ← 必须和上行路径完全相同
+      "mode": "auto"
+    },
+    "sockopt": {
+      "mark": 255                              # 可选：用于策略路由（如 Linux）
+    }
+  }
+}
+
+# 实际使用示例（假设你有 IPv6 优选节点 ipv6.cloudflare.com）：
+"extra": {
+  "downloadSettings": {
+    "address": "ipv6.cloudflare.com",
+    "port": 443,
+    "network": "xhttp",
+    "security": "tls",
+    "tlsSettings": {
+      "serverName": "${domain_list[2]}",
+      "alpn": ["h2"],
+      "fingerprint": "chrome"
+    },
+    "xhttpSettings": {
+      "path": "$path"
+    }
+  }
+}
+
+# 使用提示：
+# • 上行自动走当前服务器（你填的 ${domain_list[2]}）
+# • 下行走你配置的 downloadSettings 地址
+# • 适合：上行优选低延迟 IP，下行优选高带宽 IPv6
+# • 不影响 REALITY 和 Trojan 协议
 
 EOF
     
