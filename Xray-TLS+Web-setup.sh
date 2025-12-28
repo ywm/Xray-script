@@ -4859,12 +4859,9 @@ generate_vless_share_link()
         
     elif [ $protocol -eq 3 ]; then
         # ============ VLESS + XHTTP + TLS ============
-        local xhttp_domain_index=0
 
-        xhttp_domain_index=1
-        
-        
-        local xhttp_domain="${domain_list[$xhttp_domain_index]}"
+            
+        local xhttp_domain="${domain_list[2]}"
         
         # 构建链接（严格按照标准）
         local link="vless://${xid_3}@${xhttp_domain}:443"
