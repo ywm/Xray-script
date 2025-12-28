@@ -1839,61 +1839,107 @@ readDomain()
     
     echo -e "\n\n"
     tyblue "--------------------子域名配置--------------------"
-    tyblue "脚本将配置三个协议，推荐每个协议使用独立子域名"
-    tyblue "推荐配置: reality.${main_domain}, trojan.${main_domain}, cdn.${main_domain}"
-    tyblue "也可以全部使用主域名 ${main_domain} (所有协议共用)"
+    tyblue "为了更好的隐蔽性,建议使用看起来正常的子域名前缀"
+    echo
+    yellow "常见业务子域名示例:"
+    purple "  api, static, cdn, img, video, media, assets, file, data"
     echo
     
-    # REALITY 子域名
+    # ===== REALITY 子域名 =====
     local reality_subdomain=""
-    tyblue "请输入 REALITY 使用的子域名前缀 [默认: reality, 留空则使用主域名]"
-    read -p "子域名前缀: " reality_subdomain
-    [ -z "$reality_subdomain" ] && reality_subdomain="reality"
+    echo
+    green  "━━━ REALITY 协议 (直连,推荐日常使用) ━━━"
+    tyblue "推荐: api, data, portal"
+    echo
+    tyblue "  1. api      - API接口服务 (推荐)"
+    tyblue "  2. data     - 数据服务"
+    tyblue "  3. portal   - 门户服务"
+    tyblue "  4. 自定义"
+    tyblue "  5. 使用主域名"
+    echo
+    local choice=""
+    while [[ ! "$choice" =~ ^[1-5]$ ]]
+    do
+        read -p "您的选择: " choice
+    done
+    
+    case $choice in
+        1) reality_subdomain="api" ;;
+        2) reality_subdomain="data" ;;
+        3) reality_subdomain="portal" ;;
+        4) read -p "请输入自定义前缀: " reality_subdomain ;;
+        5) reality_subdomain="" ;;
+    esac
     
     local reality_domain
-    if [ "$reality_subdomain" == "none" ]; then
-        reality_domain="$main_domain"
-        reality_subdomain=""
-    else
-        reality_domain="${reality_subdomain}.${main_domain}"
-    fi
+    [ -z "$reality_subdomain" ] && reality_domain="$main_domain" || reality_domain="${reality_subdomain}.${main_domain}"
     
-    # Trojan 子域名
+    # ===== Trojan 子域名 =====
     local trojan_subdomain=""
     echo
-    tyblue "请输入 Trojan 使用的子域名前缀 [默认: trojan, 输入 none 使用主域名]"
-    read -p "子域名前缀: " trojan_subdomain
-    [ -z "$trojan_subdomain" ] && trojan_subdomain="trojan"
+    green  "━━━ Trojan 协议 (传统协议,支持CDN) ━━━"
+    tyblue "推荐: static, media, file"
+    echo
+    tyblue "  1. static   - 静态资源 (推荐)"
+    tyblue "  2. media    - 媒体服务"
+    tyblue "  3. file     - 文件服务"
+    tyblue "  4. 自定义"
+    tyblue "  5. 使用主域名"
+    echo
+    choice=""
+    while [[ ! "$choice" =~ ^[1-5]$ ]]
+    do
+        read -p "您的选择: " choice
+    done
+    
+    case $choice in
+        1) trojan_subdomain="static" ;;
+        2) trojan_subdomain="media" ;;
+        3) trojan_subdomain="file" ;;
+        4) read -p "请输入自定义前缀: " trojan_subdomain ;;
+        5) trojan_subdomain="" ;;
+    esac
     
     local trojan_domain
-    if [ "$trojan_subdomain" == "none" ]; then
-        trojan_domain="$main_domain"
-        trojan_subdomain=""
-    else
-        trojan_domain="${trojan_subdomain}.${main_domain}"
-    fi
+    [ -z "$trojan_subdomain" ] && trojan_domain="$main_domain" || trojan_domain="${trojan_subdomain}.${main_domain}"
     
-    # XHTTP 子域名
+    # ===== XHTTP 子域名 =====
     local xhttp_subdomain=""
     echo
-    tyblue "请输入 XHTTP 使用的子域名前缀 [默认: cdn, 输入 none 使用主域名]"
-    read -p "子域名前缀: " xhttp_subdomain
-    [ -z "$xhttp_subdomain" ] && xhttp_subdomain="cdn"
+    green  "━━━ XHTTP 协议 (支持CDN,可隐藏IP) ━━━"
+    tyblue "推荐: cdn, img, assets"
+    echo
+    tyblue "  1. cdn      - CDN加速 (推荐)"
+    tyblue "  2. img      - 图片服务"
+    tyblue "  3. assets   - 资源服务"
+    tyblue "  4. 自定义"
+    tyblue "  5. 使用主域名"
+    echo
+    choice=""
+    while [[ ! "$choice" =~ ^[1-5]$ ]]
+    do
+        read -p "您的选择: " choice
+    done
+    
+    case $choice in
+        1) xhttp_subdomain="cdn" ;;
+        2) xhttp_subdomain="img" ;;
+        3) xhttp_subdomain="assets" ;;
+        4) read -p "请输入自定义前缀: " xhttp_subdomain ;;
+        5) xhttp_subdomain="" ;;
+    esac
     
     local xhttp_domain
-    if [ "$xhttp_subdomain" == "none" ]; then
-        xhttp_domain="$main_domain"
-        xhttp_subdomain=""
-    else
-        xhttp_domain="${xhttp_subdomain}.${main_domain}"
-    fi
+    [ -z "$xhttp_subdomain" ] && xhttp_domain="$main_domain" || xhttp_domain="${xhttp_subdomain}.${main_domain}"
     
+    # ===== 显示配置预览 =====
     echo
-    green "域名配置:"
-    green "  主域名:  $main_domain"
-    green "  REALITY: $reality_domain"
-    green "  Trojan:  $trojan_domain"
-    green "  XHTTP:   $xhttp_domain"
+    green  "━━━━━━━━━━ 域名配置预览 ━━━━━━━━━━"
+    green  "  主域名:  $main_domain"
+    green  "  REALITY: $reality_domain"
+    green  "  Trojan:  $trojan_domain"
+    green  "  XHTTP:   $xhttp_domain"
+    green  "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo
     
     if ! ask_if "确认配置?[y/n]"; then
@@ -3639,6 +3685,7 @@ install_update_xray_tls_web()
     check_important_dependence_installed wget wget
     check_important_dependence_installed "procps" "procps-ng"
     install_epel
+    install_common_tools
     ask_update_script
     check_ssh_timeout
     uninstall_firewall
@@ -5170,6 +5217,50 @@ urlencode()
     done
     echo "${encoded}"
 }
+
+install_common_tools()
+{
+    green "正在安装常用工具..."
+    
+    # 定义需要安装的工具列表
+    local tools=()
+    
+    # qrencode - 用于生成二维码
+    if ! command -v qrencode &> /dev/null; then
+        tools+=('qrencode')
+    fi
+    
+    # jq - 用于JSON处理
+    if ! command -v jq &> /dev/null; then
+        tools+=('jq')
+    fi
+    
+    # socat - 用于socket转发(备用)
+    if ! command -v socat &> /dev/null; then
+        tools+=('socat')
+    fi
+    
+    # xxd - 用于十六进制处理(通常已安装)
+    if ! command -v xxd &> /dev/null; then
+        if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
+            tools+=('xxd')
+        else
+            tools+=('vim-common')  # RedHat系的xxd在vim-common包中
+        fi
+    fi
+    
+    # 如果有需要安装的工具
+    if [ ${#tools[@]} -gt 0 ]; then
+        tyblue "需要安装的工具: ${tools[*]}"
+        install_dependence "${tools[@]}"
+        green "常用工具安装完成"
+    else
+        green "常用工具已全部安装"
+    fi
+}
+
+
+
 
 #开始菜单
 start_menu()
