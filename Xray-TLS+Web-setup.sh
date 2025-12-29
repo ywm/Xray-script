@@ -2939,7 +2939,7 @@ http {
         
         server_name ${domain_list[2]};
         
-        ssl_certificate .${nginx_prefix}/certs/${true_domain_list[0]}.cer;
+        ssl_certificate ${nginx_prefix}/certs/${true_domain_list[0]}.cer;
         ssl_certificate_key ${nginx_prefix}/certs/${true_domain_list[0]}.key;
         
         ssl_protocols TLSv1.2 TLSv1.3;
@@ -5364,7 +5364,7 @@ start_menu()
     [ -e /usr/local/bin/xray ] && xray_is_installed=1 || xray_is_installed=0
     ([ $xray_is_installed -eq 1 ] && [ $nginx_is_installed -eq 1 ]) && is_installed=1 || is_installed=0
     # ======================================
-    
+
     local xray_status
     [ $xray_is_installed -eq 1 ] && xray_status="\\033[32m已安装" || xray_status="\\033[31m未安装"
     systemctl -q is-active xray && xray_status+="                \\033[32m运行中" || xray_status+="                \\033[31m未运行"
