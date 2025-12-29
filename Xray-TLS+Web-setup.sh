@@ -5356,6 +5356,15 @@ install_common_tools()
 #开始菜单
 start_menu()
 {
+    # ========== 重新检测安装状态 ==========
+    # 每次进入主菜单时都检测一次安装状态
+    [ -e $nginx_config ] && nginx_is_installed=1 || nginx_is_installed=0
+    [ -e ${php_prefix}/php-fpm.service.default ] && php_is_installed=1 || php_is_installed=0
+    [ -e ${cloudreve_prefix}/cloudreve.db ] && cloudreve_is_installed=1 || cloudreve_is_installed=0
+    [ -e /usr/local/bin/xray ] && xray_is_installed=1 || xray_is_installed=0
+    ([ $xray_is_installed -eq 1 ] && [ $nginx_is_installed -eq 1 ]) && is_installed=1 || is_installed=0
+    # ======================================
+    
     local xray_status
     [ $xray_is_installed -eq 1 ] && xray_status="\\033[32m已安装" || xray_status="\\033[31m未安装"
     systemctl -q is-active xray && xray_status+="                \\033[32m运行中" || xray_status+="                \\033[31m未运行"
