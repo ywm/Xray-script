@@ -22,7 +22,7 @@ unset ssh_service
 nginx_version="nginx-1.29.4"
 openssl_version="openssl-3.6.0"
 nginx_prefix="/usr/local/nginx"
-nginx_config="${nginx_prefix}/conf/gninx.conf"
+nginx_config="${nginx_prefix}/conf/nginx.conf"
 nginx_service="/etc/systemd/system/nginx.service"
 nginx_is_installed=""
 
