@@ -85,6 +85,8 @@ unset xid_2
 # XHTTP协议的vless uuid
 unset xid_3
 
+unset ipv6_download_domain
+
 
 
 # 现在有没有通过脚本启动swap
@@ -686,6 +688,11 @@ get_config_info()
     domain_config_list=($(grep "^#domain_config_list=" $nginx_config | cut -d = -f 2))
     pretend_list=($(grep "^#pretend_list=" $nginx_config | cut -d = -f 2))
     subdomain_prefix_list=($(grep "^#subdomain_prefix_list=" $nginx_config | cut -d = -f 2))
+
+    # 读取 IPv6 下行域名
+    ipv6_download_domain="$(grep "^#ipv6_download_domain=" $nginx_config | cut -d = -f 2)"
+    [ -z "$ipv6_download_domain" ] && ipv6_download_domain="[2606:4700:4700::1111]"
+
 }
 
 
@@ -1855,8 +1862,20 @@ readDomain()
     # ===== REALITY 子域名 =====
     local reality_subdomain=""
     echo
-    green  "━━━ REALITY 协议 (直连,推荐日常使用) ━━━"
-    tyblue "推荐: api, data, portal"
+    green  "┏━━ REALITY 协议 (直连,推荐日常使用) ━━┓"
+    
+    # 读取配置文件中的上次选择
+    local last_reality_prefix=""
+    if [ -f "$nginx_config" ]; then
+        last_reality_prefix=$(grep "^#subdomain_prefix_list=" "$nginx_config" 2>/dev/null | cut -d= -f2 | awk '{print $1}')
+    fi
+    
+    if [ -n "$last_reality_prefix" ]; then
+        tyblue "上次选择: ${last_reality_prefix:-主域名}"
+        tyblue "直接回车使用上次配置,或输入新选择"
+    else
+        tyblue "推荐: api, data, portal"
+    fi
     echo
     tyblue "  1. api      - API接口服务 (推荐)"
     tyblue "  2. data     - 数据服务"
@@ -1864,19 +1883,28 @@ readDomain()
     tyblue "  4. 自定义"
     tyblue "  5. 使用主域名"
     echo
-    local choice=""
-    while [[ ! "$choice" =~ ^[1-5]$ ]]
-    do
-        read -p "您的选择: " choice
-    done
     
-    case $choice in
-        1) reality_subdomain="api" ;;
-        2) reality_subdomain="data" ;;
-        3) reality_subdomain="portal" ;;
-        4) read -p "请输入自定义前缀: " reality_subdomain ;;
-        5) reality_subdomain="" ;;
-    esac
+    local choice=""
+    read -p "您的选择 [直接回车使用上次配置]: " choice
+    
+    # 如果直接回车且有上次配置
+    if [ -z "$choice" ] && [ -n "$last_reality_prefix" ]; then
+        reality_subdomain="$last_reality_prefix"
+        green "使用上次配置: ${reality_subdomain:-主域名}"
+    else
+        case $choice in
+            1) reality_subdomain="api" ;;
+            2) reality_subdomain="data" ;;
+            3) reality_subdomain="portal" ;;
+            4) read -p "请输入自定义前缀: " reality_subdomain ;;
+            5) reality_subdomain="" ;;
+            "") reality_subdomain="" ;;  # 没有上次配置时的默认选择
+            *) 
+                red "无效选择,使用主域名"
+                reality_subdomain=""
+                ;;
+        esac
+    fi
     
     local reality_domain
     [ -z "$reality_subdomain" ] && reality_domain="$main_domain" || reality_domain="${reality_subdomain}.${main_domain}"
@@ -1884,8 +1912,19 @@ readDomain()
     # ===== Trojan 子域名 =====
     local trojan_subdomain=""
     echo
-    green  "━━━ Trojan 协议 (传统协议,支持CDN) ━━━"
-    tyblue "推荐: static, media, file"
+    green  "┏━━ Trojan 协议 (传统协议,支持CDN) ━━┓"
+    
+    local last_trojan_prefix=""
+    if [ -f "$nginx_config" ]; then
+        last_trojan_prefix=$(grep "^#subdomain_prefix_list=" "$nginx_config" 2>/dev/null | cut -d= -f2 | awk '{print $2}')
+    fi
+    
+    if [ -n "$last_trojan_prefix" ]; then
+        tyblue "上次选择: ${last_trojan_prefix:-主域名}"
+        tyblue "直接回车使用上次配置,或输入新选择"
+    else
+        tyblue "推荐: static, media, file"
+    fi
     echo
     tyblue "  1. static   - 静态资源 (推荐)"
     tyblue "  2. media    - 媒体服务"
@@ -1894,18 +1933,25 @@ readDomain()
     tyblue "  5. 使用主域名"
     echo
     choice=""
-    while [[ ! "$choice" =~ ^[1-5]$ ]]
-    do
-        read -p "您的选择: " choice
-    done
+    read -p "您的选择 [直接回车使用上次配置]: " choice
     
-    case $choice in
-        1) trojan_subdomain="static" ;;
-        2) trojan_subdomain="media" ;;
-        3) trojan_subdomain="file" ;;
-        4) read -p "请输入自定义前缀: " trojan_subdomain ;;
-        5) trojan_subdomain="" ;;
-    esac
+    if [ -z "$choice" ] && [ -n "$last_trojan_prefix" ]; then
+        trojan_subdomain="$last_trojan_prefix"
+        green "使用上次配置: ${trojan_subdomain:-主域名}"
+    else
+        case $choice in
+            1) trojan_subdomain="static" ;;
+            2) trojan_subdomain="media" ;;
+            3) trojan_subdomain="file" ;;
+            4) read -p "请输入自定义前缀: " trojan_subdomain ;;
+            5) trojan_subdomain="" ;;
+            "") trojan_subdomain="" ;;
+            *)
+                red "无效选择,使用主域名"
+                trojan_subdomain=""
+                ;;
+        esac
+    fi
     
     local trojan_domain
     [ -z "$trojan_subdomain" ] && trojan_domain="$main_domain" || trojan_domain="${trojan_subdomain}.${main_domain}"
@@ -1913,8 +1959,19 @@ readDomain()
     # ===== XHTTP 子域名 =====
     local xhttp_subdomain=""
     echo
-    green  "━━━ XHTTP 协议 (支持CDN,可隐藏IP) ━━━"
-    tyblue "推荐: cdn, img, assets"
+    green  "┏━━ XHTTP 协议 (支持CDN,可隐藏IP) ━━┓"
+    
+    local last_xhttp_prefix=""
+    if [ -f "$nginx_config" ]; then
+        last_xhttp_prefix=$(grep "^#subdomain_prefix_list=" "$nginx_config" 2>/dev/null | cut -d= -f2 | awk '{print $3}')
+    fi
+    
+    if [ -n "$last_xhttp_prefix" ]; then
+        tyblue "上次选择: ${last_xhttp_prefix:-主域名}"
+        tyblue "直接回车使用上次配置,或输入新选择"
+    else
+        tyblue "推荐: cdn, img, assets"
+    fi
     echo
     tyblue "  1. cdn      - CDN加速 (推荐)"
     tyblue "  2. img      - 图片服务"
@@ -1923,21 +1980,57 @@ readDomain()
     tyblue "  5. 使用主域名"
     echo
     choice=""
-    while [[ ! "$choice" =~ ^[1-5]$ ]]
-    do
-        read -p "您的选择: " choice
-    done
+    read -p "您的选择 [直接回车使用上次配置]: " choice
     
-    case $choice in
-        1) xhttp_subdomain="cdn" ;;
-        2) xhttp_subdomain="img" ;;
-        3) xhttp_subdomain="assets" ;;
-        4) read -p "请输入自定义前缀: " xhttp_subdomain ;;
-        5) xhttp_subdomain="" ;;
-    esac
+    if [ -z "$choice" ] && [ -n "$last_xhttp_prefix" ]; then
+        xhttp_subdomain="$last_xhttp_prefix"
+        green "使用上次配置: ${xhttp_subdomain:-主域名}"
+    else
+        case $choice in
+            1) xhttp_subdomain="cdn" ;;
+            2) xhttp_subdomain="img" ;;
+            3) xhttp_subdomain="assets" ;;
+            4) read -p "请输入自定义前缀: " xhttp_subdomain ;;
+            5) xhttp_subdomain="" ;;
+            "") xhttp_subdomain="" ;;
+            *)
+                red "无效选择,使用主域名"
+                xhttp_subdomain=""
+                ;;
+        esac
+    fi
     
     local xhttp_domain
     [ -z "$xhttp_subdomain" ] && xhttp_domain="$main_domain" || xhttp_domain="${xhttp_subdomain}.${main_domain}"
+    
+    # ===== XHTTP IPv6 下行域名配置 =====
+    echo
+    tyblue "--------------------XHTTP IPv6 下行配置--------------------"
+    yellow "XHTTP 支持上下行分离模式:"
+    purple "  • 上行: 走当前服务器 (低延迟)"
+    purple "  • 下行: 走 IPv6 优选节点 (高带宽)"
+    echo
+    tyblue "请输入 IPv6 下行域名 (留空则使用 Cloudflare IPv6)"
+    tyblue "注意: 此域名只需要 IPv6 解析 (AAAA 记录)"
+    echo
+    purple "常用公共 IPv6 节点示例:"
+    purple "  • [2606:4700:4700::1111]  (Cloudflare DNS)"
+    purple "  • ipv6.cloudflare.com"
+    echo
+    
+    local ipv6_domain=""
+    read -p "IPv6 下行域名 [留空使用默认]: " ipv6_domain
+    
+    if [ -z "$ipv6_domain" ]; then
+        ipv6_domain="[2606:4700:4700::1111]"
+        green "使用默认: Cloudflare IPv6 (${ipv6_domain})"
+    else
+        green "已设置 IPv6 下行: ${ipv6_domain}"
+        yellow "请确保此域名有 AAAA 记录解析"
+    fi
+    
+    # 保存 IPv6 域名供后续使用
+    ipv6_download_domain="$ipv6_domain"
     
     # ===== 显示配置预览 =====
     echo
@@ -1946,7 +2039,8 @@ readDomain()
     green  "  REALITY: $reality_domain"
     green  "  Trojan:  $trojan_domain"
     green  "  XHTTP:   $xhttp_domain"
-    green  "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    purple "  IPv6下行: $ipv6_domain"
+    green  "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo
     
     if ! ask_if "确认配置?[y/n]"; then
@@ -3042,6 +3136,7 @@ EOF
 #domain_config_list=${domain_config_list[*]}
 #pretend_list=${pretend_list[*]}
 #subdomain_prefix_list=${subdomain_prefix_list[*]}
+#ipv6_download_domain=${ipv6_download_domain}
 EOF
 }
 
@@ -3680,7 +3775,7 @@ generate_trojan_share_link()
     link+="&fp=chrome"                   # 指纹
     
     # 描述文字
-    link+="#Trojan-${trojan_domain}"
+    link+="#Trojan-TLS"
     
     echo "$link"
 }
@@ -4867,7 +4962,7 @@ generate_vless_share_link()
         fi
         
         # 描述文字（推荐）
-        link+="#REALITY-${reality_domain}"
+        link+="#VLESS-REALITY-VISION"
         
         echo "$link"
         
@@ -4878,10 +4973,13 @@ generate_vless_share_link()
         # 第一条：普通 XHTTP（上下行同线路）
         local link_normal="vless://${xid_3}@${xhttp_domain}:443"
         link_normal+="?type=xhttp&security=tls&fp=chrome&alpn=h2&path=${encoded_path}"
-        link_normal+="#XHTTP-${xhttp_domain}"
+        link_normal+="#VLESS-XHTTP-TLS"
         
         # 第二条：上下行分离（上行 IPv4，下行 IPv6 示例节点）
         # 注意：这里用一个常见的公共 IPv6 测试节点作为示例，用户可自行替换
+
+        local ipv6_domain="${ipv6_download_domain:-[2606:4700:4700::1111]}"
+
         local link_split="vless://${xid_3}@${xhttp_domain}:443"
         link_split+="?type=xhttp&security=tls&fp=chrome&alpn=h2&path=${encoded_path}"
         link_split+="&extra=" # 开始 extra 参数（URI 编码）
@@ -4889,7 +4987,7 @@ generate_vless_share_link()
         # extra JSON 编码（简单方式：base64 编码整个 extra）
         local extra_json='{
   "downloadSettings": {
-    "address": "[2606:4700:4700::1111]",
+    "address": "'${ipv6_domain}'",
     "port": 443,
     "network": "xhttp",
     "security": "tls",
@@ -4906,7 +5004,7 @@ generate_vless_share_link()
         local extra_b64=$(echo -n "$extra_json" | base64 -w 0)
         link_split+="$(printf '%s' "$extra_b64" | sed 's/+/%2B/g;s/\//%2F/g;s/=/%3D/g')"
         
-        link_split+="#XHTTP-IPv6下行-${xhttp_domain}"
+        link_split+="#VLESS-XHTTP-IPV6-Split"
         # 输出两条链接
         echo "$link_normal"
         echo "$link_split"
