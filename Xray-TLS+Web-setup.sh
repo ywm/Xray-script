@@ -22,7 +22,7 @@ unset ssh_service
 nginx_version="nginx-1.29.4"
 openssl_version="openssl-3.6.0"
 nginx_prefix="/usr/local/nginx"
-nginx_config="${nginx_prefix}/conf.d/xray.conf"
+nginx_config="${nginx_prefix}/conf/gninx.conf"
 nginx_service="/etc/systemd/system/nginx.service"
 nginx_is_installed=""
 
@@ -2939,7 +2939,7 @@ http {
         
         server_name ${domain_list[2]};
         
-        ssl_certificate ${nginx_prefix}/certs/${true_domain_list[0]}.cer;
+        ssl_certificate .${nginx_prefix}/certs/${true_domain_list[0]}.cer;
         ssl_certificate_key ${nginx_prefix}/certs/${true_domain_list[0]}.key;
         
         ssl_protocols TLSv1.2 TLSv1.3;
@@ -3037,11 +3037,11 @@ EOF
 }
 
 #-----------------不要修改以下内容----------------
-#domain_list=${domain_list[@]}
-#true_domain_list=${true_domain_list[@]}
-#domain_config_list=${domain_config_list[@]}
-#pretend_list=${pretend_list[@]}
-#subdomain_prefix_list=${subdomain_prefix_list[@]}
+#domain_list=${domain_list[*]}
+#true_domain_list=${true_domain_list[*]}
+#domain_config_list=${domain_config_list[*]}
+#pretend_list=${pretend_list[*]}
+#subdomain_prefix_list=${subdomain_prefix_list[*]}
 EOF
 }
 
