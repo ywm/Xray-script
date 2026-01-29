@@ -616,11 +616,14 @@ remove_nginx()
         # 保留 custom.d，其余删除
         mkdir -p /tmp/nginx_custom_backup
         mv "${nginx_prefix}/custom.d" /tmp/nginx_custom_backup/ 2>/dev/null
+        mv "${nginx_prefix}/certs" /tmp/nginx_custom_backup/ 2>/dev/null
 
         rm -rf "${nginx_prefix}"
 
         mkdir -p "${nginx_prefix}"
         mv /tmp/nginx_custom_backup/custom.d "${nginx_prefix}/" 2>/dev/null
+        mv /tmp/nginx_custom_backup/certs "${nginx_prefix}/" 2>/dev/null
+
         rm -rf /tmp/nginx_custom_backup
     fi
     nginx_is_installed=0
@@ -2503,7 +2506,7 @@ install_nginx_part2()
     if [ ! -f "${nginx_prefix}/custom.d/location.conf" ]; then
       touch "${nginx_prefix}/custom.d/location.conf"
     fi
-    mkdir ${nginx_prefix}/certs
+    [ ! -d "${nginx_prefix}/certs" ] && mkdir ${nginx_prefix}/certs
     
       # 生成自签名证书
     generate_self_signed_cert
