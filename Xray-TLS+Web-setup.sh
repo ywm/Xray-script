@@ -55,7 +55,19 @@ unset cloudreve_is_installed
 
 nextcloud_url="https://download.nextcloud.com/server/releases/nextcloud-31.0.8.tar.bz2"
 
+# Xray 多文件配置目录
+xray_config_dir="/usr/local/etc/xray/config.d"
+# 兼容旧版单文件配置（用于迁移检测）
 xray_config="/usr/local/etc/xray/config.json"
+# 多文件配置路径定义（每隔10，方便插入新配置）
+xray_config_log="${xray_config_dir}/00_log.json"
+xray_config_dns="${xray_config_dir}/10_dns.json"
+xray_config_inbound_reality="${xray_config_dir}/20_inbound_reality.json"
+xray_config_inbound_trojan="${xray_config_dir}/21_inbound_trojan.json"
+xray_config_inbound_xhttp="${xray_config_dir}/22_inbound_xhttp.json"
+xray_config_routing="${xray_config_dir}/50_routing.json"
+xray_config_outbound_direct="${xray_config_dir}/60_outbound_direct.json"
+xray_config_outbound_block="${xray_config_dir}/61_outbound_block_tail.json"
 unset xray_is_installed
 
 temp_dir="/temp_install_update_xray_tls_web"
@@ -603,6 +615,9 @@ remove_xray()
         rm -rf /var/log/xray
         systemctl daemon-reload
     fi
+    # 确保多文件配置目录被删除
+    rm -rf "$xray_config_dir"
+    rm -f "$xray_config"
     xray_is_installed=0
     is_installed=0
 }
@@ -613,7 +628,7 @@ remove_nginx()
     rm -rf $nginx_service
     systemctl daemon-reload
     if [ -d "${nginx_prefix}" ]; then
-        # 保留 custom.d，其余删除
+        # 保留 custom.d 和 certs，其余删除
         mkdir -p /tmp/nginx_custom_backup
         mv "${nginx_prefix}/custom.d" /tmp/nginx_custom_backup/ 2>/dev/null
         mv "${nginx_prefix}/certs" /tmp/nginx_custom_backup/ 2>/dev/null
@@ -623,7 +638,6 @@ remove_nginx()
         mkdir -p "${nginx_prefix}"
         mv /tmp/nginx_custom_backup/custom.d "${nginx_prefix}/" 2>/dev/null
         mv /tmp/nginx_custom_backup/certs "${nginx_prefix}/" 2>/dev/null
-
         rm -rf /tmp/nginx_custom_backup
     fi
     nginx_is_installed=0
@@ -666,24 +680,46 @@ get_config_info()
 {
     [ $is_installed -eq 0 ] && return
     
-    # 读取 UUID（固定三个）
-    xid_1="$(grep '"id"' $xray_config | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
-    xid_2="$(grep -A10 '"protocol"[ '$'\t]*:[ '$'\t]*"trojan"' $xray_config | grep '"password"' | head -n1 | cut -d : -f 2 | cut -d \" -f 2)"
-    xid_3="$(grep '"id"' $xray_config | tail -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
+    # 检测并迁移旧版单文件配置
+    if [ -f "$xray_config" ] && [ ! -d "$xray_config_dir" ]; then
+        yellow "检测到旧版单文件配置，将在下次重新配置时自动迁移到多文件配置"
+    fi
     
-    # 读取 REALITY 配置
-    reality_private_key="$(grep '"privateKey"' $xray_config | cut -d : -f 2 | cut -d \" -f 2)"
-    reality_dest="$(grep '"target"' $xray_config | cut -d : -f 2 | cut -d \" -f 2)"
-    reality_server_names="$(grep '"serverNames"' $xray_config | sed 's/.*\[//;s/\].*//' | tr ',' ' ' | sed 's/"//g')"
-    reality_short_ids="$(grep '"shortIds"' $xray_config | sed 's/.*\[//;s/\].*//' | tr ',' ' ')"
+    # 优先从多文件配置读取
+    if [ -d "$xray_config_dir" ]; then
+        # 读取 REALITY UUID (从 20_inbound_reality.json)
+        if [ -f "$xray_config_inbound_reality" ]; then
+            xid_1="$(grep '"id"' $xray_config_inbound_reality | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
+            reality_private_key="$(grep '"privateKey"' $xray_config_inbound_reality | cut -d : -f 2 | cut -d \" -f 2)"
+            reality_server_names="$(grep '"serverNames"' $xray_config_inbound_reality | sed 's/.*\[//;s/\].*//' | tr ',' ' ' | sed 's/"//g')"
+            reality_short_ids="$(grep '"shortIds"' $xray_config_inbound_reality | sed 's/.*\[//;s/\].*//' | tr ',' ' ')"
+        fi
+        
+        # 读取 Trojan 密码 (从 21_inbound_trojan.json)
+        if [ -f "$xray_config_inbound_trojan" ]; then
+            xid_2="$(grep '"password"' $xray_config_inbound_trojan | head -n1 | cut -d : -f 2 | cut -d \" -f 2)"
+        fi
+        
+        # 读取 XHTTP UUID 和 path (从 22_inbound_xhttp.json)
+        if [ -f "$xray_config_inbound_xhttp" ]; then
+            xid_3="$(grep '"id"' $xray_config_inbound_xhttp | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
+            path="$(grep '"path"' $xray_config_inbound_xhttp | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
+        fi
+    else
+        # 兼容旧版单文件配置
+        xid_1="$(grep '"id"' $xray_config | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
+        xid_2="$(grep -A10 '"protocol"[ '$'\t]*:[ '$'\t]*"trojan"' $xray_config | grep '"password"' | head -n1 | cut -d : -f 2 | cut -d \" -f 2)"
+        xid_3="$(grep '"id"' $xray_config | tail -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
+        reality_private_key="$(grep '"privateKey"' $xray_config | cut -d : -f 2 | cut -d \" -f 2)"
+        reality_server_names="$(grep '"serverNames"' $xray_config | sed 's/.*\[//;s/\].*//' | tr ',' ' ' | sed 's/"//g')"
+        reality_short_ids="$(grep '"shortIds"' $xray_config | sed 's/.*\[//;s/\].*//' | tr ',' ' ')"
+        path="$(grep '"path"' $xray_config | tail -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
+    fi
     
     # 生成 Password
     if [ -n "$reality_private_key" ] && [ -f "/usr/local/bin/xray" ]; then
         reality_password=$(/usr/local/bin/xray x25519 -i "$reality_private_key" 2>/dev/null | awk '/^Password:/ {print $2}')
     fi
-    
-    # 读取 XHTTP path
-    path="$(grep '"path"' $xray_config | tail -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
     
     # 读取域名配置
     domain_list=($(grep "^#domain_list=" $nginx_config | cut -d = -f 2))
@@ -2506,6 +2542,7 @@ install_nginx_part2()
     if [ ! -f "${nginx_prefix}/custom.d/location.conf" ]; then
       touch "${nginx_prefix}/custom.d/location.conf"
     fi
+    # 如果 certs 不存在则创建（更新nginx时已被备份恢复）
     [ ! -d "${nginx_prefix}/certs" ] && mkdir ${nginx_prefix}/certs
     
       # 生成自签名证书
@@ -2779,9 +2816,12 @@ get_cert()
     # 获取 CF 凭据
     read_cf_api
 
-    # 准备申请环境
-    mv ${xray_config} ${xray_config}.bak 2>/dev/null
-    echo "{}" > $xray_config
+    # 准备申请环境 - 临时停止 xray 以避免配置冲突
+    local xray_was_running=0
+    if systemctl -q is-active xray; then
+        xray_was_running=1
+        systemctl stop xray
+    fi
 
     # 申请泛域名证书
     green "正在申请泛域名证书: ${main_domain} 和 *.${main_domain}"
@@ -2793,7 +2833,7 @@ get_cert()
         
         red "泛域名证书申请失败！"
         red "请检查: 1. CF API Key/Email 是否正确; 2. 域名是否在当前 CF 账号下; 3. 网络是否通畅。"
-        mv ${xray_config}.bak $xray_config 2>/dev/null
+        [ $xray_was_running -eq 1 ] && systemctl start xray
         return 1
     fi
 
@@ -2804,7 +2844,7 @@ get_cert()
         --reloadcmd "systemctl restart xray nginx"; then
         
         red "证书安装失败！"
-        mv ${xray_config}.bak $xray_config 2>/dev/null
+        [ $xray_was_running -eq 1 ] && systemctl start xray
         return 1
     fi
 
@@ -2812,7 +2852,7 @@ get_cert()
     touch "$wildcard_marker"
     echo "Wildcard certificate for *.${main_domain}" > "$wildcard_marker"
 
-    mv ${xray_config}.bak $xray_config 2>/dev/null
+    [ $xray_was_running -eq 1 ] && systemctl start xray
     green "泛域名证书部署成功！"
     return 0
 }
@@ -3202,30 +3242,49 @@ generate_self_signed_cert()
 #配置xray
 config_xray()
 {
-    cat > $xray_config <<EOF
+    # 创建多文件配置目录
+    mkdir -p "$xray_config_dir"
+    
+    # 清理旧的配置文件
+    rm -f ${xray_config_dir}/*.json
+    # 删除旧版单文件配置（如果存在）
+    rm -f "$xray_config"
+    
+    # ==================== 00_log.json ====================
+    cat > "$xray_config_log" <<EOF
 {
     "log": {
         "loglevel": "warning",
         "error": "/var/log/xray/error.log",
         "access": "/var/log/xray/access.log"
-    },
-    "inbounds": [
+    }
+}
 EOF
 
-    # REALITY 配置（固定）
-    generate_reality_inbound
-    echo ',' >> $xray_config
-    
-    # Trojan 配置（固定）
-    generate_trojan_inbound
-    echo ',' >> $xray_config
-    
-    # XHTTP 配置（固定）
-    generate_xhttp_inbound
+    # ==================== 10_dns.json ====================
+    cat > "$xray_config_dns" <<EOF
+{
+    "dns": {
+        "servers": [
+            "1.1.1.1",
+            "8.8.8.8"
+        ]
+    }
+}
+EOF
 
+    # ==================== 20_inbound_reality.json ====================
+    generate_reality_inbound_file
+    
+    # ==================== 21_inbound_trojan.json ====================
+    generate_trojan_inbound_file
+    
+    # ==================== 22_inbound_xhttp.json ====================
+    generate_xhttp_inbound_file
 
-    cat >> $xray_config <<'EOF'
-    ],
+    # ==================== 50_routing.json ====================
+    cat > "$xray_config_routing" <<'EOF'
+{
     "routing": {
         "rules": [
             {
@@ -3234,12 +3293,28 @@ EOF
                 "outboundTag": "block"
             }
         ]
-    },
+    }
+}
+EOF
+
+    # ==================== 60_outbound_direct.json ====================
+    cat > "$xray_config_outbound_direct" <<'EOF'
+{
     "outbounds": [
         {
+            "tag": "direct",
             "protocol": "freedom",
             "settings": {}
-        },
+        }
+    ]
+}
+EOF
+
+    # ==================== 61_outbound_block_tail.json ====================
+    # 文件名含有 tail，添加至 outbounds 最后
+    cat > "$xray_config_outbound_block" <<'EOF'
+{
+    "outbounds": [
         {
             "tag": "block",
             "protocol": "blackhole",
@@ -3248,14 +3323,113 @@ EOF
     ]
 }
 EOF
+
+    green "Xray 多文件配置已生成到 ${xray_config_dir}/"
+}
+
+# 验证 Xray 配置是否正确
+# 返回: 0=验证通过, 1=验证失败
+xray_test_config()
+{
+    if [ ! -d "$xray_config_dir" ]; then
+        red "Xray 配置目录不存在: $xray_config_dir"
+        return 1
+    fi
+    
+    if [ ! -f "/usr/local/bin/xray" ]; then
+        yellow "Xray 未安装，跳过配置验证"
+        return 0
+    fi
+    
+    # 使用 xray -test 验证配置
+    local test_output
+    test_output=$(/usr/local/bin/xray run -confdir "$xray_config_dir" -test 2>&1)
+    local test_result=$?
+    
+    if [ $test_result -eq 0 ]; then
+        return 0
+    else
+        red "Xray 配置验证失败！"
+        yellow "错误信息："
+        echo "$test_output"
+        return 1
+    fi
+}
+
+# 安全重启 Xray（先验证配置再重启）
+# 参数: $1 = "quiet" 时不输出成功信息
+xray_safe_restart()
+{
+    local quiet_mode="$1"
+    
+    # 如果 xray 没有运行，直接返回
+    if ! systemctl -q is-active xray; then
+        return 0
+    fi
+    
+    # 验证配置
+    if ! xray_test_config; then
+        red "配置验证失败，取消重启 Xray"
+        yellow "请检查配置文件: $xray_config_dir"
+        yellow "可以运行: xray run -confdir $xray_config_dir -test 查看详细错误"
+        return 1
+    fi
+    
+    # 重启 xray
+    systemctl restart xray
+    sleep 1s
+    
+    if systemctl -q is-active xray; then
+        [ "$quiet_mode" != "quiet" ] && green "Xray 重启成功！"
+        return 0
+    else
+        red "Xray 重启失败！"
+        yellow "请检查日志: journalctl -u xray -n 50"
+        return 1
+    fi
+}
+
+# 安全重启 Xray 和 Nginx
+xray_nginx_safe_restart()
+{
+    # 验证 xray 配置
+    if ! xray_test_config; then
+        red "Xray 配置验证失败，取消重启"
+        return 1
+    fi
+    
+    # 重启服务
+    systemctl restart xray nginx
+    sleep 1s
+    
+    local failed=0
+    if ! systemctl -q is-active xray; then
+        red "Xray 重启失败！"
+        failed=1
+    fi
+    if ! systemctl -q is-active nginx; then
+        red "Nginx 重启失败！"
+        failed=1
+    fi
+    
+    if [ $failed -eq 0 ]; then
+        green "Xray 和 Nginx 重启成功！"
+        return 0
+    else
+        yellow "请检查日志: journalctl -u xray -n 50"
+        return 1
+    fi
 }
 
 
-# 生成 REALITY Inbound
-generate_reality_inbound()
+# 生成 REALITY Inbound 配置文件
+generate_reality_inbound_file()
 {
-    cat >> $xray_config <<EOF
+    cat > "$xray_config_inbound_reality" <<EOF
+{
+    "inbounds": [
         {
+            "tag": "reality-in",
             "listen": "/dev/shm/xray/reality.sock,0666",
             "protocol": "vless",
             "settings": {
@@ -3295,14 +3469,19 @@ generate_reality_inbound()
                 "routeOnly": true
             }
         }
+    ]
+}
 EOF
 }
 
-# 生成 Trojan Inbound
-generate_trojan_inbound()
+# 生成 Trojan Inbound 配置文件
+generate_trojan_inbound_file()
 {
-    cat >> $xray_config <<EOF
+    cat > "$xray_config_inbound_trojan" <<EOF
+{
+    "inbounds": [
         {
+            "tag": "trojan-in",
             "listen": "/dev/shm/xray/trojan.sock,0666",
             "protocol": "trojan",
             "settings": {
@@ -3342,14 +3521,19 @@ generate_trojan_inbound()
                 "routeOnly": true
             }
         }
+    ]
+}
 EOF
 }
 
-# 生成 XHTTP Inbound
-generate_xhttp_inbound()
+# 生成 XHTTP Inbound 配置文件
+generate_xhttp_inbound_file()
 {
-    cat >> $xray_config <<EOF
+    cat > "$xray_config_inbound_xhttp" <<EOF
+{
+    "inbounds": [
         {
+            "tag": "xhttp-entry-in",
             "listen": "/dev/shm/xray/xhttp_entry.sock,0666",
             "protocol": "vless",
             "settings": {
@@ -3396,6 +3580,7 @@ generate_xhttp_inbound()
             }
         },
         {
+            "tag": "xhttp-in",
             "listen": "/dev/shm/xray/xhttp.sock,0666",
             "protocol": "vless",
             "settings": {
@@ -3417,7 +3602,7 @@ generate_xhttp_inbound()
                       "noGRPCHeader": $xhttp_grpc_header,
                       "noSSEHeader": $xhttp_sse_header,
                       "scStreamUpServerSecs": "$xhttp_streamup_keepalive"
-    }
+                    }
                 }
             },
             "sniffing": {
@@ -3426,6 +3611,8 @@ generate_xhttp_inbound()
                 "routeOnly": true
             }
         }
+    ]
+}
 EOF
 }
 
@@ -3976,7 +4163,14 @@ install_update_xray_tls_web()
     config_xray
     sleep 2s
     systemctl stop cloudreve
-    systemctl restart xray nginx
+    
+    # 验证并重启
+    if ! xray_test_config; then
+        red "Xray 配置验证失败！"
+        yellow "请检查配置文件: $xray_config_dir"
+    else
+        systemctl restart xray nginx
+    fi
     
     if [ $update -eq 0 ]; then
         [ "${pretend_list[0]}" == "1" ] && [ $temp_remove_cloudreve -eq 1 ] && remove_cloudreve
@@ -4123,7 +4317,12 @@ check_update_update_nginx()
         systemctl stop nginx
     fi
     if [ $xray_status -eq 1 ]; then
-        systemctl restart xray
+        # 验证配置后再重启
+        if xray_test_config; then
+            systemctl restart xray
+        else
+            red "Xray 配置验证失败，请手动检查配置"
+        fi
     else
         systemctl stop xray
     fi
@@ -4134,6 +4333,14 @@ check_update_update_nginx()
 restart_xray_tls_web()
 {
     get_config_info
+    
+    # 先验证 Xray 配置
+    if ! xray_test_config; then
+        red "Xray 配置验证失败，取消重启"
+        yellow "请检查配置文件后重试"
+        return 1
+    fi
+    
     systemctl restart xray nginx
     systemctl stop php-fpm cloudreve
     turn_on_off_php
@@ -4141,6 +4348,7 @@ restart_xray_tls_web()
     sleep 1s
     if ! systemctl -q is-active xray; then
         red "Xray启动失败！！"
+        yellow "请检查日志: journalctl -u xray -n 50"
     elif ! systemctl -q is-active nginx; then
         red "Nginx启动失败！！"
     elif check_need_php && ! systemctl -q is-active php-fpm; then
@@ -4266,7 +4474,7 @@ reinit_domain()
     
     # 启动服务
     green "启动服务..."
-    systemctl restart xray nginx
+    xray_nginx_safe_restart
     
     # 初始化伪装网站
     init_web 0
@@ -4325,7 +4533,7 @@ add_domain()
     fi
     if ! get_cert "-1"; then
         sleep 2s
-        systemctl restart xray nginx
+        xray_test_config && systemctl restart xray nginx
         red "申请证书失败！！"
         red "域名添加失败"
         return 1
@@ -4334,7 +4542,7 @@ add_domain()
     config_xray
     sleep 2s
     systemctl stop php-fpm cloudreve
-    systemctl restart xray nginx
+    xray_nginx_safe_restart
     init_web "-1"
     green "域名添加完成！！"
     print_config_info
@@ -4382,7 +4590,7 @@ delete_domain()
     pretend_list=("${pretend_list[@]}")
     config_nginx
     config_xray
-    systemctl restart xray nginx
+    xray_nginx_safe_restart
     turn_on_off_php
     turn_on_off_cloudreve
     green "域名删除完成！！"
@@ -4586,17 +4794,22 @@ change_xray_id()
         ask_if "是否确定?[y/n]" && break
     done
     
-    # 更新配置
+    # 更新配置 - 只更新对应的配置文件
     if [ $flag -eq 1 ]; then
         xid_1="$new_id"
+        generate_reality_inbound_file
+        green "已更新 REALITY 配置文件: $xray_config_inbound_reality"
     elif [ $flag -eq 2 ]; then
         xid_2="$new_id"
+        generate_trojan_inbound_file
+        green "已更新 Trojan 配置文件: $xray_config_inbound_trojan"
     else
         xid_3="$new_id"
+        generate_xhttp_inbound_file
+        green "已更新 XHTTP 配置文件: $xray_config_inbound_xhttp"
     fi
     
-    config_xray
-    systemctl -q is-active xray && systemctl restart xray
+    xray_safe_restart
     
     green "更换成功！"
     echo
@@ -4620,10 +4833,11 @@ change_xray_path()
         tyblue "您输入的path是：$path"
         ask_if "是否确定?[y/n]" && break
     done
-    config_xray
+    # 只更新 XHTTP 配置文件
+    generate_xhttp_inbound_file
+    green "已更新 XHTTP 配置文件: $xray_config_inbound_xhttp"
     config_nginx
-    systemctl -q is-active xray && systemctl restart xray
-    systemctl -q is-active nginx && systemctl restart nginx
+    xray_nginx_safe_restart
     green "更换成功！！"
     print_config_info
 }
@@ -4829,7 +5043,6 @@ change_reality_config()
 
     echo -e "\\n\\n"
     tyblue "==================== 当前 REALITY 配置 ===================="
-    yellow "  Dest:        $reality_dest"
     yellow "  ServerNames: $reality_server_names"
     yellow "  ShortIds:    $reality_short_ids"
     yellow "  PrivateKey:  $reality_private_key"
@@ -4876,7 +5089,6 @@ change_reality_config()
         yellow "PrivateKey: $reality_private_key"
         yellow "Password:  $reality_password"
         echo
-        green "正在生成 REALITY 密钥对..."
     elif [ $choice -eq 2 ]; then
         # 重新生成 ShortIds
         echo
@@ -4912,22 +5124,85 @@ change_reality_config()
         echo
     fi
 
-    green "更新配置文件..."
-    config_xray
+    # 只更新 REALITY 配置文件
+    generate_reality_inbound_file
+    green "已更新 REALITY 配置文件: $xray_config_inbound_reality"
 
-    if systemctl -q is-active xray; then
-        green "重启 Xray 服务..."
-        systemctl restart xray
-        sleep 2s
-        
-        if systemctl -q is-active xray; then
-            green "Xray 重启成功！"
-        else
-            red "Xray 重启失败！请检查配置"
-            yellow "可以运行: journalctl -u xray -n 50 查看日志"
-            return 1
-        fi
+    xray_safe_restart
+}
+
+# 查看 Xray 多文件配置合并后的完整配置
+view_xray_merged_config()
+{
+    if [ ! -d "$xray_config_dir" ]; then
+        red "Xray 配置目录不存在: $xray_config_dir"
+        return 1
     fi
+    
+    echo -e "\\n"
+    tyblue "==================== Xray 多文件配置目录 ===================="
+    tyblue "配置目录: $xray_config_dir"
+    echo
+    tyblue "配置文件列表:"
+    ls -la "$xray_config_dir"/*.json 2>/dev/null
+    echo
+    
+    tyblue "-------------请选择要查看的内容-------------"
+    tyblue " 1. 查看合并后的完整配置 (xray -dump)"
+    tyblue " 2. 查看单个配置文件"
+    tyblue " 3. 验证配置是否正确"
+    yellow " 0. 返回"
+    echo
+    
+    local choice=""
+    while [[ ! "$choice" =~ ^(0|[1-3])$ ]]
+    do
+        read -p "您的选择是：" choice
+    done
+    
+    [ $choice -eq 0 ] && return 0
+    
+    if [ $choice -eq 1 ]; then
+        echo -e "\\n"
+        tyblue "==================== 合并后的完整配置 ===================="
+        /usr/local/bin/xray run -confdir "$xray_config_dir" -dump 2>&1
+        echo
+    elif [ $choice -eq 2 ]; then
+        echo -e "\\n"
+        tyblue "可查看的配置文件:"
+        local files=($(ls "$xray_config_dir"/*.json 2>/dev/null))
+        local i=1
+        for f in "${files[@]}"; do
+            tyblue "  $i. $(basename "$f")"
+            ((i++))
+        done
+        echo
+        
+        local file_choice=""
+        read -p "请输入文件编号: " file_choice
+        
+        if [[ "$file_choice" =~ ^[0-9]+$ ]] && [ "$file_choice" -ge 1 ] && [ "$file_choice" -le "${#files[@]}" ]; then
+            local selected_file="${files[$((file_choice-1))]}"
+            echo -e "\\n"
+            tyblue "==================== $(basename "$selected_file") ===================="
+            cat "$selected_file"
+            echo
+        else
+            red "无效的选择"
+        fi
+    elif [ $choice -eq 3 ]; then
+        echo -e "\\n"
+        tyblue "==================== 配置验证 ===================="
+        if /usr/local/bin/xray run -confdir "$xray_config_dir" -test 2>&1; then
+            green "配置验证通过！"
+        else
+            red "配置验证失败！"
+        fi
+        echo
+    fi
+    
+    yellow "按回车键继续..."
+    read -s
 }
 
 # 生成 VLESS 分享链接（完全符合标准）
@@ -5536,24 +5811,26 @@ start_menu()
     tyblue "  19. 修改id[UUID/密码]"
     tyblue "  20. 修改XHTTP的path"
     tyblue "  21. 修改REALITY配置"
+    tyblue "  22. 查看Xray合并配置"
+    purple "         查看多文件配置合并后的完整配置"
     echo
     tyblue " ----------------其它----------------"
-    tyblue "  22. 精简系统"
+    tyblue "  23. 精简系统"
     purple "         删除不必要的系统组件"
-    tyblue "  23. 修复退格键问题"
-    tyblue "  24. 修改dns"
+    tyblue "  24. 修复退格键问题"
+    tyblue "  25. 修改dns"
     yellow "  0. 退出脚本"
     echo
     echo
     
     local choice=""
-    while [[ ! "$choice" =~ ^(0|[1-9][0-9]*)$ ]] || ((choice>24))
+    while [[ ! "$choice" =~ ^(0|[1-9][0-9]*)$ ]] || ((choice>25))
     do
         read -p "您的选择是：" choice
     done
     
     # 权限检查
-    if (( choice==2 || (7<=choice&&choice<=9) || choice==13 || (15<=choice&&choice<=21) )) && [ $is_installed -eq 0 ]; then
+    if (( choice==2 || (7<=choice&&choice<=9) || choice==13 || (15<=choice&&choice<=22) )) && [ $is_installed -eq 0 ]; then
         red "请先安装Xray-REALITY+Web！"
         return 1
     fi
@@ -5687,12 +5964,15 @@ start_menu()
             change_reality_config
             ;;
         22)
-            simplify_system
+            view_xray_merged_config
             ;;
         23)
-            repair_tuige
+            simplify_system
             ;;
         24)
+            repair_tuige
+            ;;
+        25)
             change_dns
             ;;
         0)
