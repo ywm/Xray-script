@@ -2672,26 +2672,37 @@ install_update_xray()
         green "REALITY密钥已生成并保存到 /usr/local/etc/xray/reality_keys.json"
     fi
 
-    if ! grep -q "# This file has been edited by Xray-TLS-Web setup script" /etc/systemd/system/xray.service; then
-cat >> /etc/systemd/system/xray.service <<EOF
+    # 删除官方安装脚本创建的 drop-in 配置（它会覆盖我们的设置）
+    rm -rf /etc/systemd/system/xray.service.d
+    
+    # 创建多文件配置目录
+    mkdir -p "$xray_config_dir"
+
+    # 覆盖写入完整的 systemd 服务文件
+    cat > /etc/systemd/system/xray.service <<EOF
 [Unit]
 Description=Xray Service
+Documentation=https://github.com/xtls
 After=network.target nss-lookup.target
 
 # This file has been edited by Xray-TLS-Web setup script
 [Service]
-
-CapabilityBoundingSet=CAP_NET_BIND_SERVICE
-AmbientCapabilities=CAP_NET_BIND_SERVICE
+User=root
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_RAW
+AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_NET_RAW
+NoNewPrivileges=true
 
 # 启动前清理并创建 /dev/shm/xray
 ExecStartPre=/bin/rm -rf /dev/shm/xray
-ExecStartPre=/bin/mkdir /dev/shm/xray
+ExecStartPre=/bin/mkdir -p /dev/shm/xray
 ExecStartPre=/bin/chmod 711 /dev/shm/xray
+
+# 使用多文件配置目录
+ExecStart=/usr/local/bin/xray run -confdir ${xray_config_dir}
+
 # 停止后清理
 ExecStopPost=/bin/rm -rf /dev/shm/xray
 
-ExecStart=/usr/local/bin/xray run -confdir /usr/local/etc/xray/config.d/
 Restart=on-failure
 RestartPreventExitStatus=23
 LimitNPROC=10000
@@ -2700,10 +2711,15 @@ LimitNOFILE=1000000
 [Install]
 WantedBy=multi-user.target
 EOF
-        systemctl daemon-reload
-        systemctl -q is-active xray && systemctl restart xray
-    fi
+
+    systemctl daemon-reload
     systemctl enable xray
+    
+    # 如果 xray 正在运行且配置存在，则重启
+    if systemctl -q is-active xray && [ -d "$xray_config_dir" ] && [ "$(ls -A $xray_config_dir 2>/dev/null)" ]; then
+        systemctl restart xray
+    fi
+    
     xray_is_installed=1
     [ $nginx_is_installed -eq 1 ] && is_installed=1 || is_installed=0
 }
