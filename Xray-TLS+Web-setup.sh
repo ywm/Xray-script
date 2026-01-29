@@ -67,7 +67,7 @@ xray_config_inbound_trojan="${xray_config_dir}/21_inbound_trojan.json"
 xray_config_inbound_xhttp="${xray_config_dir}/22_inbound_xhttp.json"
 xray_config_routing="${xray_config_dir}/50_routing.json"
 xray_config_outbound_direct="${xray_config_dir}/60_outbound_direct.json"
-xray_config_outbound_block="${xray_config_dir}/61_outbound_block_tail.json"
+xray_config_outbound_block="${xray_config_dir}/69_outbound_block_tail.json"
 unset xray_is_installed
 
 temp_dir="/temp_install_update_xray_tls_web"
@@ -3261,10 +3261,25 @@ config_xray()
     # 创建多文件配置目录
     mkdir -p "$xray_config_dir"
     
-    # 清理旧的配置文件
-    rm -f ${xray_config_dir}/*.json
+    # 只删除脚本管理的配置文件，保留用户自定义配置
+    # 脚本管理的文件编号: 00, 10, 20, 21, 22, 50, 60, 69
+    rm -f "${xray_config_dir}/00_"*.json
+    rm -f "${xray_config_dir}/10_"*.json
+    rm -f "${xray_config_dir}/20_"*.json
+    rm -f "${xray_config_dir}/21_"*.json
+    rm -f "${xray_config_dir}/22_"*.json
+    rm -f "${xray_config_dir}/50_"*.json
+    rm -f "${xray_config_dir}/60_"*.json
+    rm -f "${xray_config_dir}/69_"*.json
+    
     # 删除旧版单文件配置（如果存在）
     rm -f "$xray_config"
+    
+    # 检查是否有用户自定义配置文件
+    local user_configs=$(ls "${xray_config_dir}"/*.json 2>/dev/null | grep -v -E "/(00|10|20|21|22|50|60|69)_" | wc -l)
+    if [ "$user_configs" -gt 0 ]; then
+        green "检测到 ${user_configs} 个用户自定义配置文件，将保留这些文件"
+    fi
     
     # ==================== 00_log.json ====================
     cat > "$xray_config_log" <<EOF
@@ -3326,8 +3341,8 @@ EOF
 }
 EOF
 
-    # ==================== 61_outbound_block_tail.json ====================
-    # 文件名含有 tail，添加至 outbounds 最后
+    # ==================== 69_outbound_block_tail.json ====================
+    # 文件名含有 tail，确保添加至 outbounds 最后
     cat > "$xray_config_outbound_block" <<'EOF'
 {
     "outbounds": [
@@ -3341,6 +3356,57 @@ EOF
 EOF
 
     green "Xray 多文件配置已生成到 ${xray_config_dir}/"
+}
+
+# 备份用户自定义的 Xray 配置文件
+backup_user_xray_configs()
+{
+    local backup_dir="$1"
+    [ -z "$backup_dir" ] && backup_dir="/tmp/xray_user_configs_backup_$(date +%Y%m%d_%H%M%S)"
+    
+    if [ ! -d "$xray_config_dir" ]; then
+        return 0
+    fi
+    
+    # 查找用户自定义配置（非脚本管理的编号）
+    local user_files=$(ls "${xray_config_dir}"/*.json 2>/dev/null | grep -v -E "/(00|10|20|21|22|50|60|69)_")
+    
+    if [ -z "$user_files" ]; then
+        yellow "没有检测到用户自定义配置文件"
+        return 0
+    fi
+    
+    mkdir -p "$backup_dir"
+    
+    green "正在备份用户自定义配置到: $backup_dir"
+    for f in $user_files; do
+        cp "$f" "$backup_dir/"
+        green "  已备份: $(basename $f)"
+    done
+    
+    echo "$backup_dir"
+}
+
+# 列出用户自定义的 Xray 配置文件
+list_user_xray_configs()
+{
+    if [ ! -d "$xray_config_dir" ]; then
+        return 0
+    fi
+    
+    local user_files=$(ls "${xray_config_dir}"/*.json 2>/dev/null | grep -v -E "/(00|10|20|21|22|50|60|69)_")
+    
+    if [ -z "$user_files" ]; then
+        return 0
+    fi
+    
+    echo
+    tyblue "检测到以下用户自定义配置文件:"
+    for f in $user_files; do
+        yellow "  - $(basename $f)"
+    done
+    echo
+    return 1  # 返回1表示有用户配置
 }
 
 # 验证 Xray 配置是否正确
@@ -3989,6 +4055,21 @@ generate_trojan_share_link()
 install_update_xray_tls_web()
 {
     in_install_update_xray_tls_web=1
+    
+    # 检查是否有用户自定义配置，提示备份
+    if [ -d "$xray_config_dir" ]; then
+        if ! list_user_xray_configs; then
+            yellow "重新安装/更新会保留这些用户自定义配置文件"
+            yellow "脚本管理的配置文件（编号 00/10/20/21/22/50/60/69）将被重新生成"
+            echo
+            if ask_if "是否先备份用户自定义配置?[y/n]"; then
+                local backup_path=$(backup_user_xray_configs)
+                green "配置已备份到: $backup_path"
+                echo
+            fi
+        fi
+    fi
+    
     check_nginx_installed_system
     [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
     check_SELinux
@@ -5147,7 +5228,7 @@ change_reality_config()
     xray_safe_restart
 }
 
-# 查看 Xray 多文件配置合并后的完整配置
+# 管理 Xray 多文件配置
 view_xray_merged_config()
 {
     if [ ! -d "$xray_config_dir" ]; then
@@ -5156,22 +5237,49 @@ view_xray_merged_config()
     fi
     
     echo -e "\\n"
-    tyblue "==================== Xray 多文件配置目录 ===================="
+    tyblue "==================== Xray 多文件配置管理 ===================="
     tyblue "配置目录: $xray_config_dir"
     echo
-    tyblue "配置文件列表:"
-    ls -la "$xray_config_dir"/*.json 2>/dev/null
+    
+    # 统计配置文件
+    local total_files=$(ls "$xray_config_dir"/*.json 2>/dev/null | wc -l)
+    local script_files=$(ls "$xray_config_dir"/*.json 2>/dev/null | grep -E "/(00|10|20|21|22|50|60|69)_" | wc -l)
+    local user_files=$((total_files - script_files))
+    
+    tyblue "配置文件统计:"
+    green "  脚本管理的配置: ${script_files} 个"
+    if [ $user_files -gt 0 ]; then
+        yellow "  用户自定义配置: ${user_files} 个"
+    else
+        tyblue "  用户自定义配置: 0 个"
+    fi
     echo
     
-    tyblue "-------------请选择要查看的内容-------------"
-    tyblue " 1. 查看合并后的完整配置 (xray -dump)"
+    tyblue "脚本管理的配置文件 (重装时会被覆盖):"
+    tyblue "  00_*.json - 日志配置"
+    tyblue "  10_*.json - DNS配置"
+    tyblue "  20_*.json - REALITY入站"
+    tyblue "  21_*.json - Trojan入站"
+    tyblue "  22_*.json - XHTTP入站"
+    tyblue "  50_*.json - 路由规则"
+    tyblue "  60_*.json - 直连出站"
+    tyblue "  69_*.json - 阻止出站 (tail)"
+    echo
+    yellow "提示: 用户自定义配置请使用其他编号 (如 30_, 40_, 55_ 等)"
+    echo
+    
+    tyblue "-------------请选择操作-------------"
+    tyblue " 1. 查看合并后的完整配置"
     tyblue " 2. 查看单个配置文件"
     tyblue " 3. 验证配置是否正确"
+    tyblue " 4. 列出所有配置文件"
+    tyblue " 5. 备份用户自定义配置"
+    tyblue " 6. 查看配置文件编号说明"
     yellow " 0. 返回"
     echo
     
     local choice=""
-    while [[ ! "$choice" =~ ^(0|[1-3])$ ]]
+    while [[ ! "$choice" =~ ^(0|[1-6])$ ]]
     do
         read -p "您的选择是：" choice
     done
@@ -5189,7 +5297,13 @@ view_xray_merged_config()
         local files=($(ls "$xray_config_dir"/*.json 2>/dev/null))
         local i=1
         for f in "${files[@]}"; do
-            tyblue "  $i. $(basename "$f")"
+            local fname=$(basename "$f")
+            # 标记用户配置
+            if echo "$fname" | grep -qE "^(00|10|20|21|22|50|60|69)_"; then
+                tyblue "  $i. $fname [脚本管理]"
+            else
+                yellow "  $i. $fname [用户自定义]"
+            fi
             ((i++))
         done
         echo
@@ -5214,6 +5328,56 @@ view_xray_merged_config()
         else
             red "配置验证失败！"
         fi
+        echo
+    elif [ $choice -eq 4 ]; then
+        echo -e "\\n"
+        tyblue "==================== 配置文件列表 ===================="
+        ls -la "$xray_config_dir"/*.json 2>/dev/null
+        echo
+        list_user_xray_configs
+    elif [ $choice -eq 5 ]; then
+        echo -e "\\n"
+        if [ $user_files -eq 0 ]; then
+            yellow "没有检测到用户自定义配置文件"
+        else
+            backup_user_xray_configs
+        fi
+        echo
+    elif [ $choice -eq 6 ]; then
+        echo -e "\\n"
+        tyblue "==================== 配置文件编号说明 ===================="
+        echo
+        tyblue "Xray 多文件配置按文件名排序后依次加载并合并。"
+        tyblue "编号越小越先加载，后加载的配置会覆盖或补充前面的配置。"
+        echo
+        tyblue "脚本使用的编号 (请勿使用):"
+        yellow "  00 - 日志配置 (log)"
+        yellow "  10 - DNS配置 (dns)"
+        yellow "  20 - REALITY入站 (inbounds)"
+        yellow "  21 - Trojan入站 (inbounds)"
+        yellow "  22 - XHTTP入站 (inbounds)"
+        yellow "  50 - 路由规则 (routing)"
+        yellow "  60 - 直连出站 (outbounds)"
+        yellow "  69 - 阻止出站 (outbounds, tail确保在最后)"
+        echo
+        tyblue "建议用户使用的编号:"
+        green "  05 - 自定义日志配置 (会覆盖00的设置)"
+        green "  15 - 自定义DNS配置"
+        green "  25-49 - 自定义入站 (如SOCKS代理、额外的VLESS等)"
+        green "  55 - 自定义路由规则 (会与50合并)"
+        green "  61-68 - 自定义出站 (如代理链、负载均衡等)"
+        echo
+        tyblue "示例: 添加一个SOCKS5入站"
+        tyblue "  文件名: 25_inbound_socks.json"
+        tyblue "  内容:"
+        echo '  {'
+        echo '    "inbounds": [{'
+        echo '      "tag": "socks-in",'
+        echo '      "port": 1080,'
+        echo '      "protocol": "socks",'
+        echo '      "settings": { "auth": "noauth" }'
+        echo '    }]'
+        echo '  }'
         echo
     fi
     
@@ -5827,8 +5991,8 @@ start_menu()
     tyblue "  19. 修改id[UUID/密码]"
     tyblue "  20. 修改XHTTP的path"
     tyblue "  21. 修改REALITY配置"
-    tyblue "  22. 查看Xray合并配置"
-    purple "         查看多文件配置合并后的完整配置"
+    tyblue "  22. 管理Xray配置"
+    purple "         查看/验证/备份多文件配置，管理用户自定义配置"
     echo
     tyblue " ----------------其它----------------"
     tyblue "  23. 精简系统"
