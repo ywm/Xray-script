@@ -612,6 +612,8 @@ remove_xray()
         rm -rf /usr/local/etc/xray
         rm -rf /etc/systemd/system/xray.service
         rm -rf /etc/systemd/system/xray@.service
+        rm -rf /etc/systemd/system/xray.service.d
+        rm -rf /etc/systemd/system/xray@.service.d
         rm -rf /var/log/xray
         systemctl daemon-reload
     fi
@@ -2674,6 +2676,8 @@ install_update_xray()
 
     # 删除官方安装脚本创建的 drop-in 配置（它会覆盖我们的设置）
     rm -rf /etc/systemd/system/xray.service.d
+    rm -rf /etc/systemd/system/xray@.service
+    rm -rf /etc/systemd/system/xray@.service.d
     
     # 创建多文件配置目录
     mkdir -p "$xray_config_dir"
