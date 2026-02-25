@@ -2135,9 +2135,9 @@ install_nginx_dependence()
 {
     green "正在安装Nginx依赖。。。"
     if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == oracle ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        install_dependence pcre2-devel zlib-devel libxml2-devel libxslt-devel gd-devel geoip-devel perl-ExtUtils-Embed gperftools-devel perl-devel
+        install_dependence pcre2-devel zlib-devel libxml2-devel libxslt-devel gd-devel geoip-devel libmaxminddb-devel perl-ExtUtils-Embed gperftools-devel perl-devel
     else
-        install_dependence libpcre2-dev zlib1g-dev libxml2-dev libxslt1-dev libgd-dev libgeoip-dev libgoogle-perftools-dev libperl-dev
+        install_dependence libpcre2-dev zlib1g-dev libxml2-dev libxslt1-dev libgd-dev libgeoip-dev libmaxminddb-dev libgoogle-perftools-dev libperl-dev
     fi
 }
 install_php_dependence()
@@ -2345,6 +2345,17 @@ compile_nginx()
     fi
     tar -zxf ${openssl_version}.tar.gz
     rm -f "${openssl_version}.tar.gz"
+
+    # 下载 ngx_http_geoip2_module
+    green "正在下载 ngx_http_geoip2_module..."
+    if ! wget -O ngx_http_geoip2_module.zip "https://github.com/leev/ngx_http_geoip2_module/archive/refs/heads/master.zip"; then
+        red    "获取 ngx_http_geoip2_module 失败"
+        yellow "按回车键继续或者按Ctrl+c终止"
+        read -s
+    fi
+    unzip -q ngx_http_geoip2_module.zip
+    rm -f ngx_http_geoip2_module.zip
+
     cd ${nginx_version}
     
     local openssl_supports_quic=0
@@ -2399,6 +2410,7 @@ compile_nginx()
         "--with-stream_ssl_preread_module"
         "--with-google_perftools_module"
         "--with-compat"
+        "--add-module=../ngx_http_geoip2_module-master"
         "--with-cc-opt=${cflags[*]}"
         "--with-openssl=../$openssl_version"
         "--with-openssl-opt=${cflags[*]}"
@@ -2639,6 +2651,7 @@ EOF
     systemctl enable nginx
     nginx_is_installed=1
     [ $xray_is_installed -eq 1 ] && is_installed=1 || is_installed=0
+    install_geoip2_database
 }
 
 
@@ -2647,6 +2660,22 @@ install_geodata() {
     wget -O /usr/local/share/xray/geoip.dat https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.dat
     wget -O /usr/local/share/xray/geosite.dat https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat
     green "Xray geodata 已下载完成"
+}
+
+install_geoip2_database() {
+    green "正在下载 GeoLite2 数据库 (Loyalsoldier)..."
+    mkdir -p /usr/local/share/GeoIP2
+    local db_dir="/usr/local/share/GeoIP2"
+    local db_file="${db_dir}/GeoLite2-Country.mmdb"
+
+    if ! wget -O "${db_file}" "https://github.com/Loyalsoldier/geoip/releases/latest/download/Country.mmdb"; then
+        red    "GeoLite2 数据库下载失败！"
+        yellow "请手动下载并放到: ${db_file}"
+        yellow "按回车键继续..."
+        read -s
+        return 1
+    fi
+    green "GeoLite2 数据库已安装到: ${db_file}"
 }
 
 #安装/更新Xray
@@ -3080,6 +3109,17 @@ http {
     sendfile        on;
     keepalive_timeout  65;
 
+    # GeoIP2 封禁配置
+    geoip2 /usr/local/share/GeoIP2/GeoLite2-Country.mmdb {
+        \$geoip2_data_country_code country iso_code;
+    }
+    map \$geoip2_data_country_code \$blocked_country {
+        default 1;
+        CN      0;
+        CLOUDFLARE 0;
+        CLOUDFRONT 0;
+    }
+
     # HTTP 80 重定向到主域名的伪装站
     server {
         listen 80 reuseport default_server;
@@ -3105,6 +3145,7 @@ http {
         
         add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
         include ${nginx_prefix}/custom.d/location.conf;
+        if (\$blocked_country) { return 403; }
         
 EOF
 
@@ -3132,6 +3173,7 @@ EOF
         
         add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
         include ${nginx_prefix}/custom.d/location.conf;
+        if (\$blocked_country) { return 403; }
         
 EOF
 
@@ -3158,6 +3200,7 @@ EOF
         
         add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
         include ${nginx_prefix}/custom.d/location.conf;
+        if (\$blocked_country) { return 403; }
         
 EOF
 
@@ -3186,6 +3229,7 @@ EOF
         
         add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
         include ${nginx_prefix}/custom.d/location.conf;
+        if (\$blocked_country) { return 403; }
 
 EOF
     add_pretend_config_to_file
@@ -6172,4 +6216,3 @@ else
     update=0
     start_menu
 fi
-
