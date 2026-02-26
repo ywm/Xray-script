@@ -3068,6 +3068,14 @@ events {
 
 # Stream 模块 - SNI 分流
 stream {
+     log_format stream_log '$remote_addr [$time_local] '
+                          '$ssl_preread_server_name '
+                          '$protocol $status '
+                          '$bytes_sent $bytes_received '
+                          '$session_time';
+
+    access_log /var/log/nginx/stream_access.log stream_log buffer=128k flush=3s;
+
     map \$ssl_preread_server_name \$backend_name {
         ${domain_list[0]} reality;  # REALITY 域名
         ${domain_list[1]} trojan;   # Trojan 域名
