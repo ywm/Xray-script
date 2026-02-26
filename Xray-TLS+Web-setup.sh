@@ -3068,11 +3068,11 @@ events {
 
 # Stream 模块 - SNI 分流
 stream {
-     log_format stream_log '$remote_addr [$time_local] '
-                          '$ssl_preread_server_name '
-                          '$protocol $status '
-                          '$bytes_sent $bytes_received '
-                          '$session_time';
+    log_format stream_log '\$remote_addr [\$time_local] '
+                          '\$ssl_preread_server_name '
+                          '\$protocol \$status '
+                          '\$bytes_sent \$bytes_received '
+                          '\$session_time';
 
     access_log ${nginx_prefix}/logs/stream_access.log stream_log buffer=128k flush=3s;
 
