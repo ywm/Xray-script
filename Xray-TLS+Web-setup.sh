@@ -2721,6 +2721,7 @@ After=network.target nss-lookup.target
 # This file has been edited by Xray-TLS-Web setup script
 [Service]
 User=root
+LimitNOFILE=65535
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_RAW
 AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_NET_RAW
 NoNewPrivileges=true
@@ -3058,12 +3059,13 @@ config_nginx()
     cat > ${nginx_prefix}/conf/nginx.conf <<EOF
 user  root root;
 worker_processes  auto;
+worker_rlimit_nofile 65535;
 
 #error_log  logs/error.log;
 google_perftools_profiles /dev/shm/nginx/tcmalloc/tcmalloc;
 
 events {
-    worker_connections  1024;
+    worker_connections  4096;
 }
 
 # Stream 模块 - SNI 分流
