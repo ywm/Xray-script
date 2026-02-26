@@ -3074,7 +3074,18 @@ stream {
                           '$bytes_sent $bytes_received '
                           '$session_time';
 
-    access_log /var/log/nginx/stream_access.log stream_log buffer=128k flush=3s;
+    access_log ${nginx_prefix}/logs/stream_access.log stream_log buffer=128k flush=3s;
+
+    # Stream 层 GeoIP2 封禁
+    geoip2 /usr/local/share/GeoIP2/GeoLite2-Country.mmdb {
+        \$geoip2_data_country_code source=\$remote_addr country iso_code;
+    }
+    map \$geoip2_data_country_code \$blocked_country_stream {
+        default    1;
+        CN         0;
+        CLOUDFLARE 0;
+        CLOUDFRONT 0;
+    }
 
     map \$ssl_preread_server_name \$backend_name {
         ${domain_list[0]} reality;  # REALITY 域名
@@ -3084,7 +3095,13 @@ stream {
         ${true_domain_list[0]} web;
         default web;
     }
-    
+
+    # 封禁时映射到 blocked upstream，否则走正常后端
+    map \$blocked_country_stream \$real_backend {
+        0  \$backend_name;
+        1  blocked;
+    }
+
     upstream reality {
         server unix:/dev/shm/xray/reality.sock;
     }
@@ -3100,13 +3117,18 @@ stream {
     upstream web {
         server unix:/dev/shm/nginx/default_web.sock;
     }
+
+    # 封禁用的空 upstream，连接会立即被拒绝
+    upstream blocked {
+        server 127.0.0.1:1;
+    }
     
     server {
         listen 443;
         listen [::]:443;
         ssl_preread on;
         proxy_protocol on;
-        proxy_pass \$backend_name;
+        proxy_pass \$real_backend;
     }
 }
 
@@ -3117,13 +3139,13 @@ http {
     sendfile        on;
     keepalive_timeout  65;
 
-    # GeoIP2 封禁配置
+    # HTTP 层 GeoIP2 封禁（与 stream 层独立配置）
     geoip2 /usr/local/share/GeoIP2/GeoLite2-Country.mmdb {
         \$geoip2_data_country_code country iso_code;
     }
     map \$geoip2_data_country_code \$blocked_country {
-        default 1;
-        CN      0;
+        default    1;
+        CN         0;
         CLOUDFLARE 0;
         CLOUDFRONT 0;
     }
@@ -6224,3 +6246,4 @@ else
     update=0
     start_menu
 fi
+
