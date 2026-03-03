@@ -505,10 +505,26 @@ check_nginx_update()
     local nginx_version_now
     local openssl_version_now
     nginx_version_now="nginx-$(${nginx_prefix}/sbin/nginx -V 2>&1 | grep "^nginx version:" | cut -d / -f 2)"
-    openssl_version_now="openssl-openssl-$(${nginx_prefix}/sbin/nginx -V 2>&1 | grep "^built with OpenSSL" | awk '{print $4}')"
+    openssl_version_now="openssl-$(${nginx_prefix}/sbin/nginx -V 2>&1 | grep "^built with OpenSSL" | awk '{print $4}')"
+
+    # ========== 调试输出 ==========
+    echo
+    tyblue "=========== Nginx 版本检查 ==========="
+    tyblue "当前安装的 Nginx 版本：   $nginx_version_now"
+    tyblue "脚本目标 Nginx 版本：     $nginx_version"
+    echo
+    tyblue "当前安装的 OpenSSL 版本： $openssl_version_now"
+    tyblue "脚本目标 OpenSSL 版本：   $openssl_version"
+    echo
     if [ "$nginx_version_now" == "$nginx_version" ] && [ "$openssl_version_now" == "$openssl_version" ]; then
+        green "✓ Nginx 和 OpenSSL 已是最新版本"
+        tyblue "========================================="
+        echo
         return 1
     else
+        yellow "！Nginx 或 OpenSSL 有新版本可用"
+        tyblue "========================================="
+        echo
         return 0
     fi
 }
