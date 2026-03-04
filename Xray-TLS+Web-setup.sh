@@ -2941,135 +2941,9 @@ get_all_certs()
     done
 }
 
-#配置nginx
-config_nginx_init()
-{
-cat > ${nginx_prefix}/conf/nginx.conf <<EOF
-
-user  root root;
-worker_processes  auto;
-
-#error_log  logs/error.log;
-#error_log  logs/error.log  notice;
-#error_log  logs/error.log  info;
-
-#pid        logs/nginx.pid;
-google_perftools_profiles /dev/shm/nginx/tcmalloc/tcmalloc;
-
-events {
-    worker_connections  1024;
-}
-
-
-http {
-    include       mime.types;
-    default_type  application/octet-stream;
-
-    #log_format  main  '\$remote_addr - \$remote_user [\$time_local] "\$request" '
-    #                  '\$status \$body_bytes_sent "\$http_referer" '
-    #                  '"\$http_user_agent" "\$http_x_forwarded_for"';
-
-    #access_log  logs/access.log  main;
-
-    sendfile        on;
-    #tcp_nopush     on;
-
-    #keepalive_timeout  0;
-    keepalive_timeout  65;
-
-    #gzip  on;
-
-    include       $nginx_config;
-    #server {
-        #listen       80;
-        #server_name  localhost;
-
-        #charset koi8-r;
-
-        #access_log  logs/host.access.log  main;
-
-        #location / {
-        #    root   html;
-        #    index  index.html index.htm;
-        #}
-
-        #error_page  404              /404.html;
-
-        # redirect server error pages to the static page /50x.html
-        #
-        #error_page   500 502 503 504  /50x.html;
-        #location = /50x.html {
-        #    root   html;
-        #}
-
-        # proxy the PHP scripts to Apache listening on 127.0.0.1:80
-        #
-        #location ~ \\.php\$ {
-        #    proxy_pass   http://127.0.0.1;
-        #}
-
-        # pass the PHP scripts to FastCGI server listening on 127.0.0.1:9000
-        #
-        #location ~ \\.php\$ {
-        #    root           html;
-        #    fastcgi_pass   127.0.0.1:9000;
-        #    fastcgi_index  index.php;
-        #    fastcgi_param  SCRIPT_FILENAME  /scripts\$fastcgi_script_name;
-        #    include        fastcgi_params;
-        #}
-
-        # deny access to .htaccess files, if Apache's document root
-        # concurs with nginx's one
-        #
-        #location ~ /\\.ht {
-        #    deny  all;
-        #}
-    #}
-
-
-    # another virtual host using mix of IP-, name-, and port-based configuration
-    #
-    #server {
-    #    listen       8000;
-    #    listen       somename:8080;
-    #    server_name  somename  alias  another.alias;
-
-    #    location / {
-    #        root   html;
-    #        index  index.html index.htm;
-    #    }
-    #}
-
-
-    # HTTPS server
-    #
-    #server {
-    #    listen       443 ssl;
-    #    server_name  localhost;
-
-    #    ssl_certificate      cert.pem;
-    #    ssl_certificate_key  cert.key;
-
-    #    ssl_session_cache    shared:SSL:1m;
-    #    ssl_session_timeout  5m;
-
-    #    ssl_ciphers  HIGH:!aNULL:!MD5;
-    #    ssl_prefer_server_ciphers  on;
-
-    #    location / {
-    #        root   html;
-    #        index  index.html index.htm;
-    #    }
-    #}
-
-}
-EOF
-}
-
 #nginx 配置
 config_nginx()
 {
-    config_nginx_init
     
     # 一次性生成完整的 Nginx 配置,避免多次 cat 拼接导致的问题
     cat > ${nginx_prefix}/conf/nginx.conf <<EOF
@@ -3175,116 +3049,17 @@ http {
         return 301 https://${true_domain_list[0]}\$request_uri;
     }
 
-    # XHTTP Web 服务器
-    server {
-        listen unix:/dev/shm/nginx/xhttp_web.sock ssl proxy_protocol;
-        http2 on;
-        set_real_ip_from unix:;
-        real_ip_header proxy_protocol;
-        
-        server_name ${domain_list[2]};
-        
-        ssl_certificate ${nginx_prefix}/certs/${true_domain_list[0]}.cer;
-        ssl_certificate_key ${nginx_prefix}/certs/${true_domain_list[0]}.key;
-        
-        ssl_protocols TLSv1.2 TLSv1.3;
-        ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305;
-        ssl_prefer_server_ciphers on;
-        
-        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
-        include ${nginx_prefix}/custom.d/location.conf;
-        if (\$blocked_country) { return 403; }
-        
-EOF
+    # 使用参数化函数添加四个 SSL server 块
+    add_ssl_server_block "/dev/shm/nginx/xhttp_web.sock" "${domain_list[2]}" "XHTTP Web 服务器"
+    add_ssl_server_block "/dev/shm/nginx/reality_web.sock" "${domain_list[0]}" "REALITY Web 服务器"
+    add_ssl_server_block "/dev/shm/nginx/trojan_web.sock" "${domain_list[1]}" "Trojan Web 服务器"
 
-    # 添加伪装网站配置 (三个域名都用同一个伪装配置)
-    add_pretend_config_to_file
-    
-    cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
-    }
+    # 默认 Web 服务器 (处理未匹配的 SNI)
+    add_ssl_server_block "/dev/shm/nginx/default_web.sock" "${true_domain_list[0]} www.${true_domain_list[0]} _" "默认 Web 服务器 (处理未匹配的 SNI)"
 
-    # REALITY Web 服务器
-    server {
-        listen unix:/dev/shm/nginx/reality_web.sock ssl proxy_protocol;
-        http2 on;
-        set_real_ip_from unix:;
-        real_ip_header proxy_protocol;
-        
-        server_name ${domain_list[0]};
-        
-        ssl_certificate ${nginx_prefix}/certs/${true_domain_list[0]}.cer;
-        ssl_certificate_key ${nginx_prefix}/certs/${true_domain_list[0]}.key;
-        
-        ssl_protocols TLSv1.2 TLSv1.3;
-        ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305;
-        ssl_prefer_server_ciphers on;
-        
-        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
-        include ${nginx_prefix}/custom.d/location.conf;
-        if (\$blocked_country) { return 403; }
-        
-EOF
 
-    add_pretend_config_to_file
-    
-    cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
-    }
 
-    # Trojan Web 服务器
-    server {
-        listen unix:/dev/shm/nginx/trojan_web.sock ssl proxy_protocol;
-        http2 on;
-        set_real_ip_from unix:;
-        real_ip_header proxy_protocol;
-        
-        server_name ${domain_list[1]};
-        
-        ssl_certificate ${nginx_prefix}/certs/${true_domain_list[0]}.cer;
-        ssl_certificate_key ${nginx_prefix}/certs/${true_domain_list[0]}.key;
-        
-        ssl_protocols TLSv1.2 TLSv1.3;
-        ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305;
-        ssl_prefer_server_ciphers on;
-        
-        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
-        include ${nginx_prefix}/custom.d/location.conf;
-        if (\$blocked_country) { return 403; }
-        
-EOF
-
-    add_pretend_config_to_file
-    
-    cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
-    }
-
-    # 默认 Web 服务器(处理未匹配的SNI)
-    server {
-        listen unix:/dev/shm/nginx/default_web.sock ssl proxy_protocol;
-        http2 on;
-        set_real_ip_from unix:;
-        real_ip_header proxy_protocol;
-        
-       # 同时处理 www、主域名和其他未匹配的域名
-        server_name ${true_domain_list[0]} www.${true_domain_list[0]} _;
-        
-        # 使用正式证书(支持泛域名)
-        ssl_certificate ${nginx_prefix}/certs/${true_domain_list[0]}.cer;
-        ssl_certificate_key ${nginx_prefix}/certs/${true_domain_list[0]}.key;
-        
-        ssl_protocols TLSv1.2 TLSv1.3;
-        ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305;
-        ssl_prefer_server_ciphers on;
-        
-        add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
-        include ${nginx_prefix}/custom.d/location.conf;
-        if (\$blocked_country) { return 403; }
-
-EOF
-    add_pretend_config_to_file
-    cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
-    }
 }
-
 #-----------------不要修改以下内容----------------
 #domain_list=${domain_list[*]}
 #true_domain_list=${true_domain_list[*]}
@@ -3333,6 +3108,42 @@ EOF
         }
 EOF
     fi
+}
+
+
+# 添加 SSL server 块到 nginx 配置
+# 参数：$1=socket 路径，$2=server_name, $3=注释描述
+add_ssl_server_block()
+{
+    local listen_sock="$1"
+    local server_name="$2"
+    local comment="$3"
+
+    cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
+
+# ${comment}
+server {
+    listen unix:${listen_sock} ssl proxy_protocol;
+    http2 on;
+    set_real_ip_from unix:;
+    real_ip_header proxy_protocol;
+
+    server_name ${server_name};
+
+    ssl_certificate ${nginx_prefix}/certs/${true_domain_list[0]}.cer;
+    ssl_certificate_key ${nginx_prefix}/certs/${true_domain_list[0]}.key;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-ECDSA-CHACHA20-POLY1305;
+    ssl_prefer_server_ciphers on;
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+    include ${nginx_prefix}/custom.d/location.conf;
+    if (\$blocked_country) { return 403; }
+
+EOF
+    add_pretend_config_to_file
+    echo "}" >> ${nginx_prefix}/conf/nginx.conf
 }
 
 # 生成自签名证书(仅用于REALITY回落，实际不会被验证)
@@ -5371,114 +5182,129 @@ view_xray_merged_config()
     tyblue " 4. 列出所有配置文件"
     tyblue " 5. 备份用户自定义配置"
     tyblue " 6. 查看配置文件编号说明"
-    yellow " 0. 返回"
+    yellow " 0. 返回主菜单"
     echo
-    
-    local choice=""
-    while [[ ! "$choice" =~ ^(0|[1-6])$ ]]
-    do
-        read -p "您的选择是：" choice
-    done
-    
-    [ $choice -eq 0 ] && return 0
-    
-    if [ $choice -eq 1 ]; then
-        echo -e "\\n"
-        tyblue "==================== 合并后的完整配置 ===================="
-        /usr/local/bin/xray run -confdir "$xray_config_dir" -dump 2>&1
-        echo
-    elif [ $choice -eq 2 ]; then
-        echo -e "\\n"
-        tyblue "可查看的配置文件:"
-        local files=($(ls "$xray_config_dir"/*.json 2>/dev/null))
-        local i=1
-        for f in "${files[@]}"; do
-            local fname=$(basename "$f")
-            # 标记用户配置
-            if echo "$fname" | grep -qE "^(00|10|20|21|22|50|60|69)_"; then
-                tyblue "  $i. $fname [脚本管理]"
-            else
-                yellow "  $i. $fname [用户自定义]"
-            fi
-            ((i++))
+
+    # ========== 主循环 - 操作后返回菜单而不是退出 ==========
+    while true; do
+        local choice=""
+        while [[ ! "$choice" =~ ^(0|[1-6])$ ]]
+        do
+            read -p "您的选择是：" choice
         done
-        echo
-        
-        local file_choice=""
-        read -p "请输入文件编号: " file_choice
-        
-        if [[ "$file_choice" =~ ^[0-9]+$ ]] && [ "$file_choice" -ge 1 ] && [ "$file_choice" -le "${#files[@]}" ]; then
-            local selected_file="${files[$((file_choice-1))]}"
+
+        [ $choice -eq 0 ] && return 0
+
+        if [ $choice -eq 1 ]; then
             echo -e "\\n"
-            tyblue "==================== $(basename "$selected_file") ===================="
-            cat "$selected_file"
+            tyblue "==================== 合并后的完整配置 ===================="
+            /usr/local/bin/xray run -confdir "$xray_config_dir" -dump 2>&1
             echo
-        else
-            red "无效的选择"
+            yellow "按回车键返回菜单..."
+            read -s
+        elif [ $choice -eq 2 ]; then
+            echo -e "\\n"
+            tyblue "可查看的配置文件:"
+            local files=($(ls "$xray_config_dir"/*.json 2>/dev/null))
+            local i=1
+            for f in "${files[@]}"; do
+                local fname=$(basename "$f")
+                # 标记用户配置
+                if echo "$fname" | grep -qE "^(00|10|20|21|22|50|60|69)_"; then
+                    tyblue "  $i. $fname [脚本管理]"
+                else
+                    yellow "  $i. $fname [用户自定义]"
+                fi
+                ((i++))
+            done
+            echo
+
+            local file_choice=""
+            read -p "请输入文件编号：" file_choice
+
+            if [[ "$file_choice" =~ ^[0-9]+$ ]] && [ "$file_choice" -ge 1 ] && [ "$file_choice" -le "${#files[@]}" ]; then
+                local selected_file="${files[$((file_choice-1))]}"
+                echo -e "\\n"
+                tyblue "==================== $(basename "$selected_file") ===================="
+                cat "$selected_file"
+                echo
+                yellow "按回车键返回菜单..."
+                read -s
+            else
+                red "无效的选择"
+                yellow "按回车键返回菜单..."
+                read -s
+            fi
+        elif [ $choice -eq 3 ]; then
+            echo -e "\\n"
+            tyblue "==================== 配置验证 ===================="
+            if /usr/local/bin/xray run -confdir "$xray_config_dir" -test 2>&1; then
+                green "配置验证通过！"
+            else
+                red "配置验证失败！"
+            fi
+            echo
+            yellow "按回车键返回菜单..."
+            read -s
+        elif [ $choice -eq 4 ]; then
+            echo -e "\\n"
+            tyblue "==================== 配置文件列表 ===================="
+            ls -la "$xray_config_dir"/*.json 2>/dev/null
+            echo
+            list_user_xray_configs
+            echo
+            yellow "按回车键返回菜单..."
+            read -s
+        elif [ $choice -eq 5 ]; then
+            echo -e "\\n"
+            if [ $user_files -eq 0 ]; then
+                yellow "没有检测到用户自定义配置文件"
+            else
+                backup_user_xray_configs
+            fi
+            echo
+            yellow "按回车键返回菜单..."
+            read -s
+        elif [ $choice -eq 6 ]; then
+            echo -e "\\n"
+            tyblue "==================== 配置文件编号说明 ===================="
+            echo
+            tyblue "Xray 多文件配置按文件名排序后依次加载并合并。"
+            tyblue "编号越小越先加载，后加载的配置会覆盖或补充前面的配置。"
+            echo
+            tyblue "脚本使用的编号 (请勿使用):"
+            yellow "  00 - 日志配置 (log)"
+            yellow "  10 - DNS 配置 (dns)"
+            yellow "  20 - REALITY 入站 (inbounds)"
+            yellow "  21 - Trojan 入站 (inbounds)"
+            yellow "  22 - XHTTP 入站 (inbounds)"
+            yellow "  50 - 路由规则 (routing)"
+            yellow "  60 - 直连出站 (outbounds)"
+            yellow "  69 - 阻止出站 (outbounds, tail 确保在最后)"
+            echo
+            tyblue "建议用户使用的编号:"
+            green "  05 - 自定义日志配置 (会覆盖 00 的设置)"
+            green "  15 - 自定义 DNS 配置"
+            green "  25-49 - 自定义入站 (如 SOCKS 代理、额外的 VLESS 等)"
+            green "  55 - 自定义路由规则 (会与 50 合并)"
+            green "  61-68 - 自定义出站 (如代理链、负载均衡等)"
+            echo
+            tyblue "示例：添加一个 SOCKS5 入站"
+            tyblue "  文件名：25_inbound_socks.json"
+            tyblue "  内容:"
+            echo '  {'
+            echo '    "inbounds": [{'
+            echo '      "tag": "socks-in",'
+            echo '      "port": 1080,'
+            echo '      "protocol": "socks",'
+            echo '      "settings": { "auth": "noauth" }'
+            echo '    }]'
+            echo '  }'
+            echo
+            yellow "按回车键返回菜单..."
+            read -s
         fi
-    elif [ $choice -eq 3 ]; then
-        echo -e "\\n"
-        tyblue "==================== 配置验证 ===================="
-        if /usr/local/bin/xray run -confdir "$xray_config_dir" -test 2>&1; then
-            green "配置验证通过！"
-        else
-            red "配置验证失败！"
-        fi
-        echo
-    elif [ $choice -eq 4 ]; then
-        echo -e "\\n"
-        tyblue "==================== 配置文件列表 ===================="
-        ls -la "$xray_config_dir"/*.json 2>/dev/null
-        echo
-        list_user_xray_configs
-    elif [ $choice -eq 5 ]; then
-        echo -e "\\n"
-        if [ $user_files -eq 0 ]; then
-            yellow "没有检测到用户自定义配置文件"
-        else
-            backup_user_xray_configs
-        fi
-        echo
-    elif [ $choice -eq 6 ]; then
-        echo -e "\\n"
-        tyblue "==================== 配置文件编号说明 ===================="
-        echo
-        tyblue "Xray 多文件配置按文件名排序后依次加载并合并。"
-        tyblue "编号越小越先加载，后加载的配置会覆盖或补充前面的配置。"
-        echo
-        tyblue "脚本使用的编号 (请勿使用):"
-        yellow "  00 - 日志配置 (log)"
-        yellow "  10 - DNS配置 (dns)"
-        yellow "  20 - REALITY入站 (inbounds)"
-        yellow "  21 - Trojan入站 (inbounds)"
-        yellow "  22 - XHTTP入站 (inbounds)"
-        yellow "  50 - 路由规则 (routing)"
-        yellow "  60 - 直连出站 (outbounds)"
-        yellow "  69 - 阻止出站 (outbounds, tail确保在最后)"
-        echo
-        tyblue "建议用户使用的编号:"
-        green "  05 - 自定义日志配置 (会覆盖00的设置)"
-        green "  15 - 自定义DNS配置"
-        green "  25-49 - 自定义入站 (如SOCKS代理、额外的VLESS等)"
-        green "  55 - 自定义路由规则 (会与50合并)"
-        green "  61-68 - 自定义出站 (如代理链、负载均衡等)"
-        echo
-        tyblue "示例: 添加一个SOCKS5入站"
-        tyblue "  文件名: 25_inbound_socks.json"
-        tyblue "  内容:"
-        echo '  {'
-        echo '    "inbounds": [{'
-        echo '      "tag": "socks-in",'
-        echo '      "port": 1080,'
-        echo '      "protocol": "socks",'
-        echo '      "settings": { "auth": "noauth" }'
-        echo '    }]'
-        echo '  }'
-        echo
-    fi
-    
-    yellow "按回车键继续..."
-    read -s
+    done
 }
 
 # 生成 VLESS 分享链接（完全符合标准）
