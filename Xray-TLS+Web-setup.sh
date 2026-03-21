@@ -1044,8 +1044,8 @@ check_port()
     green "正在检查端口占用。。。"
     local xray_status=0
     local nginx_status=0
-    systemctl -q is-active xray && xray_status=1 && systemctl stop xray
-    systemctl -q is-active nginx && nginx_status=1 && systemctl stop nginx
+    systemctl -q is-active xray 2>/dev/null && xray_status=1 && systemctl stop xray || true
+    systemctl -q is-active nginx 2>/dev/null && nginx_status=1 && systemctl stop nginx || true
     ([ $xray_status -eq 1 ] || [ $nginx_status -eq 1 ]) && sleep 2s
     local check_list=('80' '443')
     local i
@@ -3682,7 +3682,7 @@ update_cloudreve()
 {
     green "正在安装/更新Cloudreve。。。"
     local temp_cloudreve_status=0
-    systemctl -q is-active cloudreve && temp_cloudreve_status=1
+    systemctl -q is-active cloudreve 2>/dev/null && temp_cloudreve_status=1 || true
     systemctl stop cloudreve
     if ! wget -O "$cloudreve_prefix/cloudreve.tar.gz" "https://github.com/cloudreve/Cloudreve/releases/download/${cloudreve_version}/cloudreve_${cloudreve_version}_linux_${machine}.tar.gz"; then
         red "获取Cloudreve失败！！"
@@ -4287,7 +4287,7 @@ install_check_update_update_php()
             green "php已是最新版本"
             return 0
         fi
-        systemctl -q is-active php-fpm && php_status=1
+        systemctl -q is-active php-fpm 2>/dev/null && php_status=1 || true
     else
         ask_update_script
         tyblue "安装php用于运行nextcloud网盘"
@@ -4344,8 +4344,8 @@ check_update_update_nginx()
     echo "[DEBUG] 配置信息获取完成"
     local nginx_status=0
     local xray_status=0
-    systemctl -q is-active nginx && nginx_status=1
-    systemctl -q is-active xray && xray_status=1
+    systemctl -q is-active nginx 2>/dev/null && nginx_status=1 || true
+    systemctl -q is-active xray 2>/dev/null && xray_status=1 || true
     echo "[DEBUG] nginx 状态: $nginx_status, xray 状态: $xray_status"
     install_nginx_compile_toolchains
     echo "[DEBUG] nginx 编译工具链安装完成"
