@@ -1403,18 +1403,26 @@ install_bbr()
     get_kernel_info()
     {
         green "正在获取最新版本内核版本号。。。。(60内秒未获取成功自动跳过)"
+        echo "[DEBUG] get_kernel_info 开始执行"
         your_kernel_version="$(uname -r | cut -d - -f 1)"
+        echo "[DEBUG] 当前内核版本: $your_kernel_version"
         while [ ${your_kernel_version##*.} -eq 0 ]
         do
             your_kernel_version=${your_kernel_version%.*}
         done
+        echo "[DEBUG] 处理后内核版本: $your_kernel_version"
+        echo "[DEBUG] 开始下载内核列表..."
         if ! timeout 60 wget -q -O "temp_kernel_version" "https://kernel.ubuntu.com/~kernel-ppa/mainline/"; then
+            yellow "获取内核版本超时或失败，跳过内核检查"
             latest_kernel_version="error"
-            return 1
+            rm -f temp_kernel_version 2>/dev/null
+            return 0
         fi
+        echo "[DEBUG] 内核列表下载完成，开始解析..."
         local kernel_list=()
         local kernel_list_temp
         kernel_list_temp=($(awk -F'\"v' '/v[0-9]/{print $2}' "temp_kernel_version" | cut -d '"' -f1 | cut -d '/' -f1 | sort -rV))
+        echo "[DEBUG] 找到 ${#kernel_list_temp[@]} 个内核版本"
         if [ ${#kernel_list_temp[@]} -le 1 ]; then
             latest_kernel_version="error"
             return 1
