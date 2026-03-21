@@ -364,23 +364,45 @@ install_dependence()
 # 防止apt卸载时自动安装替代软件
 apt_purge()
 {
-    local ret_code=0
-    mv /etc/apt/sources.list /etc/apt/sources.list.bak
-    mv /etc/apt/sources.list.d /etc/apt/sources.list.d.bak
-    $apt -y --allow-change-held-packages purge "$@" || ret_code=1
-    mv /etc/apt/sources.list.bak /etc/apt/sources.list
-    mv /etc/apt/sources.list.d.bak /etc/apt/sources.list.d
-    return $ret_code
+    # 收集实际安装的包
+    local pkgs_to_remove=()
+    for pkg in "$@"; do
+        if dpkg -l "$pkg" 2>/dev/null | grep -q '^ii'; then
+            pkgs_to_remove+=("$pkg")
+        fi
+    done
+
+    # 没有包需要删除
+    [ ${#pkgs_to_remove[@]} -eq 0 ] && return 0
+
+    # 执行删除
+    mv /etc/apt/sources.list /etc/apt/sources.list.bak 2>/dev/null || true
+    mv /etc/apt/sources.list.d /etc/apt/sources.list.d.bak 2>/dev/null || true
+    $apt -y --allow-change-held-packages purge "${pkgs_to_remove[@]}" 2>/dev/null || true
+    mv /etc/apt/sources.list.bak /etc/apt/sources.list 2>/dev/null || true
+    mv /etc/apt/sources.list.d.bak /etc/apt/sources.list.d 2>/dev/null || true
+    return 0
 }
 apt_auto_remove_purge()
 {
-    local ret_code=0
-    mv /etc/apt/sources.list /etc/apt/sources.list.bak
-    mv /etc/apt/sources.list.d /etc/apt/sources.list.d.bak
-    $apt -y --auto-remove --allow-change-held-packages purge "$@" || ret_code=1
-    mv /etc/apt/sources.list.bak /etc/apt/sources.list
-    mv /etc/apt/sources.list.d.bak /etc/apt/sources.list.d
-    return $ret_code
+    # 收集实际安装的包
+    local pkgs_to_remove=()
+    for pkg in "$@"; do
+        if dpkg -l "$pkg" 2>/dev/null | grep -q '^ii'; then
+            pkgs_to_remove+=("$pkg")
+        fi
+    done
+
+    # 没有包需要删除
+    [ ${#pkgs_to_remove[@]} -eq 0 ] && return 0
+
+    # 执行删除
+    mv /etc/apt/sources.list /etc/apt/sources.list.bak 2>/dev/null || true
+    mv /etc/apt/sources.list.d /etc/apt/sources.list.d.bak 2>/dev/null || true
+    $apt -y --auto-remove --allow-change-held-packages purge "${pkgs_to_remove[@]}" 2>/dev/null || true
+    mv /etc/apt/sources.list.bak /etc/apt/sources.list 2>/dev/null || true
+    mv /etc/apt/sources.list.d.bak /etc/apt/sources.list.d 2>/dev/null || true
+    return 0
 }
 #安装epel源
 install_epel()
