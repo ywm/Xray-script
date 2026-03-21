@@ -3295,7 +3295,7 @@ EOF
 # 备份用户自定义的 Xray 配置文件
 backup_user_xray_configs()
 {
-    local backup_dir="$1"
+    local backup_dir="${1:-}"
     [ -z "$backup_dir" ] && backup_dir="/tmp/xray_user_configs_backup_$(date +%Y%m%d_%H%M%S)"
     
     if [ ! -d "$xray_config_dir" ]; then
@@ -3376,7 +3376,7 @@ xray_test_config()
 # 参数: $1 = "quiet" 时不输出成功信息
 xray_safe_restart()
 {
-    local quiet_mode="$1"
+    local quiet_mode="${1:-}"
     
     # 如果 xray 没有运行，直接返回
     if ! systemctl -q is-active xray; then
@@ -5828,7 +5828,7 @@ generate_qrcode()
 
 urlencode()
 {
-    local string="$1"
+    local string="${1:-}"
     local strlen=${#string}
     local encoded=""
     local pos c o
