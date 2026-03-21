@@ -664,6 +664,7 @@ remove_xray()
 }
 remove_nginx()
 {
+    echo "[DEBUG] remove_nginx 开始执行..."
     systemctl stop nginx
     systemctl disable nginx
     rm -rf $nginx_service
@@ -683,6 +684,7 @@ remove_nginx()
     fi
     nginx_is_installed=0
     is_installed=0
+    echo "[DEBUG] remove_nginx 执行完成"
 }
 remove_php()
 {
@@ -705,8 +707,10 @@ remove_cloudreve()
 #备份域名伪装网站
 backup_domains_web()
 {
+    echo "[DEBUG] backup_domains_web 开始执行..."
     local i
     mkdir "${temp_dir}/domain_backup"
+    echo "[DEBUG] true_domain_list: ${true_domain_list[@]}"
     for i in "${true_domain_list[@]}"
     do
         if [ "$1" == "cp" ]; then
@@ -715,12 +719,15 @@ backup_domains_web()
             mv "${nginx_prefix}/html/${i}" "${temp_dir}/domain_backup" 2>/dev/null
         fi
     done
+    echo "[DEBUG] backup_domains_web 执行完成"
 }
 #获取配置信息
 get_config_info()
 {
-    [[ $is_installed -eq 0 ]] && return
-    
+    echo "[DEBUG] get_config_info 开始执行, is_installed=$is_installed"
+    [[ $is_installed -eq 0 ]] && { echo "[DEBUG] is_installed=0，直接返回"; return; }
+
+    echo "[DEBUG] 开始读取配置..."
     # 检测并迁移旧版单文件配置
     if [ -f "$xray_config" ] && [ ! -d "$xray_config_dir" ]; then
         yellow "检测到旧版单文件配置，将在下次重新配置时自动迁移到多文件配置"
@@ -773,6 +780,7 @@ get_config_info()
     ipv6_download_domain="$(grep "^#ipv6_download_domain=" $nginx_config | cut -d = -f 2)"
     [ -z "$ipv6_download_domain" ] && ipv6_download_domain="[2606:4700:4700::1111]"
 
+    echo "[DEBUG] get_config_info 执行完成"
 }
 
 
@@ -2491,6 +2499,7 @@ compile_nginx()
     swap_off
     _nginx_http3=$openssl_supports_quic
     cd ..
+    echo "[DEBUG] compile_nginx 执行完成"
 }
 
 config_service_nginx()
@@ -2523,15 +2532,18 @@ EOF
 }
 install_nginx_part1()
 {
+    echo "[DEBUG] install_nginx_part1 开始执行..."
     green "正在安装Nginx。。。"
     cd "${nginx_version}"
     make install
     cd ..
     rm -rf "${nginx_version}"
     rm -rf "$openssl_version"
+    echo "[DEBUG] install_nginx_part1 执行完成"
 }
 install_nginx_part2()
 {
+    echo "[DEBUG] install_nginx_part2 开始执行..."
     mkdir ${nginx_prefix}/conf.d
     touch $nginx_config
     # 如果 custom.d 不存在则创建
@@ -2639,6 +2651,7 @@ EOF
     nginx_is_installed=1
     [ $xray_is_installed -eq 1 ] && is_installed=1 || is_installed=0
     install_geoip2_database
+    echo "[DEBUG] install_nginx_part2 执行完成"
 }
 
 
@@ -2897,9 +2910,12 @@ get_cert()
 
 get_all_certs()
 {
+    echo "[DEBUG] get_all_certs 开始执行..."
     local i
+    echo "[DEBUG] domain_list 数量: ${#domain_list[@]}"
     for ((i=0;i<${#domain_list[@]};i++))
     do
+        echo "[DEBUG] 处理域名 ${i}: ${true_domain_list[$i]}"
         if ! get_cert "$i"; then
             red    "域名\"${true_domain_list[$i]}\"证书申请失败！"
             yellow "请检查："
@@ -2910,6 +2926,7 @@ get_all_certs()
             read -r -s -n 1 || true
         fi
     done
+    echo "[DEBUG] get_all_certs 执行完成"
 }
 
 #nginx 配置
@@ -3039,6 +3056,7 @@ http {
 #subdomain_prefix_list=${subdomain_prefix_list[*]}
 #ipv6_download_domain=${ipv6_download_domain}
 EOF
+    echo "[DEBUG] config_nginx 执行完成"
 }
 
 add_pretend_config_to_file()
