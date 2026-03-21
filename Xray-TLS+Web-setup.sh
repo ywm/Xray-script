@@ -770,14 +770,14 @@ get_config_info()
     fi
     
     # 读取域名配置
-    domain_list=($(grep "^#domain_list=" $nginx_config | cut -d = -f 2))
-    true_domain_list=($(grep "^#true_domain_list=" $nginx_config | cut -d = -f 2))
-    domain_config_list=($(grep "^#domain_config_list=" $nginx_config | cut -d = -f 2))
-    pretend_list=($(grep "^#pretend_list=" $nginx_config | cut -d = -f 2))
-    subdomain_prefix_list=($(grep "^#subdomain_prefix_list=" $nginx_config | cut -d = -f 2))
+    domain_list=($(grep "^#domain_list=" $nginx_config 2>/dev/null | cut -d = -f 2 || true))
+    true_domain_list=($(grep "^#true_domain_list=" $nginx_config 2>/dev/null | cut -d = -f 2 || true))
+    domain_config_list=($(grep "^#domain_config_list=" $nginx_config 2>/dev/null | cut -d = -f 2 || true))
+    pretend_list=($(grep "^#pretend_list=" $nginx_config 2>/dev/null | cut -d = -f 2 || true))
+    subdomain_prefix_list=($(grep "^#subdomain_prefix_list=" $nginx_config 2>/dev/null | cut -d = -f 2 || true))
 
     # 读取 IPv6 下行域名
-    ipv6_download_domain="$(grep "^#ipv6_download_domain=" $nginx_config | cut -d = -f 2)"
+    ipv6_download_domain="$(grep "^#ipv6_download_domain=" $nginx_config 2>/dev/null | cut -d = -f 2 || true)"
     [ -z "$ipv6_download_domain" ] && ipv6_download_domain="[2606:4700:4700::1111]"
 
     echo "[DEBUG] get_config_info 执行完成"
