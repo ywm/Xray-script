@@ -1,4 +1,27 @@
 #!/bin/bash
+set -euo pipefail
+
+# 清理临时文件 trap
+cleanup_temp() {
+    if [[ -n "${temp_dir:-}" ]] && [[ -d "$temp_dir" ]]; then
+        rm -rf "$temp_dir"
+    fi
+    # 清理根目录可能的残留临时文件
+    rm -f /temp.c /temp.cpp 2>/dev/null || true
+}
+# 用户中断信号处理
+handle_interrupt()
+{
+    echo
+    red "操作已取消"
+    echo
+    cleanup_temp
+    exit 130
+}
+trap cleanup_temp EXIT INT TERM
+trap handle_interrupt INT TERM
+
+
 
 #系统信息
 # 指令集
@@ -227,9 +250,9 @@ redhat_install()
     else
         local disable_repo="--disablerepo "
     fi
-    if [ $release == centos-stream ]; then
+    if [[ "$release" == "centos-stream" ]]; then
         local epel_repo="epel,epel-next"
-    elif [ $release == oracle ]; then
+    elif [[ "$release" == "oracle" ]]; then
         if version_ge "$systemVersion" 9; then
             local epel_repo="ol9_developer_EPEL"
         elif version_ge "$systemVersion" 8; then
@@ -244,7 +267,7 @@ redhat_install()
     fi
 
 
-    if [ $release == fedora ]; then
+    if [[ "$release" == "fedora" ]]; then
         if $dnf_no_install_recommends -y ${enable_repo}"remi" install "$@"; then
             return 0
         fi
@@ -268,7 +291,7 @@ redhat_install()
 test_important_dependence_installed()
 {
     local temp_exit_code=1
-    if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
+    if [[ "$release" == "ubuntu" ]] || [[ "$release" == "debian" ]] || [ $release == "deepin" ] || [[ "$release" == "other-debian" ]]; then
         if LANG="en_US.UTF-8" LANGUAGE="en_US:en" dpkg -s "$1" 2>/dev/null | grep -qi 'status[ '$'\t]*:[ '$'\t]*install[ '$'\t]*ok[ '$'\t]*installed[ '$'\t]*$'; then
             if LANG="en_US.UTF-8" LANGUAGE="en_US:en" apt-mark manual "$1" | grep -qi 'set[ '$'\t]*to[ '$'\t]*manually[ '$'\t]*installed'; then
                 temp_exit_code=0
@@ -276,7 +299,7 @@ test_important_dependence_installed()
                 red "安装依赖 \"$1\" 出错！"
                 green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
                 yellow "按回车键继续或者Ctrl+c退出"
-                read -s
+                read -r -s -n 1 || true
             fi
         elif $apt_no_install_recommends -y install "$1"; then
             temp_exit_code=0
@@ -306,19 +329,19 @@ test_important_dependence_installed()
 check_important_dependence_installed()
 {
     if ! test_important_dependence_installed "$@"; then
-        if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
+        if [[ "$release" == "ubuntu" ]] || [[ "$release" == "debian" ]] || [ $release == "deepin" ] || [[ "$release" == "other-debian" ]]; then
             red "重要组件\"$1\"安装失败！！"
         else
             red "重要组件\"$2\"安装失败！！"
         fi
         yellow "按回车键继续或者Ctrl+c退出"
-        read -s
+        read -r -s -n 1 || true
     fi
 }
 #安装依赖
 install_dependence()
 {
-    if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
+    if [[ "$release" == "ubuntu" ]] || [[ "$release" == "debian" ]] || [ $release == "deepin" ] || [[ "$release" == "other-debian" ]]; then
         if ! $apt_no_install_recommends -y install "$@"; then
             $apt update
             $apt_no_install_recommends -y -f install
@@ -326,7 +349,7 @@ install_dependence()
                 yellow "依赖安装失败！！"
                 green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
                 yellow "按回车键继续或者Ctrl+c退出"
-                read -s
+                read -r -s -n 1 || true
             fi
         fi
     else
@@ -334,7 +357,7 @@ install_dependence()
             yellow "依赖安装失败！！"
             green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
             yellow "按回车键继续或者Ctrl+c退出"
-            read -s
+            read -r -s -n 1 || true
         fi
     fi
 }
@@ -362,14 +385,14 @@ apt_auto_remove_purge()
 #安装epel源
 install_epel()
 {
-    if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
+    if [[ "$release" == "ubuntu" ]] || [[ "$release" == "debian" ]] || [ $release == "deepin" ] || [[ "$release" == "other-debian" ]]; then
         return
     fi
 
     local ret=0
-    if [ $release == fedora ]; then
+    if [[ "$release" == "fedora" ]]; then
         return
-    elif [ $release == centos-stream ]; then
+    elif [[ "$release" == "centos-stream" ]]; then
         if version_ge "$systemVersion" 10; then
             ret=-1
         elif version_ge "$systemVersion" 9; then
@@ -383,7 +406,7 @@ install_epel()
         else
             ret=-1
         fi
-    elif [ $release == centos ]; then
+    elif [[ "$release" == "centos" ]]; then
         if version_ge "$systemVersion" 9; then
             ret=-1
         elif version_ge "$systemVersion" 8; then
@@ -397,7 +420,7 @@ install_epel()
         else
             ret=-1
         fi
-    elif [ $release == oracle ]; then
+    elif [[ "$release" == "oracle" ]]; then
         if version_ge "$systemVersion" 9; then
             ret=-1
         elif version_ge "$systemVersion" 8; then
@@ -407,7 +430,7 @@ install_epel()
         else
             ret=-1
         fi
-    elif [ $release == rhel ]; then
+    elif [[ "$release" == "rhel" ]]; then
         if version_ge "$systemVersion" 9; then
             ret=-1
         elif version_ge "$systemVersion" 8; then
@@ -421,12 +444,12 @@ install_epel()
         fi
     else
         ############
-        if [ $dnf == microdnf ]; then
+        if [[ "$dnf" == "microdnf" ]]; then
             check_important_dependence_installed "" dnf
             dnf="dnf"
             dnf_no_install_recommends="dnf --setopt install_weak_deps=0"
         fi
-        if [ $dnf == dnf ]; then
+        if [[ "$dnf" == "dnf" ]]; then
             check_important_dependence_installed "" dnf-plugins-core
             dnf config-manager --set-enabled powertools || dnf config-manager --set-enabled PowerTools
         fi
@@ -434,7 +457,7 @@ install_epel()
     fi
 
     if [ $ret -ne 0 ]; then
-        if [ $release == other-redhat ]; then
+        if [[ "$release" == "other-redhat" ]]; then
             if $dnf repolist epel | grep -q epel; then
                 return
             fi
@@ -448,19 +471,19 @@ install_epel()
         echo
         green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
         yellow "按回车键继续或者Ctrl+c退出"
-        read -s
+        read -r -s -n 1 || true
     fi
 }
 fedora_install_remi()
 {
-    if [ $release != fedora ]; then
+    if [[ "$release" != "fedora" ]]; then
         return
     fi
     if ! redhat_install "https://rpms.remirepo.net/fedora/remi-release-$systemVersion.rpm"; then
         yellow "remi源安装失败！！"
         green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
         yellow "按回车键继续或者Ctrl+c退出"
-        read -s
+        read -r -s -n 1 || true
     fi
 }
 #进入工作目录
@@ -480,7 +503,7 @@ enter_temp_dir()
 #检查是否需要php
 check_need_php()
 {
-    [ $is_installed -eq 0 ] && return 1
+    [[ $is_installed -eq 0 ]] && return 1
     local i
     for i in "${pretend_list[@]}"
     do
@@ -491,7 +514,7 @@ check_need_php()
 #检查是否需要cloudreve
 check_need_cloudreve()
 {
-    [ $is_installed -eq 0 ] && return 1
+    [[ $is_installed -eq 0 ]] && return 1
     local i
     for i in "${pretend_list[@]}"
     do
@@ -542,7 +565,7 @@ swap_on()
         red    "开启swap错误发生"
         green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
         yellow "按回车键继续或者Ctrl+c退出"
-        read -s
+        read -r -s -n 1 || true
     fi
     local need_swap_size=$(( $1+$(free -m | sed -n 2p | awk '{print $3}')+$(free -m | sed -n 3p | awk '{print $3}')-$(free -m | sed -n 2p | awk '{print $2}')-$(free -m | sed -n 3p | awk '{print $2}') ))
     if [ $need_swap_size -gt 0 ]; then
@@ -555,13 +578,13 @@ swap_on()
             yellow "可能是机器内存和硬盘空间都不足"
             green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
             yellow "按回车键继续或者Ctrl+c退出"
-            read -s
+            read -r -s -n 1 || true
         fi
     fi
 }
 swap_off()
 {
-    if [ $using_swap_now -eq 1 ]; then
+    if [[ $using_swap_now -eq 1 ]]; then
         tyblue "正在恢复swap。。。"
         if swapoff ${temp_dir}/swap && rm -rf ${temp_dir}/swap; then
             using_swap_now=0
@@ -569,7 +592,7 @@ swap_off()
             red    "关闭swap失败！"
             green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
             yellow "按回车键继续或者Ctrl+c退出"
-            read -s
+            read -r -s -n 1 || true
         fi
     fi
 }
@@ -604,8 +627,8 @@ let_change_cloudreve_domain()
     sleep 15s
     echo -e "\\n\\n"
     tyblue "按两次回车键以继续。。。"
-    read -s
-    read -s
+    read -r -s -n 1 || true
+    read -r -s -n 1 || true
 }
 ask_if()
 {
@@ -696,7 +719,7 @@ backup_domains_web()
 #获取配置信息
 get_config_info()
 {
-    [ $is_installed -eq 0 ] && return
+    [[ $is_installed -eq 0 ]] && return
     
     # 检测并迁移旧版单文件配置
     if [ -f "$xray_config" ] && [ ! -d "$xray_config_dir" ]; then
@@ -927,7 +950,7 @@ fi
 [ -e ${php_prefix}/php-fpm.service.default ] && php_is_installed=1 || php_is_installed=0
 [ -e ${cloudreve_prefix}/cloudreve.db ] && cloudreve_is_installed=1 || cloudreve_is_installed=0
 [ -e /usr/local/bin/xray ] && xray_is_installed=1 || xray_is_installed=0
-([ $xray_is_installed -eq 1 ] && [ $nginx_is_installed -eq 1 ]) && is_installed=1 || is_installed=0
+([ $xray_is_installed -eq 1 ] && [[ $nginx_is_installed -eq 1 ]]) && is_installed=1 || is_installed=0
 cpu_thread_num="$(grep '^processor' /proc/cpuinfo | uniq | wc -l)"
 if [ -z "$cpu_thread_num" ] || [ $cpu_thread_num -lt 1 ]; then
     red "获取CPU线程数失败！"
@@ -962,7 +985,7 @@ get_system_info()
         yellow "获取时区失败！"
         green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
         yellow "按回车键继续或者Ctrl+c退出"
-        read -s
+        read -r -s -n 1 || true
     fi
     if bash -c "echo $(grep '^[ '$'\t]*ID[ '$'\t]*=' /etc/os-release | cut -d = -f 2-)" | grep -qiw ubuntu; then
         release="ubuntu"
@@ -990,7 +1013,7 @@ get_system_info()
         yellow "获取系统信息失败！"
         green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
         yellow "按回车键继续或者Ctrl+c退出"
-        read -s
+        read -r -s -n 1 || true
     fi
 }
 
@@ -1094,7 +1117,7 @@ check_ssh_timeout()
         yellow " 重新连接服务器后，请再次运行脚本完成剩余部分的安装/升级"
         yellow " 再次运行脚本时，重复之前选过的选项即可"
         yellow " 按回车键退出。。。。"
-        read -s
+        read -r -s -n 1 || true
     fi
     exit 0
 }
@@ -1219,12 +1242,12 @@ doupdate()
         do
             read -p "您的选择是：" choice
         done
-        if [ $choice -ne 0 ]; then
+        if [[ $choice -ne 0 ]]; then
             if ! [[ "$(grep -i '^[ '$'\t]*port[ '$'\t]' /etc/ssh/sshd_config | awk '{print $2}')" =~ ^("22"|)$ ]]; then
                 red "检测到ssh端口号被修改"
                 red "升级系统后ssh端口号可能恢复默认值(22)"
                 yellow "按回车键继续。。。"
-                read -s
+                read -r -s -n 1 || true
             fi
             if [ $in_install_update_xray_tls_web -eq 1 ]; then
                 echo
@@ -1234,7 +1257,7 @@ doupdate()
                 echo
                 sleep 2s
                 yellow "按回车键以继续。。。"
-                read -s
+                read -r -s -n 1 || true
             fi
         fi
         local i
@@ -1281,7 +1304,7 @@ doupdate()
         green  " 1. 更新已安装软件，并升级系统 (Ubuntu专享)"
         green  " 2. 仅更新已安装软件"
         red    " 3. 不更新"
-        if [ $release == "ubuntu" ] && (($(free -m | sed -n 2p | awk '{print $2}')<400)); then
+        if [[ "$release" == "ubuntu" ]] && (($(free -m | sed -n 2p | awk '{print $2}')<400)); then
             red "检测到内存过小，升级系统可能导致无法开机，请谨慎选择"
         fi
         echo
@@ -1290,22 +1313,22 @@ doupdate()
         do
             read -p "您的选择是：" choice
         done
-        if [ $release == "ubuntu" ] || [ $choice -ne 1 ]; then
+        if [[ "$release" == "ubuntu" ]] || [[ $choice -ne 1 ]]; then
             break
         fi
         echo
         yellow " 更新系统仅支持Ubuntu！"
         sleep 3s
     done
-    if [ $choice -eq 1 ]; then
+    if [[ $choice -eq 1 ]]; then
         updateSystem
         $apt -y --purge autoremove
         $apt clean
-    elif [ $choice -eq 2 ]; then
+    elif [[ $choice -eq 2 ]]; then
         tyblue "-----------------------即将开始更新-----------------------"
         yellow " 更新过程中遇到问话/对话框，如果不明白，选择yes/y/第一个选项"
         yellow " 按回车键继续。。。"
-        read -s
+        read -r -s -n 1 || true
         $apt -y --purge autoremove
         $apt update
         $apt -y --purge autoremove
@@ -1379,7 +1402,7 @@ install_bbr()
             done
         fi
         latest_kernel_version="${kernel_list[0]}"
-        if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
+        if [[ "$release" == "ubuntu" ]] || [[ "$release" == "debian" ]] || [ $release == "deepin" ] || [[ "$release" == "other-debian" ]]; then
             local rc_version
             rc_version="$(uname -r | cut -d - -f 2)"
             if [[ $rc_version =~ rc ]]; then
@@ -1395,7 +1418,7 @@ install_bbr()
     remove_other_kernel()
     {
         local exit_code=1
-        if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
+        if [[ "$release" == "ubuntu" ]] || [[ "$release" == "debian" ]] || [ $release == "deepin" ] || [[ "$release" == "other-debian" ]]; then
             dpkg --list > "temp_installed_list"
             local kernel_list_image
             kernel_list_image=($(awk '{print $2}' "temp_installed_list" | grep '^linux-image'))
@@ -1414,7 +1437,7 @@ install_bbr()
             if [ $ok_install -lt 1 ]; then
                 red "未发现正在使用的内核，可能已经被卸载，请先重新启动"
                 yellow "按回车键继续。。。"
-                read -s
+                read -r -s -n 1 || true
                 return 1
             fi
             for ((i=${#kernel_list_modules[@]}-1;i>=0;i--))
@@ -1455,7 +1478,7 @@ install_bbr()
             if [ $ok_install -lt 1 ]; then
                 red "未发现正在使用的内核，可能已经被卸载，请先重新启动"
                 yellow "按回车键继续。。。"
-                read -s
+                read -r -s -n 1 || true
                 return 1
             fi
             #for ((i=${#kernel_list_headers[@]}-1;i>=0;i--))
@@ -1495,7 +1518,7 @@ install_bbr()
         else
             red "卸载失败！"
             yellow "按回车键继续或Ctrl+c退出"
-            read -s
+            read -r -s -n 1 || true
             return 1
         fi
     }
@@ -1542,7 +1565,7 @@ install_bbr()
         tyblue "提示：bbr2_ECN 会在系统重启后自动关闭"
         tyblue " 若重启系统，可以 运行脚本 -> 安装/更新bbr -> 启用bbr2_ECN 来重新启用bbr2_ECN"
         yellow "按回车键以继续。。。"
-        read -s
+        read -r -s -n 1 || true
         echo Y > /sys/module/tcp_bbr2/parameters/ecn_enable
         sysctl net.ipv4.tcp_ecn=1
         sleep 1s
@@ -1620,13 +1643,13 @@ install_bbr()
             read -p "您的选择是：" choice
         done
         if (( 1<=choice&&choice<=4 )); then
-            if (( choice==1 || choice==4 )) && ([ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]) && ! dpkg-deb --help | grep -qw "zstd"; then
+            if (( choice==1 || choice==4 )) && ([[ "$release" == "ubuntu" ]] || [[ "$release" == "debian" ]] || [ $release == "deepin" ] || [[ "$release" == "other-debian" ]]) && ! dpkg-deb --help | grep -qw "zstd"; then
                 red    "当前系统dpkg不支持解压zst包，不支持安装此内核！"
                 green  "请更新系统，或选择使用其他系统，或选择安装xanmod内核"
-            elif (( choice==2 || choice==3 )) && ([ $release == "centos" ] || [ $release == centos-stream ] || [ $release == oracle ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]); then
+            elif (( choice==2 || choice==3 )) && ([ $release == "centos" ] || [[ "$release" == "centos-stream" ]] || [[ "$release" == "oracle" ]] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]); then
                 red "xanmod内核仅支持Debian系的系统，如Ubuntu、Debian、deepin、UOS"
             else
-                if (( choice==1 || choice==4 )) && ([ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]); then
+                if (( choice==1 || choice==4 )) && ([[ "$release" == "ubuntu" ]] || [[ "$release" == "debian" ]] || [ $release == "deepin" ] || [[ "$release" == "other-debian" ]]); then
                     check_important_dependence_installed "linux-base" ""
                     if ! version_ge "$(dpkg --list | grep '^[ '$'\t]*ii[ '$'\t][ '$'\t]*linux-base[ '$'\t]' | awk '{print $3}')" "4.5ubuntu1~16.04.1"; then
                         install_dependence linux-base
@@ -1635,17 +1658,17 @@ install_bbr()
                                 red "$apt update出错"
                                 green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
                                 yellow "按回车键继续或者Ctrl+c退出"
-                                read -s
+                                read -r -s -n 1 || true
                             fi
                             install_dependence linux-base
                         fi
                     fi
                 fi
-                if (( choice==1 || choice==4 )) && ([ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]) && ! version_ge "$(dpkg --list | grep '^[ '$'\t]*ii[ '$'\t][ '$'\t]*linux-base[ '$'\t]' | awk '{print $3}')" "4.5ubuntu1~16.04.1"; then
+                if (( choice==1 || choice==4 )) && ([[ "$release" == "ubuntu" ]] || [[ "$release" == "debian" ]] || [ $release == "deepin" ] || [[ "$release" == "other-debian" ]]) && ! version_ge "$(dpkg --list | grep '^[ '$'\t]*ii[ '$'\t][ '$'\t]*linux-base[ '$'\t]' | awk '{print $3}')" "4.5ubuntu1~16.04.1"; then
                     red    "当前系统版本过低，不支持安装此内核！"
                     green  "请使用新系统或选择安装xanmod内核"
                 else
-                    if [ $choice -eq 3 ]; then
+                    if [[ $choice -eq 3 ]]; then
                         local temp_bbr=bbr2
                     else
                         local temp_bbr=bbr
@@ -1665,12 +1688,12 @@ install_bbr()
                         echo
                         sleep 2s
                         yellow "按回车键以继续。。。"
-                        read -s
+                        read -r -s -n 1 || true
                     fi
                     local temp_kernel_sh_url
-                    if [ $choice -eq 1 ]; then
+                    if [[ $choice -eq 1 ]]; then
                         temp_kernel_sh_url="https://github.com/ywm/update-kernel/raw/master/update-kernel-stable.sh"
-                    elif [ $choice -eq 4 ]; then
+                    elif [[ $choice -eq 4 ]]; then
                         temp_kernel_sh_url="https://github.com/ywm/update-kernel/raw/master/update-kernel.sh"
                     else
                         temp_kernel_sh_url="https://github.com/ywm/xanmod-install/raw/main/xanmod-install.sh"
@@ -1678,7 +1701,7 @@ install_bbr()
                     if ! wget -O kernel.sh "$temp_kernel_sh_url"; then
                         red    "获取内核安装脚本失败"
                         yellow "按回车键继续或者按Ctrl+c终止"
-                        read -s
+                        read -r -s -n 1 || true
                     fi
                     chmod +x kernel.sh
                     ./kernel.sh
@@ -1691,7 +1714,7 @@ install_bbr()
                     fi
                 fi
             fi
-        elif [ $choice -eq 5 ]; then
+        elif [[ $choice -eq 5 ]]; then
             if [ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(grep '^[ '$'\t]*net.ipv4.tcp_congestion_control[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" == "bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]; then
                 green "--------------------bbr已安装--------------------"
             else
@@ -1712,18 +1735,18 @@ install_bbr()
                         echo
                         sleep 2s
                         yellow "按回车键以继续。。。"
-                        read -s
+                        read -r -s -n 1 || true
                     fi
                     if ! wget -O bbr.sh https://github.com/teddysun/across/raw/master/bbr.sh; then
                         red    "获取bbr脚本失败"
                         yellow "按回车键继续或者按Ctrl+c终止"
-                        read -s
+                        read -r -s -n 1 || true
                     fi
                     chmod +x bbr.sh
                     ./bbr.sh
                 fi
             fi
-        elif [ $choice -eq 6 ]; then
+        elif [[ $choice -eq 6 ]]; then
             if [ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "bbr2" ] && [ "$(grep '^[ '$'\t]*net.ipv4.tcp_congestion_control[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" == "bbr2" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]; then
                 green "--------------------bbr2已安装--------------------"
             else
@@ -1740,7 +1763,7 @@ install_bbr()
                     yellow "可能是内核不支持"
                 fi
             fi
-        elif [ $choice -eq 7 ]; then
+        elif [[ $choice -eq 7 ]]; then
             tyblue "提示：安装bbrplus/bbr魔改版/暴力bbr魔改版/锐速内核需要重启"
             if [ $in_install_update_xray_tls_web -eq 1 ]; then
                 yellow " 重启后，请："
@@ -1752,19 +1775,19 @@ install_bbr()
             fi
             sleep 2s
             yellow " 按回车键以继续。。。。"
-            read -s
+            read -r -s -n 1 || true
             if ! wget -O tcp.sh "https://raw.githubusercontent.com/chiakge/Linux-NetSpeed/master/tcp.sh"; then
                 red    "获取脚本失败"
                 yellow "按回车键继续或者按Ctrl+c终止"
-                read -s
+                read -r -s -n 1 || true
             fi
             chmod +x tcp.sh
             ./tcp.sh
-        elif [ $choice -eq 8 ]; then
+        elif [[ $choice -eq 8 ]]; then
             change_qdisc
-        elif [ $choice -eq 9 ]; then
+        elif [[ $choice -eq 9 ]]; then
             enable_ecn
-        elif [ $choice -eq 10 ]; then
+        elif [[ $choice -eq 10 ]]; then
             tyblue " 该操作将会卸载除现在正在使用的内核外的其余内核"
             tyblue "    您正在使用的内核是：$(uname -r)"
             ask_if "是否继续？[y/n]" && remove_other_kernel
@@ -1813,7 +1836,7 @@ readPretend()
                 queren=0
             fi
         elif [ $pretend -eq 2 ]; then
-            if (([ $release == "centos" ] || [ $release == centos-stream ] || [ $release == oracle ]) && ! version_ge "$systemVersion" "8" ) || ([ $release == "rhel" ] && ! version_ge "$systemVersion" "8") || ([ $release == "fedora" ] && ! version_ge "$systemVersion" "30") || ([ $release == "ubuntu" ] && ! version_ge "$systemVersion" "20.04") || ([ $release == "debian" ] && ! version_ge "$systemVersion" "11"); then
+            if (([ $release == "centos" ] || [[ "$release" == "centos-stream" ]] || [[ "$release" == "oracle" ]]) && ! version_ge "$systemVersion" "8" ) || ([ $release == "rhel" ] && ! version_ge "$systemVersion" "8") || ([ $release == "fedora" ] && ! version_ge "$systemVersion" "30") || ([[ "$release" == "ubuntu" ]] && ! version_ge "$systemVersion" "20.04") || ([[ "$release" == "debian" ]] && ! version_ge "$systemVersion" "11"); then
                 red "系统版本过低，无法安装php！"
                 echo
                 tyblue "安装Nextcloud需要安装php"
@@ -1829,7 +1852,7 @@ readPretend()
                 sleep 3s
                 queren=0
                 continue
-            elif [ $release == "other-debian" ] || [ $release == "other-redhat" ]; then
+            elif [[ "$release" == "other-debian" ]] || [ $release == "other-redhat" ]; then
                 yellow "未知的系统，可能导致php安装失败！"
                 echo
                 tyblue "安装Nextcloud需要安装php"
@@ -1849,7 +1872,7 @@ readPretend()
                 queren=0
                 continue
             fi
-            if [ $php_is_installed -eq 0 ]; then
+            if [[ $php_is_installed -eq 0 ]]; then
                 tyblue "安装Nextcloud需要安装php"
                 yellow "编译&&安装php可能需要额外消耗15-60分钟"
                 yellow "php将占用一定系统资源，不建议内存<512M的机器使用"
@@ -2129,7 +2152,7 @@ readDomain()
 install_nginx_compile_toolchains()
 {
     green "正在安装Nginx编译工具链。。。"
-    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == oracle ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+    if [ $release == "centos" ] || [[ "$release" == "centos-stream" ]] || [[ "$release" == "oracle" ]] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         install_dependence ca-certificates wget gcc gcc-c++ make perl-IPC-Cmd perl-Getopt-Long perl-Data-Dumper
         if ! perl -e "use FindBin" > /dev/null 2>&1; then
             install_dependence perl-FindBin
@@ -2141,7 +2164,7 @@ install_nginx_compile_toolchains()
 install_php_compile_toolchains()
 {
     green "正在安装php编译工具链。。。"
-    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == oracle ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+    if [ $release == "centos" ] || [[ "$release" == "centos-stream" ]] || [[ "$release" == "oracle" ]] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         install_dependence ca-certificates wget xz gcc gcc-c++ make pkgconf-pkg-config autoconf git
     else
         install_dependence ca-certificates wget xz-utils gcc g++ make pkg-config autoconf git
@@ -2150,7 +2173,7 @@ install_php_compile_toolchains()
 install_nginx_dependence()
 {
     green "正在安装Nginx依赖。。。"
-    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == oracle ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+    if [ $release == "centos" ] || [[ "$release" == "centos-stream" ]] || [[ "$release" == "oracle" ]] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         install_dependence pcre2-devel zlib-devel libxml2-devel libxslt-devel gd-devel geoip-devel libmaxminddb-devel perl-ExtUtils-Embed gperftools-devel perl-devel
     else
         install_dependence libpcre2-dev zlib1g-dev libxml2-dev libxslt1-dev libgd-dev libgeoip-dev libmaxminddb-dev libgoogle-perftools-dev libperl-dev
@@ -2159,7 +2182,7 @@ install_nginx_dependence()
 install_php_dependence()
 {
     green "正在安装php依赖。。。"
-    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == oracle ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+    if [ $release == "centos" ] || [[ "$release" == "centos-stream" ]] || [[ "$release" == "oracle" ]] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         fedora_install_remi
         install_dependence libxml2-devel sqlite-devel systemd-devel libacl-devel openssl-devel krb5-devel pcre2-devel zlib-devel bzip2-devel libcurl-devel gdbm-devel libdb-devel tokyocabinet-devel lmdb-devel enchant-devel libffi-devel libpng-devel gd-devel libwebp-devel libjpeg-turbo-devel libXpm-devel freetype-devel gmp-devel uw-imap-devel libicu-devel openldap-devel oniguruma-devel unixODBC-devel freetds-devel libpq-devel aspell-devel libedit-devel net-snmp-devel libsodium-devel libargon2-devel libtidy-devel libxslt-devel libzip-devel ImageMagick-devel
     else
@@ -2170,7 +2193,7 @@ install_php_dependence()
                 yellow "依赖安装失败！！"
                 green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
                 yellow "按回车键继续或者Ctrl+c退出"
-                read -s
+                read -r -s -n 1 || true
             fi
         fi
     fi
@@ -2178,7 +2201,7 @@ install_php_dependence()
 install_acme_dependence()
 {
     green "正在安装acme.sh依赖。。。"
-    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == oracle ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+    if [ $release == "centos" ] || [[ "$release" == "centos-stream" ]] || [[ "$release" == "oracle" ]] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         install_dependence curl openssl crontabs
     else
         install_dependence curl openssl cron
@@ -2222,13 +2245,13 @@ compile_php()
     if ! wget -O "${php_version}.tar.xz" "https://www.php.net/distributions/${php_version}.tar.xz"; then
         red    "获取php失败"
         yellow "按回车键继续或者按Ctrl+c终止"
-        read -s
+        read -r -s -n 1 || true
     fi
     tar -xJf "${php_version}.tar.xz"
     rm -f "${php_version}.tar.xz"
     cd "${php_version}"
     #sed -i 's#db$THIS_VERSION/db_185.h include/db$THIS_VERSION/db_185.h include/db/db_185.h#& include/db_185.h#' configure
-    if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
+    if [[ "$release" == "ubuntu" ]] || [[ "$release" == "debian" ]] || [ $release == "deepin" ] || [[ "$release" == "other-debian" ]]; then
         sed -i 's#if test -f $THIS_PREFIX/$PHP_LIBDIR/lib$LIB.a || test -f $THIS_PREFIX/$PHP_LIBDIR/lib$LIB.$SHLIB_SUFFIX_NAME#& || true#' configure
         sed -i 's#if test ! -r "$PDO_FREETDS_INSTALLATION_DIR/$PHP_LIBDIR/libsybdb.a" && test ! -r "$PDO_FREETDS_INSTALLATION_DIR/$PHP_LIBDIR/libsybdb.so"#& \&\& false#' configure
         ./configure --prefix=${php_prefix} --enable-embed=shared --enable-fpm --with-fpm-user=www-data --with-fpm-group=www-data --with-fpm-systemd --with-fpm-acl --with-fpm-apparmor --disable-phpdbg --with-layout=GNU --with-openssl --with-kerberos --with-external-pcre --with-zlib --enable-bcmath --with-bz2 --enable-calendar --with-curl --enable-dba --with-qdbm --with-db4 --with-db1 --with-tcadb --with-lmdb --with-enchant --enable-exif --with-ffi --enable-ftp --enable-gd --with-external-gd --with-avif --with-webp --with-jpeg --with-xpm --with-freetype --enable-gd-jis-conv --with-gettext --with-gmp --with-mhash --with-imap --with-imap-ssl --enable-intl --with-ldap --with-ldap-sasl --enable-mbstring --with-mysqli --with-mysql-sock --with-unixODBC --enable-pcntl --with-pdo-dblib --with-pdo-mysql --with-zlib-dir --with-pdo-odbc=unixODBC,/usr --with-pdo-pgsql --with-pgsql --with-pspell --with-libedit --with-mm --enable-shmop --with-snmp --enable-soap --enable-sockets --with-sodium --with-external-libcrypt --with-password-argon2 --enable-sysvmsg --enable-sysvsem --enable-sysvshm --with-tidy --with-xsl --with-zip --enable-mysqlnd --with-pear CFLAGS="${cflags[*]}" CXXFLAGS="${cxxflags[*]}"
@@ -2253,7 +2276,7 @@ instal_php_imagick()
     if ! git clone https://github.com/Imagick/imagick; then
         yellow "获取php-imagick源码失败"
         yellow "按回车键继续或者按Ctrl+c终止"
-        read -s
+        read -r -s -n 1 || true
     fi
     cd imagick
     ${php_prefix}/bin/phpize
@@ -2265,7 +2288,7 @@ instal_php_imagick()
         green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
         yellow "在Bug修复前，建议使用Ubuntu最新版系统"
         yellow "按回车键继续或者按Ctrl+c终止"
-        read -s
+        read -r -s -n 1 || true
     else
         swap_off
     fi
@@ -2350,14 +2373,14 @@ compile_nginx()
     if ! wget -O ${nginx_version}.tar.gz https://nginx.org/download/${nginx_version}.tar.gz; then
         red    "获取nginx失败"
         yellow "按回车键继续或者按Ctrl+c终止"
-        read -s
+        read -r -s -n 1 || true
     fi
     tar -zxf ${nginx_version}.tar.gz
     rm -f "${nginx_version}.tar.gz"
     if ! wget -O ${openssl_version}.tar.gz https://github.com/openssl/openssl/releases/download/${openssl_version}/${openssl_version}.tar.gz; then
         red    "获取openssl失败"
         yellow "按回车键继续或者按Ctrl+c终止"
-        read -s
+        read -r -s -n 1 || true
     fi
     tar -zxf ${openssl_version}.tar.gz
     rm -f "${openssl_version}.tar.gz"
@@ -2367,14 +2390,14 @@ compile_nginx()
     if ! wget -O ngx_http_geoip2_module.zip "https://github.com/leev/ngx_http_geoip2_module/archive/refs/heads/master.zip"; then
         red    "获取 ngx_http_geoip2_module 失败"
         yellow "按回车键继续或者按Ctrl+c终止"
-        read -s
+        read -r -s -n 1 || true
     fi
     unzip -q ngx_http_geoip2_module.zip
     rm -f ngx_http_geoip2_module.zip
 
     cd ${nginx_version}
     
-    local openssl_supports_quic=0
+    openssl_supports_quic=0
     if version_ge "${openssl_version#openssl-}" "3.0.0"; then
         openssl_supports_quic=1
         tyblue "OpenSSL版本支持QUIC，启用HTTP/3编译选项"
@@ -2466,60 +2489,8 @@ compile_nginx()
         fi
     fi
     swap_off
+    _nginx_http3=$openssl_supports_quic
     cd ..
-}
-
-# 检查Nginx版本和HTTP/3支持
-check_nginx_http3_support()
-{
-    if [ $nginx_is_installed -eq 1 ]; then
-        if ${nginx_prefix}/sbin/nginx -V 2>&1 | grep -q "http_v3_module"; then
-            green "当前Nginx支持HTTP/3"
-            return 0
-        else
-            yellow "当前Nginx不支持HTTP/3"
-            return 1
-        fi
-    fi
-    return 1
-}
-
-# 生成nginx配置时检查HTTP/3支持
-config_nginx_with_http3_check() {
-    local http3_supported=0
-    check_nginx_http3_support && http3_supported=1
-    
-    # 在生成配置时根据HTTP/3支持情况调整
-    if [ $http3_supported -eq 0 ]; then
-        # 移除HTTP/3相关配置
-        sed -i '/listen.*quic/d' "$nginx_config"
-        sed -i '/Alt-Svc.*h3/d' "$nginx_config" 
-        yellow "由于Nginx不支持HTTP/3，已移除相关配置"
-    fi
-}
-
-# 检查系统是否满足HTTP/3编译要求
-check_http3_requirements()
-{
-    tyblue "检查HTTP/3编译要求..."
-    
-    # 检查系统版本
-    if [ $release == "ubuntu" ]; then
-        if ! version_ge "$systemVersion" "20.04"; then
-            yellow "Ubuntu版本低于20.04，可能不支持HTTP/3编译"
-        fi
-    elif [ $release == "debian" ]; then
-        if ! version_ge "$systemVersion" "11"; then
-            yellow "Debian版本低于11，可能不支持HTTP/3编译"
-        fi
-    fi
-    
-    # 检查是否有必要的依赖
-    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == oracle ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
-        install_dependence cmake3
-    else
-        install_dependence cmake
-    fi
 }
 
 config_service_nginx()
@@ -2688,7 +2659,7 @@ install_geoip2_database() {
         red    "GeoLite2 数据库下载失败！"
         yellow "请手动下载并放到: ${db_file}"
         yellow "按回车键继续..."
-        read -s
+        read -r -s -n 1 || true
         return 1
     fi
     green "GeoLite2 数据库已安装到: ${db_file}"
@@ -2703,7 +2674,7 @@ install_update_xray()
     if ! bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u root --without-geodata --without-logfiles && ! bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install -u root --without-geodata --without-logfiles; then
         red    "安装/更新Xray失败"
         yellow "按回车键继续或者按Ctrl+c终止"
-        read -s
+        read -r -s -n 1 || true
         return 1
     fi
     # 增加了安装xray geodata，是用了mihomo的数据源
@@ -2771,7 +2742,7 @@ EOF
     fi
     
     xray_is_installed=1
-    [ $nginx_is_installed -eq 1 ] && is_installed=1 || is_installed=0
+    [[ $nginx_is_installed -eq 1 ]] && is_installed=1 || is_installed=0
 }
 
 
@@ -2936,7 +2907,7 @@ get_all_certs()
             yellow "    2.vps防火墙80端口是否开放"
             yellow "并在安装/重置域名完成后，使用脚本主菜单\"重置域名\"选项修复"
             yellow "按回车键继续。。。"
-            read -s
+            read -r -s -n 1 || true
         fi
     done
 }
@@ -3125,6 +3096,16 @@ add_ssl_server_block()
 server {
     listen unix:${listen_sock} ssl proxy_protocol;
     http2 on;
+EOF
+
+    if [ "${_nginx_http3:-0}" -eq 1 ]; then
+        cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
+    listen unix:${listen_sock} quic reuseport;
+    add_header Alt-Svc 'h3=":443"; ma=86400' always;
+EOF
+    fi
+
+    cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
     set_real_ip_from unix:;
     real_ip_header proxy_protocol;
 
@@ -3624,13 +3605,13 @@ init_web()
         if ! curl -o "${nginx_prefix}/html/nextcloud.tar.bz2" "${nextcloud_url}"; then
             red    "获取Nextcloud失败"
             yellow "按回车键继续或者按Ctrl+c终止"
-            read -s
+            read -r -s -n 1 || true
         fi
         rm -rf "${nginx_prefix}/html/nextcloud"
         if ! tar -xjf "${nginx_prefix}/html/nextcloud.tar.bz2" -C "${nginx_prefix}/html"; then
             red    "解压 Nextcloud 失败"
             yellow "按回车键继续或者按Ctrl+c终止"
-            read -s
+            read -r -s -n 1 || true
         fi
         rm -f "${nginx_prefix}/html/nextcloud.tar.bz2"
         rm -rf "${nginx_prefix}/html/${true_domain_list[$1]}"
@@ -3660,7 +3641,7 @@ update_cloudreve()
     if ! wget -O "$cloudreve_prefix/cloudreve.tar.gz" "https://github.com/cloudreve/Cloudreve/releases/download/${cloudreve_version}/cloudreve_${cloudreve_version}_linux_${machine}.tar.gz"; then
         red "获取Cloudreve失败！！"
         yellow "按回车键继续或者按Ctrl+c终止"
-        read -s
+        read -r -s -n 1 || true
     fi
     tar -zxf "$cloudreve_prefix/cloudreve.tar.gz" -C "$cloudreve_prefix" cloudreve
     rm -f "$cloudreve_prefix/cloudreve.tar.gz"
@@ -3723,8 +3704,8 @@ install_init_cloudreve()
     sleep 15s
     echo -e "\\n\\n"
     tyblue "按两次回车键以继续。。。"
-    read -s
-    read -s
+    read -r -s -n 1 || true
+    read -r -s -n 1 || true
     cloudreve_is_installed=1
 }
 
@@ -3739,8 +3720,8 @@ let_init_nextcloud()
     sleep 15s
     echo -e "\\n\\n"
     tyblue "按两次回车键以继续。。。"
-    read -s
-    read -s
+    read -r -s -n 1 || true
+    read -r -s -n 1 || true
     echo
 }
 
@@ -3998,7 +3979,7 @@ install_update_xray_tls_web()
     $apt_no_install_recommends -y -f install
 
     # 读取信息
-    if [ $update -eq 0 ]; then
+    if [[ $update -eq 0 ]]; then
         readDomain
         # 先安装 xray 再生成 REALITY 配置
         install_update_xray
@@ -4013,7 +3994,7 @@ install_update_xray_tls_web()
 
     # 判断是否需要 PHP
     local install_php=0
-    if [ $update -eq 0 ]; then
+    if [[ $update -eq 0 ]]; then
         [ "${pretend_list[0]}" == "2" ] && install_php=1
     else
         install_php=$php_is_installed
@@ -4021,14 +4002,14 @@ install_update_xray_tls_web()
     
     local use_existed_php=0
     if [ $install_php -eq 1 ]; then
-        if [ $update -eq 1 ]; then
+        if [[ $update -eq 1 ]]; then
             if check_php_update; then
                 ! ask_if "检测到php有新版本，是否更新?[y/n]" && use_existed_php=1
             else
                 green "php已经是最新版本，不更新"
                 use_existed_php=1
             fi
-        elif [ $php_is_installed -eq 1 ]; then
+        elif [[ $php_is_installed -eq 1 ]]; then
             tyblue "---------------检测到php已存在---------------"
             tyblue " 1. 使用现有php"
             tyblue " 2. 卸载现有php并重新编译安装"
@@ -4038,19 +4019,19 @@ install_update_xray_tls_web()
             do
                 read -p "您的选择是：" choice
             done
-            [ $choice -eq 1 ] && use_existed_php=1
+            [[ $choice -eq 1 ]] && use_existed_php=1
         fi
     fi
 
     local use_existed_nginx=0
-    if [ $update -eq 1 ]; then
+    if [[ $update -eq 1 ]]; then
         if check_nginx_update; then
             ! ask_if "检测到Nginx有新版本，是否更新?[y/n]" && use_existed_nginx=1
         else
             green "Nginx已经是最新版本，不更新"
             use_existed_nginx=1
         fi
-    elif [ $nginx_is_installed -eq 1 ]; then
+    elif [[ $nginx_is_installed -eq 1 ]]; then
         tyblue "---------------检测到Nginx已存在---------------"
         tyblue " 1. 使用现有Nginx"
         tyblue " 2. 卸载现有Nginx并重新编译安装"
@@ -4060,11 +4041,11 @@ install_update_xray_tls_web()
         do
             read -p "您的选择是：" choice
         done
-        [ $choice -eq 1 ] && use_existed_nginx=1
+        [[ $choice -eq 1 ]] && use_existed_nginx=1
     fi
 
     local temp_remove_cloudreve=1
-    if [ $update -eq 0 ] && [ "${pretend_list[0]}" == "1" ] && [ $cloudreve_is_installed -eq 1 ]; then
+    if [[ $update -eq 0 ]] && [ "${pretend_list[0]}" == "1" ] && [ $cloudreve_is_installed -eq 1 ]; then
         tyblue "----------------- Cloudreve已存在 -----------------"
         tyblue " 1. 使用现有Cloudreve"
         tyblue " 2. 卸载并重新安装"
@@ -4075,10 +4056,10 @@ install_update_xray_tls_web()
         do
             read -p "您的选择是：" choice
         done
-        [ $choice -eq 1 ] && temp_remove_cloudreve=0
+        [[ $choice -eq 1 ]] && temp_remove_cloudreve=0
     fi
 
-    if [ $update -eq 0 ]; then
+    if [[ $update -eq 0 ]]; then
         green "即将开始安装Xray-REALITY+Web (三协议模式)，可能需要10-20分钟..."
         sleep 3s
     fi
@@ -4091,7 +4072,7 @@ install_update_xray_tls_web()
     fi
     
     install_acme_dependence
-    if [ $update -eq 0 ]; then
+    if [[ $update -eq 0 ]]; then
         install_web_dependence ""
     else
         [ $cloudreve_is_installed -eq 1 ] && install_web_dependence "1"
@@ -4110,13 +4091,13 @@ install_update_xray_tls_web()
             systemctl disable php-fpm
         fi
         install_php_part2
-        [ $update -eq 1 ] && turn_on_off_php
+        [[ $update -eq 1 ]] && turn_on_off_php
     fi
 
     # 编译安装 Nginx
     if [ $use_existed_nginx -eq 0 ]; then
         compile_nginx
-        [ $update -eq 1 ] && backup_domains_web
+        [[ $update -eq 1 ]] && backup_domains_web
         
         # 备份证书
         if [ -d "${nginx_prefix}/certs" ]; then
@@ -4144,16 +4125,16 @@ install_update_xray_tls_web()
         cp -r "${temp_dir}/certs_backup/"* "${nginx_prefix}/certs/" 2>/dev/null
     fi
 
-    [ $update -eq 1 ] && [ $use_existed_nginx -eq 0 ] && mv "${temp_dir}/domain_backup/"* ${nginx_prefix}/html 2>/dev/null
+    [[ $update -eq 1 ]] && [ $use_existed_nginx -eq 0 ] && mv "${temp_dir}/domain_backup/"* ${nginx_prefix}/html 2>/dev/null
 
     # 安装/更新 Xray (如果还没安装)
-    if [ $update -eq 1 ] || [ $xray_is_installed -eq 0 ]; then
+    if [[ $update -eq 1 ]] || [ $xray_is_installed -eq 0 ]; then
         remove_xray
         install_update_xray
     fi
 
     # 证书申请
-    if [ $update -eq 0 ]; then
+    if [[ $update -eq 0 ]]; then
         [ -e $HOME/.acme.sh/acme.sh ] && $HOME/.acme.sh/acme.sh --uninstall
         rm -rf $HOME/.acme.sh
         curl https://get.acme.sh | sh
@@ -4176,7 +4157,7 @@ install_update_xray_tls_web()
         systemctl restart xray nginx
     fi
     
-    if [ $update -eq 0 ]; then
+    if [[ $update -eq 0 ]]; then
         [ "${pretend_list[0]}" == "1" ] && [ $temp_remove_cloudreve -eq 1 ] && remove_cloudreve
         init_web 0
         green "-------------------安装完成-------------------"
@@ -4214,7 +4195,7 @@ install_check_update_update_php()
     check_SELinux
     check_important_dependence_installed tzdata tzdata
     get_system_info
-    if (([ $release == "centos" ] || [ $release == centos-stream ] || [ $release == oracle ]) && ! version_ge "$systemVersion" "8" ) || ([ $release == "rhel" ] && ! version_ge "$systemVersion" "8") || ([ $release == "fedora" ] && ! version_ge "$systemVersion" "30") || ([ $release == "ubuntu" ] && ! version_ge "$systemVersion" "20.04") || ([ $release == "debian" ] && ! version_ge "$systemVersion" "11"); then
+    if (([ $release == "centos" ] || [[ "$release" == "centos-stream" ]] || [[ "$release" == "oracle" ]]) && ! version_ge "$systemVersion" "8" ) || ([ $release == "rhel" ] && ! version_ge "$systemVersion" "8") || ([ $release == "fedora" ] && ! version_ge "$systemVersion" "30") || ([[ "$release" == "ubuntu" ]] && ! version_ge "$systemVersion" "20.04") || ([[ "$release" == "debian" ]] && ! version_ge "$systemVersion" "11"); then
         red "系统版本过低，无法安装php！"
         echo
         tyblue "安装Nextcloud需要安装php"
@@ -4228,7 +4209,7 @@ install_check_update_update_php()
         yellow " 7. Oracle Linux 8+"
         yellow " 8. 其他以 Red Hat 8+ 为基的系统"
         return 1
-    elif [ $release == "other-debian" ] || [ $release == "other-redhat" ]; then
+    elif [[ "$release" == "other-debian" ]] || [ $release == "other-redhat" ]; then
         yellow "未知的系统，可能导致php安装失败！"
         echo
         tyblue "安装Nextcloud需要安装php"
@@ -4251,7 +4232,7 @@ install_check_update_update_php()
     check_important_dependence_installed "procps" "procps-ng"
     install_epel
     local php_status=0
-    if [ $php_is_installed -eq 1 ]; then
+    if [[ $php_is_installed -eq 1 ]]; then
         ask_update_script_force
         if check_php_update; then
             green "php有新版本"
@@ -4413,7 +4394,7 @@ reinit_domain()
     xid_3="$(cat /proc/sys/kernel/random/uuid)"
     
     # 检查是否需要安装 PHP
-    if [ "${pretend_list[0]}" == "2" ] && [ $php_is_installed -eq 0 ]; then
+    if [ "${pretend_list[0]}" == "2" ] && [[ $php_is_installed -eq 0 ]]; then
         check_SELinux
         check_important_dependence_installed "procps" "procps-ng"
         install_epel
@@ -4466,7 +4447,7 @@ reinit_domain()
         yellow "  3. 网络连接是否正常"
         echo
         yellow "按回车键继续配置（将使用自签名证书）..."
-        read -s
+        read -r -s -n 1 || true
     fi
     
     # 重新生成配置
@@ -4522,7 +4503,7 @@ add_domain()
         tyblue "Nextcloud可以用于多个域名"
         return 1
     fi
-    if [ "${pretend_list[-1]}" == "2" ] && [ $php_is_installed -eq 0 ]; then
+    if [ "${pretend_list[-1]}" == "2" ] && [[ $php_is_installed -eq 0 ]]; then
         check_SELinux
         check_important_dependence_installed "procps" "procps-ng"
         install_epel
@@ -4649,7 +4630,7 @@ change_pretend()
         tyblue "Nextcloud可以用于多个域名"
         return 1
     fi
-    if [ "$pretend" == "2" ] && [ $php_is_installed -eq 0 ]; then
+    if [ "$pretend" == "2" ] && [[ $php_is_installed -eq 0 ]]; then
         check_SELinux
         check_important_dependence_installed "procps" "procps-ng"
         install_epel
@@ -4870,7 +4851,7 @@ simplify_system()
         cp /etc/ssh/sshd_config sshd_config
     fi
     uninstall_firewall
-    if [ $release == "centos" ] || [ $release == centos-stream ] || [ $release == oracle ] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
+    if [ $release == "centos" ] || [[ "$release" == "centos-stream" ]] || [[ "$release" == "oracle" ]] || [ $release == "rhel" ] || [ $release == "fedora" ] || [ $release == "other-redhat" ]; then
         local temp_backup=()
         local temp_important=('openssh-server' 'initscripts' 'tar')
         for i in "${temp_important[@]}"
@@ -4929,7 +4910,7 @@ simplify_system()
                     if ! apt_auto_remove_purge "${remove_packages[@]}"; then
                         red "卸载失败！"
                         tyblue "按回车键继续，如果后续仍有出现错误，请重装系统"
-                        read -s
+                        read -r -s -n 1 || true
                     fi
                 fi
             fi
@@ -4940,10 +4921,10 @@ simplify_system()
         done
         mv sources.list.bak /etc/apt/sources.list
     fi
-    ([ $nginx_is_installed -eq 1 ] || [ $php_is_installed -eq 1 ] || [ $is_installed -eq 1 ]) && install_epel
-    [ $nginx_is_installed -eq 1 ] && install_nginx_dependence
-    [ $php_is_installed -eq 1 ] && install_php_dependence
-    [ $is_installed -eq 1 ] && install_acme_dependence
+    ([[ $nginx_is_installed -eq 1 ]] || [[ $php_is_installed -eq 1 ]] || [[ $is_installed -eq 1 ]]) && install_epel
+    [[ $nginx_is_installed -eq 1 ]] && install_nginx_dependence
+    [[ $php_is_installed -eq 1 ]] && install_php_dependence
+    [[ $is_installed -eq 1 ]] && install_acme_dependence
     if [ $save_ssh -eq 1 ]; then
         cp sshd_config /etc/ssh/sshd_config
         cd /
@@ -5066,9 +5047,9 @@ change_reality_config()
         read -p "您的选择是：" choice
     done
     
-    [ $choice -eq 0 ] && return 0
+    [[ $choice -eq 0 ]] && return 0
     
-    if [ $choice -eq 1 ]; then
+    if [[ $choice -eq 1 ]]; then
         # 重新生成密钥对
         echo
         green "正在生成新的密钥对..."
@@ -5093,7 +5074,7 @@ change_reality_config()
         yellow "PrivateKey: $reality_private_key"
         yellow "Password:  $reality_password"
         echo
-    elif [ $choice -eq 2 ]; then
+    elif [[ $choice -eq 2 ]]; then
         # 重新生成 ShortIds
         echo
         green "正在生成新的 ShortIds..."
@@ -5105,7 +5086,7 @@ change_reality_config()
         yellow "ShortIds: $reality_short_ids"
         echo
         
-    elif [ $choice -eq 3 ]; then
+    elif [[ $choice -eq 3 ]]; then
         # 修改 ServerNames
         echo
         tyblue "当前 ServerNames: $reality_server_names"
@@ -5193,16 +5174,16 @@ view_xray_merged_config()
             read -p "您的选择是：" choice
         done
 
-        [ $choice -eq 0 ] && return 0
+        [[ $choice -eq 0 ]] && return 0
 
-        if [ $choice -eq 1 ]; then
+        if [[ $choice -eq 1 ]]; then
             echo -e "\\n"
             tyblue "==================== 合并后的完整配置 ===================="
             /usr/local/bin/xray run -confdir "$xray_config_dir" -dump 2>&1
             echo
             yellow "按回车键返回菜单..."
-            read -s
-        elif [ $choice -eq 2 ]; then
+            read -r -s -n 1 || true
+        elif [[ $choice -eq 2 ]]; then
             echo -e "\\n"
             tyblue "可查看的配置文件:"
             local files=($(ls "$xray_config_dir"/*.json 2>/dev/null))
@@ -5229,13 +5210,13 @@ view_xray_merged_config()
                 cat "$selected_file"
                 echo
                 yellow "按回车键返回菜单..."
-                read -s
+                read -r -s -n 1 || true
             else
                 red "无效的选择"
                 yellow "按回车键返回菜单..."
-                read -s
+                read -r -s -n 1 || true
             fi
-        elif [ $choice -eq 3 ]; then
+        elif [[ $choice -eq 3 ]]; then
             echo -e "\\n"
             tyblue "==================== 配置验证 ===================="
             if /usr/local/bin/xray run -confdir "$xray_config_dir" -test 2>&1; then
@@ -5245,8 +5226,8 @@ view_xray_merged_config()
             fi
             echo
             yellow "按回车键返回菜单..."
-            read -s
-        elif [ $choice -eq 4 ]; then
+            read -r -s -n 1 || true
+        elif [[ $choice -eq 4 ]]; then
             echo -e "\\n"
             tyblue "==================== 配置文件列表 ===================="
             ls -la "$xray_config_dir"/*.json 2>/dev/null
@@ -5254,8 +5235,8 @@ view_xray_merged_config()
             list_user_xray_configs
             echo
             yellow "按回车键返回菜单..."
-            read -s
-        elif [ $choice -eq 5 ]; then
+            read -r -s -n 1 || true
+        elif [[ $choice -eq 5 ]]; then
             echo -e "\\n"
             if [ $user_files -eq 0 ]; then
                 yellow "没有检测到用户自定义配置文件"
@@ -5264,8 +5245,8 @@ view_xray_merged_config()
             fi
             echo
             yellow "按回车键返回菜单..."
-            read -s
-        elif [ $choice -eq 6 ]; then
+            read -r -s -n 1 || true
+        elif [[ $choice -eq 6 ]]; then
             echo -e "\\n"
             tyblue "==================== 配置文件编号说明 ===================="
             echo
@@ -5302,7 +5283,7 @@ view_xray_merged_config()
             echo '  }'
             echo
             yellow "按回车键返回菜单..."
-            read -s
+            read -r -s -n 1 || true
         fi
     done
 }
@@ -5811,7 +5792,7 @@ install_common_tools()
     
     # xxd - 用于十六进制处理(通常已安装)
     if ! command -v xxd &> /dev/null; then
-        if [ $release == "ubuntu" ] || [ $release == "debian" ] || [ $release == "deepin" ] || [ $release == "other-debian" ]; then
+        if [[ "$release" == "ubuntu" ]] || [[ "$release" == "debian" ]] || [ $release == "deepin" ] || [[ "$release" == "other-debian" ]]; then
             tools+=('xxd')
         else
             tools+=('vim-common')  # RedHat系的xxd在vim-common包中
@@ -5840,7 +5821,7 @@ start_menu()
     [ -e ${php_prefix}/php-fpm.service.default ] && php_is_installed=1 || php_is_installed=0
     [ -e ${cloudreve_prefix}/cloudreve.db ] && cloudreve_is_installed=1 || cloudreve_is_installed=0
     [ -e /usr/local/bin/xray ] && xray_is_installed=1 || xray_is_installed=0
-    ([ $xray_is_installed -eq 1 ] && [ $nginx_is_installed -eq 1 ]) && is_installed=1 || is_installed=0
+    ([ $xray_is_installed -eq 1 ] && [[ $nginx_is_installed -eq 1 ]]) && is_installed=1 || is_installed=0
     # ======================================
 
     local xray_status
@@ -5848,11 +5829,11 @@ start_menu()
     systemctl -q is-active xray && xray_status+="                \\033[32m运行中" || xray_status+="                \\033[31m未运行"
     
     local nginx_status
-    [ $nginx_is_installed -eq 1 ] && nginx_status="\\033[32m已安装" || nginx_status="\\033[31m未安装"
+    [[ $nginx_is_installed -eq 1 ]] && nginx_status="\\033[32m已安装" || nginx_status="\\033[31m未安装"
     systemctl -q is-active nginx && nginx_status+="                \\033[32m运行中" || nginx_status+="                \\033[31m未运行"
     
     local php_status
-    [ $php_is_installed -eq 1 ] && php_status="\\033[32m已安装" || php_status="\\033[31m未安装"
+    [[ $php_is_installed -eq 1 ]] && php_status="\\033[32m已安装" || php_status="\\033[31m未安装"
     systemctl -q is-active php-fpm && php_status+="                \\033[32m运行中" || php_status+="                \\033[31m未运行"
     
     local cloudreve_status
@@ -5880,7 +5861,7 @@ start_menu()
     echo
     echo
     tyblue " -----------安装/更新/卸载-----------"
-    if [ $is_installed -eq 0 ]; then
+    if [[ $is_installed -eq 0 ]]; then
         green  "   1. 安装Xray-REALITY+Web (三协议)"
     else
         green  "   1. 重新安装Xray-REALITY+Web"
@@ -5932,7 +5913,7 @@ start_menu()
     done
     
     # 权限检查
-    if (( choice==2 || (7<=choice&&choice<=9) || choice==13 || (15<=choice&&choice<=22) )) && [ $is_installed -eq 0 ]; then
+    if (( choice==2 || (7<=choice&&choice<=9) || choice==13 || (15<=choice&&choice<=22) )) && [[ $is_installed -eq 0 ]]; then
         red "请先安装Xray-REALITY+Web！"
         return 1
     fi
@@ -6024,13 +6005,13 @@ start_menu()
             ;;
         11)
             get_config_info
-            [ $is_installed -eq 1 ] && [ "${pretend_list[0]}" == "2" ] && red "当前正在使用php" && return 1
+            [[ $is_installed -eq 1 ]] && [ "${pretend_list[0]}" == "2" ] && red "当前正在使用php" && return 1
             ! ask_if "确定要删除php吗?[y/n]" && return 0
             remove_php && green "删除完成！"
             ;;
         12)
             get_config_info
-            [ $is_installed -eq 1 ] && [ "${pretend_list[0]}" == "1" ] && red "当前正在使用Cloudreve" && return 1
+            [[ $is_installed -eq 1 ]] && [ "${pretend_list[0]}" == "1" ] && red "当前正在使用Cloudreve" && return 1
             ! ask_if "确定要删除cloudreve吗?[y/n]" && return 0
             remove_cloudreve && green "删除完成！"
             ;;
@@ -6039,7 +6020,7 @@ start_menu()
             ;;
         14)
             systemctl stop xray nginx
-            [ $php_is_installed -eq 1 ] && systemctl stop php-fpm
+            [[ $php_is_installed -eq 1 ]] && systemctl stop php-fpm
             [ $cloudreve_is_installed -eq 1 ] && systemctl stop cloudreve
             green "已停止！"
             ;;
