@@ -713,7 +713,7 @@ backup_domains_web()
     echo "[DEBUG] true_domain_list: ${true_domain_list[@]}"
     for i in "${true_domain_list[@]}"
     do
-        if [ "$1" == "cp" ]; then
+        if [ "${1:-}" == "cp" ]; then
             cp -rf "${nginx_prefix}/html/${i}" "${temp_dir}/domain_backup" 2>/dev/null
         else
             mv "${nginx_prefix}/html/${i}" "${temp_dir}/domain_backup" 2>/dev/null
