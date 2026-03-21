@@ -1427,12 +1427,14 @@ install_bbr()
             latest_kernel_version="error"
             return 1
         fi
+        echo "[DEBUG] 开始处理内核列表..."
         local i2=0
         local i3
         local kernel_rc=""
         local kernel_list_temp2
         while ((i2<${#kernel_list_temp[@]}))
         do
+            echo "[DEBUG] 处理第 $i2 个: ${kernel_list_temp[$i2]}"
             if [[ "${kernel_list_temp[$i2]}" =~ -rc(0|[1-9][0-9]*)$ ]] && [ "$kernel_rc" == "" ]; then
                 kernel_list_temp2=("${kernel_list_temp[$i2]}")
                 kernel_rc="${kernel_list_temp[$i2]%-*}"
@@ -1446,6 +1448,7 @@ install_bbr()
                     kernel_list+=("${kernel_list_temp2[$i3]}")
                 done
                 kernel_rc=""
+                echo "[DEBUG] 分支3: 不增加 i2，重新处理"
             elif [ -z "$kernel_rc" ] || version_ge "${kernel_list_temp[$i2]}" "$kernel_rc"; then
                 kernel_list+=("${kernel_list_temp[$i2]}")
                 ((i2++))
@@ -1455,8 +1458,10 @@ install_bbr()
                     kernel_list+=("${kernel_list_temp2[$i3]}")
                 done
                 kernel_rc=""
+                echo "[DEBUG] 分支else: 不增加 i2，重新处理"
             fi
         done
+        echo "[DEBUG] while 循环结束"
         if [ -n "$kernel_rc" ]; then
             for((i3=0;i3<${#kernel_list_temp2[@]};i3++))
             do
