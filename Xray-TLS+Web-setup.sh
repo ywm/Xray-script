@@ -1042,23 +1042,34 @@ get_system_info()
 check_port()
 {
     green "正在检查端口占用。。。"
+    echo "[DEBUG] check_port 开始执行"
     local xray_status=0
     local nginx_status=0
+    echo "[DEBUG] 检查 xray 状态..."
     systemctl -q is-active xray 2>/dev/null && xray_status=1 && systemctl stop xray || true
+    echo "[DEBUG] xray_status=$xray_status"
+    echo "[DEBUG] 检查 nginx 状态..."
     systemctl -q is-active nginx 2>/dev/null && nginx_status=1 && systemctl stop nginx || true
+    echo "[DEBUG] nginx_status=$nginx_status"
     ([ $xray_status -eq 1 ] || [ $nginx_status -eq 1 ]) && sleep 2s
+    echo "[DEBUG] 开始检查端口..."
     local check_list=('80' '443')
     local i
     for i in "${check_list[@]}"
     do
-        if ss -natl | awk '{print $4}'  | awk -F : '{print $NF}' | grep -E "^[0-9]+$" | grep -wq "${i}"; then
+        echo "[DEBUG] 检查端口 $i..."
+        local port_check_result
+        port_check_result=$(ss -natl 2>/dev/null | awk '{print $4}' | awk -F : '{print $NF}' | grep -E "^[0-9]+$" | grep -w "${i}" || true)
+        if [ -n "$port_check_result" ]; then
             red "TCP:${i}端口被占用！"
             yellow "请用 lsof -i:${i} 命令检查"
             exit 1
         fi
     done
+    echo "[DEBUG] 端口检查完成，恢复服务..."
     [ $xray_status -eq 1 ] && systemctl start xray
     [ $nginx_status -eq 1 ] && systemctl start nginx
+    echo "[DEBUG] check_port 执行完成"
 }
 
 #检查Nginx是否已通过apt/dnf/yum安装
@@ -4005,10 +4016,14 @@ install_update_xray_tls_web()
     fi
     
     check_nginx_installed_system
+    echo "[DEBUG] check_nginx_installed_system 完成"
     [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
     check_SELinux
+    echo "[DEBUG] check_SELinux 完成"
     check_important_dependence_installed iproute2 iproute
+    echo "[DEBUG] 即将执行 check_port"
     check_port
+    echo "[DEBUG] check_port 完成"
     check_important_dependence_installed tzdata tzdata
     get_system_info
     check_important_dependence_installed ca-certificates ca-certificates
