@@ -1438,10 +1438,10 @@ install_bbr()
             if [[ "${kernel_list_temp[$i2]}" =~ -rc(0|[1-9][0-9]*)$ ]] && [ "$kernel_rc" == "" ]; then
                 kernel_list_temp2=("${kernel_list_temp[$i2]}")
                 kernel_rc="${kernel_list_temp[$i2]%-*}"
-                ((i2++))
+                i2=$((i2+1))
             elif [[ "${kernel_list_temp[$i2]}" =~ -rc(0|[1-9][0-9]*)$ ]] && [ "${kernel_list_temp[$i2]%-*}" == "$kernel_rc" ]; then
                 kernel_list_temp2+=("${kernel_list_temp[$i2]}")
-                ((i2++))
+                i2=$((i2+1))
             elif [[ "${kernel_list_temp[$i2]}" =~ -rc(0|[1-9][0-9]*)$ ]] && [ "${kernel_list_temp[$i2]%-*}" != "$kernel_rc" ]; then
                 for((i3=0;i3<${#kernel_list_temp2[@]};i3++))
                 do
@@ -1451,7 +1451,7 @@ install_bbr()
                 echo "[DEBUG] 分支3: 不增加 i2，重新处理"
             elif [ -z "$kernel_rc" ] || version_ge "${kernel_list_temp[$i2]}" "$kernel_rc"; then
                 kernel_list+=("${kernel_list_temp[$i2]}")
-                ((i2++))
+                i2=$((i2+1))
             else
                 for((i3=0;i3<${#kernel_list_temp2[@]};i3++))
                 do
