@@ -1050,7 +1050,7 @@ check_nginx_installed_system()
     yellow " 如果您不记得之前有安装过Nginx，那么可能是使用别的一键脚本时安装的"
     yellow " 建议使用纯净的系统运行此脚本"
     echo
-    ! ask_if "是否尝试卸载？[y/n]" && exit 0
+    ask_if "是否尝试卸载？[y/n]" || exit 0
     apt_purge '^nginx' '^libnginx'
     $dnf -y remove 'nginx*'
     if [[ ! -f /usr/lib/systemd/system/nginx.service ]] && [[ ! -f /lib/systemd/system/nginx.service ]]; then
@@ -1103,7 +1103,7 @@ check_ssh_timeout()
     tyblue " 如果中途断开连接将会很麻烦"
     tyblue " 设置ssh连接超时时间将有效降低断连可能性"
     echo
-    ! ask_if "是否设置ssh连接超时时间？[y/n]" && return 0
+    ask_if "是否设置ssh连接超时时间？[y/n]" || return 0
     sed -i '/^[ \t]*ClientAliveInterval[ \t]/d' /etc/ssh/sshd_config
     sed -i '/^[ \t]*ClientAliveCountMax[ \t]/d' /etc/ssh/sshd_config
     echo >> /etc/ssh/sshd_config
@@ -1865,7 +1865,7 @@ readPretend()
                 yellow " 6. Fedora 30+"
                 yellow " 7. Oracle Linux 8+"
                 yellow " 8. 其他以 Red Hat 8+ 为基的系统"
-                ! ask_if "确定选择吗？[y/n]" && queren=0 && continue
+                ask_if "确定选择吗？[y/n]" || { queren=0 && continue; }
             elif [ $release == "deepin" ]; then
                 red "php暂不支持deepin，请更换其他系统"
                 sleep 3s
@@ -1876,11 +1876,11 @@ readPretend()
                 tyblue "安装Nextcloud需要安装php"
                 yellow "编译&&安装php可能需要额外消耗15-60分钟"
                 yellow "php将占用一定系统资源，不建议内存<512M的机器使用"
-                ! ask_if "确定选择吗？[y/n]" && queren=0
+                ask_if "确定选择吗？[y/n]" || queren=0
             fi
         elif [ $pretend -eq 4 ]; then
             tyblue "安装完成后请在 \"${nginx_prefix}/html/$1\" 放置您的网站源代码"
-            ! ask_if "确认并继续？[y/n]" && queren=0
+            ask_if "确认并继续？[y/n]" || queren=0
         elif [ $pretend -eq 5 ]; then
             yellow "输入反向代理网址，格式如：\"https://v.qq.com\""
             pretend=""
@@ -4004,7 +4004,7 @@ install_update_xray_tls_web()
     if [ $install_php -eq 1 ]; then
         if [[ $update -eq 1 ]]; then
             if check_php_update; then
-                ! ask_if "检测到php有新版本，是否更新?[y/n]" && use_existed_php=1
+                ask_if "检测到php有新版本，是否更新?[y/n]" || use_existed_php=1
             else
                 green "php已经是最新版本，不更新"
                 use_existed_php=1
@@ -4026,7 +4026,7 @@ install_update_xray_tls_web()
     local use_existed_nginx=0
     if [[ $update -eq 1 ]]; then
         if check_nginx_update; then
-            ! ask_if "检测到Nginx有新版本，是否更新?[y/n]" && use_existed_nginx=1
+            ask_if "检测到Nginx有新版本，是否更新?[y/n]" || use_existed_nginx=1
         else
             green "Nginx已经是最新版本，不更新"
             use_existed_nginx=1
@@ -4222,7 +4222,7 @@ install_check_update_update_php()
         yellow " 6. Fedora 30+"
         yellow " 7. Oracle Linux 8+"
         yellow " 8. 其他以 Red Hat 8+ 为基的系统"
-        ! ask_if "确定选择吗？[y/n]" && return 0
+        ask_if "确定选择吗？[y/n]" || return 0
     elif [ $release == "deepin" ]; then
         red "php暂不支持deepin，请选择其他系统"
         return 1
@@ -4247,7 +4247,7 @@ install_check_update_update_php()
         tyblue "安装php用于运行nextcloud网盘"
         yellow "编译&&安装php可能需要消耗15-60分钟"
         yellow "且php将占用一定系统资源，不建议内存<512M的机器使用"
-        ! ask_if "是否继续？[y/n]" && return 0
+        ask_if "是否继续？[y/n]" || return 0
     fi
     check_ssh_timeout
     get_config_info
@@ -4262,53 +4262,79 @@ install_check_update_update_php()
 }
 check_update_update_nginx()
 {
+    echo "[DEBUG] 开始检查 nginx 更新..."
     check_nginx_installed_system
+    echo "[DEBUG] 检查 nginx 系统安装完成"
     [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
     check_SELinux
+    echo "[DEBUG] SELinux 检查完成"
     check_important_dependence_installed tzdata tzdata
     get_system_info
+    echo "[DEBUG] 系统信息获取完成"
     check_important_dependence_installed ca-certificates ca-certificates
     check_important_dependence_installed wget wget
     check_important_dependence_installed "procps" "procps-ng"
     install_epel
+    echo "[DEBUG] 依赖检查完成"
     ask_update_script_force
+    echo "[DEBUG] 脚本更新检查完成"
     if check_nginx_update; then
         green "Nginx有新版本"
-        ask_if "是否更新？[y/n]" || return 0
+        ask_if "是否更新？[y/n]" || { echo "[DEBUG] 用户选择不更新，退出"; return 0; }
     else
         green "Nginx已是最新版本"
+        echo "[DEBUG] nginx 已是最新版本，无需更新"
         return 0
     fi
+    echo "[DEBUG] 开始执行更新步骤..."
     check_ssh_timeout
+    echo "[DEBUG] SSH 超时检查完成"
     get_config_info
+    echo "[DEBUG] 配置信息获取完成"
     local nginx_status=0
     local xray_status=0
     systemctl -q is-active nginx && nginx_status=1
     systemctl -q is-active xray && xray_status=1
+    echo "[DEBUG] nginx 状态: $nginx_status, xray 状态: $xray_status"
     install_nginx_compile_toolchains
+    echo "[DEBUG] nginx 编译工具链安装完成"
     install_nginx_dependence
+    echo "[DEBUG] nginx 依赖安装完成"
     enter_temp_dir
+    echo "[DEBUG] 进入临时目录: $temp_dir"
     compile_nginx
+    echo "[DEBUG] nginx 编译完成"
     backup_domains_web
+    echo "[DEBUG] 域名网站备份完成"
     remove_nginx
+    echo "[DEBUG] 旧 nginx 移除完成"
     install_nginx_part1
+    echo "[DEBUG] nginx part1 安装完成"
     install_nginx_part2
+    echo "[DEBUG] nginx part2 安装完成"
     config_nginx
+    echo "[DEBUG] nginx 配置完成"
     mv "${temp_dir}/domain_backup/"* ${nginx_prefix}/html 2>/dev/null
+    echo "[DEBUG] 域名备份恢复完成"
     get_all_certs
+    echo "[DEBUG] 证书获取完成"
     if [ $nginx_status -eq 1 ]; then
+        echo "[DEBUG] 重启 nginx..."
         systemctl restart nginx
     else
+        echo "[DEBUG] 停止 nginx..."
         systemctl stop nginx
     fi
     if [ $xray_status -eq 1 ]; then
         # 验证配置后再重启
         if xray_test_config; then
+            echo "[DEBUG] 重启 xray..."
             systemctl restart xray
         else
             red "Xray 配置验证失败，请手动检查配置"
         fi
     else
+        echo "[DEBUG] 停止 xray..."
         systemctl stop xray
     fi
     cd /
@@ -4371,7 +4397,7 @@ reinit_domain()
     red    "此操作不可逆！"
     echo
     
-    ! ask_if "确定要继续？[y/n]" && return 0
+    ask_if "确定要继续？[y/n]" || return 0
     
     get_config_info
     
@@ -4559,7 +4585,7 @@ delete_domain()
     ((delete--))
     if [ "${pretend_list[$delete]}" == "2" ]; then
         red "警告：此操作可能导致该域名下的Nextcloud网盘数据被删除"
-        ! ask_if "是否要继续？[y/n]" && return 0
+        ask_if "是否要继续？[y/n]" || return 0
     fi
     $HOME/.acme.sh/acme.sh --remove --domain ${true_domain_list[$delete]} --ecc
     rm -rf $HOME/.acme.sh/${true_domain_list[$delete]}_ecc
@@ -4620,7 +4646,7 @@ change_pretend()
     fi
     if [ "${pretend_list[$change]}" == "2" ]; then
         red "警告：此操作可能导致该域名下的Nextcloud网盘数据被删除"
-        ! ask_if "是否要继续？[y/n]" && return 0
+        ask_if "是否要继续？[y/n]" || return 0
     fi
     local need_cloudreve=0
     check_need_cloudreve && need_cloudreve=1
@@ -4654,7 +4680,7 @@ reinstall_cloudreve()
     get_config_info
     ! check_need_cloudreve && red "Cloudreve目前没有绑定域名" && return 1
     red "重新安装Cloudreve将删除所有的网盘文件以及帐户信息，并重置管理员密码"
-    ! ask_if "确定要继续吗？[y/n]" && return 0
+    ask_if "确定要继续吗？[y/n]" || return 0
     [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
     check_SELinux
     check_important_dependence_installed ca-certificates ca-certificates
@@ -4756,7 +4782,7 @@ change_xray_id()
     echo
     tyblue "当前 ${protocol_name}: ${current_id}"
     echo
-    ! ask_if "是否要继续修改?[y/n]" && return 0
+    ask_if "是否要继续修改?[y/n]" || return 0
     
     # 输入新值
     local new_id=""
@@ -4806,7 +4832,7 @@ change_xray_id()
 change_xray_path()
 {
     tyblue "您现在的path是：$path"
-    ! ask_if "是否要继续?[y/n]" && return 0
+    ask_if "是否要继续?[y/n]" || return 0
     while true
     do
         path=""
@@ -4839,7 +4865,7 @@ simplify_system()
     yellow "警告："
     tyblue " 1. 此功不能保证在所有系统运行成功 (特别是某些VPS定制系统)，如果运行失败，可能导致VPS无法开机"
     tyblue " 2. 如果VPS上部署了 Xray-TLS+Web 以外的东西，可能被误删"
-    ! ask_if "是否要继续?[y/n]" && return 0
+    ask_if "是否要继续?[y/n]" || return 0
     echo
     local save_ssh=0
     yellow "提示：精简系统可能导致ssh配置文件(/etc/ssh/sshd_config)恢复默认"
@@ -4936,7 +4962,7 @@ simplify_system()
 repair_tuige()
 {
     yellow "尝试修复退格键异常问题，退格键正常请不要修复"
-    ! ask_if "是否要继续?[y/n]" && return 0
+    ask_if "是否要继续?[y/n]" || return 0
     if stty -a | grep -q 'erase = ^?'; then
         stty erase '^H'
     elif stty -a | grep -q 'erase = ^H'; then
@@ -4951,7 +4977,7 @@ change_dns()
     red    "  如果不明白，那么请在安装完成后再修改dns，并且修改完后不要重新安装"
     red    "2.Ubuntu系统重启后可能会恢复原dns"
     tyblue "此操作将修改dns服务器为1.1.1.1和1.0.0.1[cloudflare公共dns]"
-    ! ask_if "是否要继续?[y/n]" && return 0
+    ask_if "是否要继续?[y/n]" || return 0
     if ! grep -q "#This file has been edited by Xray-TLS-Web-setup-script" /etc/resolv.conf; then
         sed -i 's/^[ \t]*nameserver[ \t][ \t]*/#&/' /etc/resolv.conf
         {
@@ -5991,7 +6017,7 @@ start_menu()
             green "Xray更新完成！"
             ;;
         10)
-            ! ask_if "确定要删除吗?[y/n]" && return 0
+            ask_if "确定要删除吗?[y/n]" || return 0
             [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
             check_important_dependence_installed ca-certificates ca-certificates
             check_important_dependence_installed curl curl
@@ -6006,13 +6032,13 @@ start_menu()
         11)
             get_config_info
             [[ $is_installed -eq 1 ]] && [ "${pretend_list[0]}" == "2" ] && red "当前正在使用php" && return 1
-            ! ask_if "确定要删除php吗?[y/n]" && return 0
+            ask_if "确定要删除php吗?[y/n]" || return 0
             remove_php && green "删除完成！"
             ;;
         12)
             get_config_info
             [[ $is_installed -eq 1 ]] && [ "${pretend_list[0]}" == "1" ] && red "当前正在使用Cloudreve" && return 1
-            ! ask_if "确定要删除cloudreve吗?[y/n]" && return 0
+            ask_if "确定要删除cloudreve吗?[y/n]" || return 0
             remove_cloudreve && green "删除完成！"
             ;;
         13)
