@@ -4236,7 +4236,7 @@ install_check_update_update_php()
         ask_update_script_force
         if check_php_update; then
             green "php有新版本"
-            ! ask_if "是否更新？[y/n]" && return 0
+            ask_if "是否更新？[y/n]" || return 0
         else
             green "php已是最新版本"
             return 0
@@ -4274,7 +4274,7 @@ check_update_update_nginx()
     ask_update_script_force
     if check_nginx_update; then
         green "Nginx有新版本"
-        ! ask_if "是否更新？[y/n]" && return 0
+        ask_if "是否更新？[y/n]" || return 0
     else
         green "Nginx已是最新版本"
         return 0
