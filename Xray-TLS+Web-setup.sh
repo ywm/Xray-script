@@ -4289,6 +4289,11 @@ check_update_update_nginx()
     echo "[DEBUG] 开始执行更新步骤..."
     check_ssh_timeout
     echo "[DEBUG] SSH 超时检查完成"
+    # 重新检查安装状态（因为脚本可能被更新重新加载）
+    [ -e $nginx_config ] && nginx_is_installed=1 || nginx_is_installed=0
+    [ -e /usr/local/bin/xray ] && xray_is_installed=1 || xray_is_installed=0
+    ([ $xray_is_installed -eq 1 ] && [[ $nginx_is_installed -eq 1 ]]) && is_installed=1 || is_installed=0
+    echo "[DEBUG] 安装状态检查: is_installed=$is_installed, nginx_is_installed=$nginx_is_installed, xray_is_installed=$xray_is_installed"
     get_config_info
     echo "[DEBUG] 配置信息获取完成"
     local nginx_status=0
