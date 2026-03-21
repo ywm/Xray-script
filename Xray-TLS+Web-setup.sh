@@ -1158,30 +1158,30 @@ check_ssh_timeout()
 uninstall_firewall()
 {
     green "正在删除防火墙。。。"
-    ufw disable
+    ufw disable 2>/dev/null || true
     apt_purge firewalld
     apt_purge ufw
-    systemctl stop firewalld
-    systemctl disable firewalld
-    $dnf -y remove firewalld
+    systemctl stop firewalld 2>/dev/null || true
+    systemctl disable firewalld 2>/dev/null || true
+    $dnf -y remove firewalld 2>/dev/null || true
     green "正在删除阿里云盾和腾讯云盾 (仅对阿里云和腾讯云服务器有效)。。。"
     #阿里云盾
-    pkill -9 assist_daemon
+    pkill -9 assist_daemon 2>/dev/null || true
     rm -rf /usr/local/share/assist-daemon
-    systemctl stop CmsGoAgent
-    systemctl disable CmsGoAgent
-    systemctl stop cloudmonitor
-    /etc/rc.d/init.d/cloudmonitor remove
+    systemctl stop CmsGoAgent 2>/dev/null || true
+    systemctl disable CmsGoAgent 2>/dev/null || true
+    systemctl stop cloudmonitor 2>/dev/null || true
+    /etc/rc.d/init.d/cloudmonitor remove 2>/dev/null || true
     rm -rf /usr/local/cloudmonitor
     rm -rf /etc/systemd/system/CmsGoAgent.service
     systemctl daemon-reload
     #aliyun-assist
-    systemctl stop AssistDaemon
-    systemctl disable AssistDaemon
-    systemctl stop aliyun
-    systemctl disable aliyun
+    systemctl stop AssistDaemon 2>/dev/null || true
+    systemctl disable AssistDaemon 2>/dev/null || true
+    systemctl stop aliyun 2>/dev/null || true
+    systemctl disable aliyun 2>/dev/null || true
     apt_purge aliyun-assist
-    $dnf -y remove aliyun_assist
+    $dnf -y remove aliyun_assist 2>/dev/null || true
     rm -rf /usr/local/share/aliyun-assist
     rm -rf /usr/sbin/aliyun_installer
     rm -rf /usr/sbin/aliyun-service
@@ -1190,10 +1190,10 @@ uninstall_firewall()
     rm -rf /etc/systemd/system/AssistDaemon.service
     systemctl daemon-reload
     #AliYunDun aegis
-    pkill -9 AliYunDunUpdate
-    pkill -9 AliYunDun
-    pkill -9 AliHids
-    /etc/init.d/aegis uninstall
+    pkill -9 AliYunDunUpdate 2>/dev/null || true
+    pkill -9 AliYunDun 2>/dev/null || true
+    pkill -9 AliHids 2>/dev/null || true
+    /etc/init.d/aegis uninstall 2>/dev/null || true
     rm -rf /usr/local/aegis
     rm -rf /etc/init.d/aegis
     rm -rf /etc/rc2.d/S80aegis
@@ -1202,30 +1202,30 @@ uninstall_firewall()
     rm -rf /etc/rc5.d/S80aegis
 
     #腾讯云盾
-    /usr/local/qcloud/stargate/admin/uninstall.sh
-    /usr/local/qcloud/YunJing/uninst.sh
-    /usr/local/qcloud/monitor/barad/admin/uninstall.sh
+    /usr/local/qcloud/stargate/admin/uninstall.sh 2>/dev/null || true
+    /usr/local/qcloud/YunJing/uninst.sh 2>/dev/null || true
+    /usr/local/qcloud/monitor/barad/admin/uninstall.sh 2>/dev/null || true
     systemctl daemon-reload
-    systemctl stop YDService
-    systemctl disable YDService
+    systemctl stop YDService 2>/dev/null || true
+    systemctl disable YDService 2>/dev/null || true
     rm -rf /lib/systemd/system/YDService.service
     systemctl daemon-reload
-    systemctl stop tat_agent
-    systemctl disable tat_agent
+    systemctl stop tat_agent 2>/dev/null || true
+    systemctl disable tat_agent 2>/dev/null || true
     rm -rf /etc/systemd/system/tat_agent.service
     systemctl daemon-reload
-    sed -i 's#/usr/local/qcloud#rcvtevyy4f5d#g' /etc/rc.local
-    sed -i '/rcvtevyy4f5d/d' /etc/rc.local
+    sed -i 's#/usr/local/qcloud#rcvtevyy4f5d#g' /etc/rc.local 2>/dev/null || true
+    sed -i '/rcvtevyy4f5d/d' /etc/rc.local 2>/dev/null || true
     rm -rf $(find /etc/udev/rules.d -iname "*qcloud*" 2>/dev/null)
-    pkill -9 watchdog.sh
-    pkill -9 secu-tcs-agent
-    pkill -9 YDService
-    pkill -9 YDLive
-    pkill -9 sgagent
-    pkill -9 tat_agent
-    pkill -9 /usr/local/qcloud
-    pkill -9 barad_agent
-    kill -s 9 "$(ps -aux | grep '/usr/local/qcloud/nv//nv_driver_install_helper\.sh' | awk '{print $2}')"
+    pkill -9 watchdog.sh 2>/dev/null || true
+    pkill -9 secu-tcs-agent 2>/dev/null || true
+    pkill -9 YDService 2>/dev/null || true
+    pkill -9 YDLive 2>/dev/null || true
+    pkill -9 sgagent 2>/dev/null || true
+    pkill -9 tat_agent 2>/dev/null || true
+    pkill -9 /usr/local/qcloud 2>/dev/null || true
+    pkill -9 barad_agent 2>/dev/null || true
+    kill -s 9 "$(ps -aux | grep '/usr/local/qcloud/nv//nv_driver_install_helper\.sh' | awk '{print $2}')" 2>/dev/null || true
     rm -rf /usr/local/qcloud
     rm -rf /usr/local/sa
     rm -rf /usr/local/yd.socket.client
@@ -1235,16 +1235,16 @@ uninstall_firewall()
     mkdir /usr/local/qcloud/action/login_banner.sh
     mkdir /usr/local/qcloud/action/action.sh
     if [[ "$(type -P uname)" ]] && uname -a | grep solaris >/dev/null; then
-        crontab -l | sed "/qcloud/d" | crontab --
+        crontab -l 2>/dev/null | sed "/qcloud/d" | crontab -- 2>/dev/null || true
     else
-        crontab -l | sed "/qcloud/d" | crontab -
+        crontab -l 2>/dev/null | sed "/qcloud/d" | crontab - 2>/dev/null || true
     fi
 
     # Huawei Cloud
     rm -rf /CloudResetPwdUpdateAgent
     rm -rf /etc/init.d/HSSInstall
     rm -rf /usr/local/uniagent
-    pkill -9 uniagent
+    pkill -9 uniagent 2>/dev/null || true
 }
 
 #升级系统组件
