@@ -776,6 +776,19 @@ get_config_info()
     pretend_list=($(grep "^#pretend_list=" $nginx_config 2>/dev/null | cut -d = -f 2 || true))
     subdomain_prefix_list=($(grep "^#subdomain_prefix_list=" $nginx_config 2>/dev/null | cut -d = -f 2 || true))
 
+    # 如果 nginx.conf 中没有域名信息，尝试从其他来源恢复
+    if [[ ${#domain_list[@]} -eq 0 ]] && [[ -n "${reality_server_names:-}" ]]; then
+        echo "[DEBUG] nginx.conf 中无域名信息，尝试从 xray 配置恢复..."
+        # 从 reality_server_names 获取第一个域名作为主域名
+        local main_domain="${reality_server_names%% *}"
+        if [[ -n "$main_domain" ]]; then
+            # 假设三个域名相同（常见配置）
+            domain_list=("$main_domain" "$main_domain" "$main_domain")
+            true_domain_list=("$main_domain" "$main_domain" "$main_domain")
+            echo "[DEBUG] 从 xray 配置恢复域名: $main_domain"
+        fi
+    fi
+
     # 读取 IPv6 下行域名
     ipv6_download_domain="$(grep "^#ipv6_download_domain=" $nginx_config 2>/dev/null | cut -d = -f 2 || true)"
     [ -z "$ipv6_download_domain" ] && ipv6_download_domain="[2606:4700:4700::1111]"
@@ -2932,7 +2945,19 @@ get_all_certs()
 #nginx 配置
 config_nginx()
 {
-    
+    # 检查域名列表是否有效 - 需要至少3个域名 (REALITY, Trojan, XHTTP)
+    if [[ ${#domain_list[@]} -lt 3 ]]; then
+        red "错误: 域名列表不完整 (需要3个域名，当前: ${#domain_list[@]})"
+        yellow "domain_list: ${domain_list[*]:-}"
+        yellow "请检查 nginx.conf 中的 #domain_list= 注释行"
+        return 1
+    fi
+    if [[ -z "${domain_list[0]:-}" ]] || [[ -z "${domain_list[1]:-}" ]] || [[ -z "${domain_list[2]:-}" ]]; then
+        red "错误: 域名列表包含空值"
+        yellow "domain_list[0]=${domain_list[0]:-}, [1]=${domain_list[1]:-}, [2]=${domain_list[2]:-}"
+        return 1
+    fi
+
     # 一次性生成完整的 Nginx 配置,避免多次 cat 拼接导致的问题
     cat > ${nginx_prefix}/conf/nginx.conf <<EOF
 user  root root;
@@ -3037,7 +3062,9 @@ http {
         return 301 https://${true_domain_list[0]}\$request_uri;
     }
 
-    # 使用参数化函数添加四个 SSL server 块
+EOF
+
+    # 使用参数化函数添加 SSL server 块 (在 heredoc 结束后执行)
     add_ssl_server_block "/dev/shm/nginx/xhttp_web.sock" "${domain_list[2]}" "XHTTP Web 服务器"
     add_ssl_server_block "/dev/shm/nginx/reality_web.sock" "${domain_list[0]}" "REALITY Web 服务器"
     add_ssl_server_block "/dev/shm/nginx/trojan_web.sock" "${domain_list[1]}" "Trojan Web 服务器"
@@ -3045,8 +3072,8 @@ http {
     # 默认 Web 服务器 (处理未匹配的 SNI)
     add_ssl_server_block "/dev/shm/nginx/default_web.sock" "${true_domain_list[0]} www.${true_domain_list[0]} _" "默认 Web 服务器 (处理未匹配的 SNI)"
 
-
-
+    # 关闭 http 块并添加配置注释
+    cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
 }
 #-----------------不要修改以下内容----------------
 #domain_list=${domain_list[*]}
@@ -3056,6 +3083,7 @@ http {
 #subdomain_prefix_list=${subdomain_prefix_list[*]}
 #ipv6_download_domain=${ipv6_download_domain}
 EOF
+
     echo "[DEBUG] config_nginx 执行完成"
 }
 
@@ -4335,7 +4363,10 @@ check_update_update_nginx()
     echo "[DEBUG] nginx part1 安装完成"
     install_nginx_part2
     echo "[DEBUG] nginx part2 安装完成"
-    config_nginx
+    if ! config_nginx; then
+        red "nginx 配置生成失败，更新中止"
+        return 1
+    fi
     echo "[DEBUG] nginx 配置完成"
     mv "${temp_dir}/domain_backup/"* ${nginx_prefix}/html 2>/dev/null
     echo "[DEBUG] 域名备份恢复完成"
