@@ -505,7 +505,7 @@ check_need_php()
 {
     [[ $is_installed -eq 0 ]] && return 1
     local i
-    for i in "${pretend_list[@]}"
+    for i in ${pretend_list[@]:-}
     do
         [ "$i" == "2" ] && return 0
     done
@@ -516,7 +516,7 @@ check_need_cloudreve()
 {
     [[ $is_installed -eq 0 ]] && return 1
     local i
-    for i in "${pretend_list[@]}"
+    for i in ${pretend_list[@]:-}
     do
         [ "$i" == "1" ] && return 0
     done
@@ -710,13 +710,13 @@ backup_domains_web()
     echo "[DEBUG] backup_domains_web 开始执行..."
     local i
     mkdir "${temp_dir}/domain_backup"
-    echo "[DEBUG] true_domain_list: ${true_domain_list[@]}"
-    for i in "${true_domain_list[@]}"
+    echo "[DEBUG] true_domain_list: ${true_domain_list[*]:-}"
+    for i in ${true_domain_list[@]:-}
     do
         if [ "${1:-}" == "cp" ]; then
-            cp -rf "${nginx_prefix}/html/${i}" "${temp_dir}/domain_backup" 2>/dev/null
+            cp -rf "${nginx_prefix}/html/${i}" "${temp_dir}/domain_backup" 2>/dev/null || true
         else
-            mv "${nginx_prefix}/html/${i}" "${temp_dir}/domain_backup" 2>/dev/null
+            mv "${nginx_prefix}/html/${i}" "${temp_dir}/domain_backup" 2>/dev/null || true
         fi
     done
     echo "[DEBUG] backup_domains_web 执行完成"
@@ -1905,7 +1905,7 @@ readDomain()
 {
     check_domain()
     {
-        if [ -z "$1" ]; then
+        if [ -z "${1:-}" ]; then
             return 1
         elif [ "${1%%.*}" == "www" ]; then
             red "域名前面不要带www!"
@@ -2218,15 +2218,15 @@ install_acme_dependence()
 install_web_dependence()
 {
     green "正在安装伪装网站依赖。。。"
-    if [ "$1" == "" ]; then
-        for i in "${pretend_list[@]}"
+    if [ "${1:-}" == "" ]; then
+        for i in ${pretend_list[@]:-}
         do
             if [ "$i" == "1" ]; then
                 install_dependence ca-certificates wget
                 break
             fi
         done
-        for i in "${pretend_list[@]}"
+        for i in ${pretend_list[@]:-}
         do
             if [ "$i" == "2" ]; then
                 install_dependence ca-certificates curl bzip2
@@ -4467,7 +4467,7 @@ reinit_domain()
     # 清理旧配置
     green "清理旧域名配置..."
     local i
-    for i in "${true_domain_list[@]}"
+    for i in ${true_domain_list[@]:-}
     do
         rm -rf "${nginx_prefix}/html/${i}" 2>/dev/null
     done
@@ -4618,10 +4618,10 @@ delete_domain()
     unset 'true_domain_list[$delete]'
     unset 'domain_config_list[$delete]'
     unset 'pretend_list[$delete]'
-    domain_list=("${domain_list[@]}")
-    true_domain_list=("${true_domain_list[@]}")
-    domain_config_list=("${domain_config_list[@]}")
-    pretend_list=("${pretend_list[@]}")
+    domain_list=(${domain_list[@]:-})
+    true_domain_list=(${true_domain_list[@]:-})
+    domain_config_list=(${domain_config_list[@]:-})
+    pretend_list=(${pretend_list[@]:-})
     config_nginx
     config_xray
     xray_nginx_safe_restart
