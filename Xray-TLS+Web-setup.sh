@@ -625,8 +625,8 @@ turn_on_off_php()
         systemctl start php-fpm
         systemctl enable php-fpm
     else
-        systemctl stop php-fpm
-        systemctl disable php-fpm
+        systemctl stop php-fpm 2>/dev/null || true
+        systemctl disable php-fpm 2>/dev/null || true
     fi
 }
 turn_on_off_cloudreve()
@@ -635,8 +635,8 @@ turn_on_off_cloudreve()
         systemctl start cloudreve
         systemctl enable cloudreve
     else
-        systemctl stop cloudreve
-        systemctl disable cloudreve
+        systemctl stop cloudreve 2>/dev/null || true
+        systemctl disable cloudreve 2>/dev/null || true
     fi
 }
 let_change_cloudreve_domain()
@@ -667,8 +667,8 @@ ask_if()
 remove_xray()
 {
     if ! bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ remove --purge; then
-        systemctl stop xray
-        systemctl disable xray
+        systemctl stop xray 2>/dev/null || true
+        systemctl disable xray 2>/dev/null || true
         rm -rf /usr/local/bin/xray
         rm -rf /usr/local/etc/xray
         rm -rf /etc/systemd/system/xray.service
@@ -687,8 +687,8 @@ remove_xray()
 remove_nginx()
 {
     echo "[DEBUG] remove_nginx 开始执行..."
-    systemctl stop nginx
-    systemctl disable nginx
+    systemctl stop nginx 2>/dev/null || true
+    systemctl disable nginx 2>/dev/null || true
     rm -rf $nginx_service
     systemctl daemon-reload
     if [ -d "${nginx_prefix}" ]; then
@@ -710,8 +710,8 @@ remove_nginx()
 }
 remove_php()
 {
-    systemctl stop php-fpm
-    systemctl disable php-fpm
+    systemctl stop php-fpm 2>/dev/null || true
+    systemctl disable php-fpm 2>/dev/null || true
     rm -rf $php_service
     systemctl daemon-reload
     rm -rf ${php_prefix}
@@ -719,8 +719,8 @@ remove_php()
 }
 remove_cloudreve()
 {
-    systemctl stop cloudreve
-    systemctl disable cloudreve
+    systemctl stop cloudreve 2>/dev/null || true
+    systemctl disable cloudreve 2>/dev/null || true
     rm -rf $cloudreve_service
     systemctl daemon-reload
     rm -rf ${cloudreve_prefix}
@@ -1068,10 +1068,10 @@ check_port()
     local xray_status=0
     local nginx_status=0
     echo "[DEBUG] 检查 xray 状态..."
-    systemctl -q is-active xray 2>/dev/null && xray_status=1 && systemctl stop xray || true
+    systemctl -q is-active xray 2>/dev/null && xray_status=1 && systemctl stop xray 2>/dev/null || true
     echo "[DEBUG] xray_status=$xray_status"
     echo "[DEBUG] 检查 nginx 状态..."
-    systemctl -q is-active nginx 2>/dev/null && nginx_status=1 && systemctl stop nginx || true
+    systemctl -q is-active nginx 2>/dev/null && nginx_status=1 && systemctl stop nginx 2>/dev/null || true
     echo "[DEBUG] nginx_status=$nginx_status"
     ([ $xray_status -eq 1 ] || [ $nginx_status -eq 1 ]) && sleep 2s
     echo "[DEBUG] 开始检查端口..."
@@ -2929,7 +2929,7 @@ get_cert()
     local xray_was_running=0
     if systemctl -q is-active xray; then
         xray_was_running=1
-        systemctl stop xray
+        systemctl stop xray 2>/dev/null || true
     fi
 
     # 申请泛域名证书
@@ -3682,8 +3682,8 @@ EOF
 
 init_web()
 {
-    systemctl stop php-fpm
-    systemctl stop cloudreve
+    systemctl stop php-fpm 2>/dev/null || true
+    systemctl stop cloudreve 2>/dev/null || true
     if [ "${pretend_list[$1]}" == "1" ]; then
         if [ $cloudreve_is_installed -eq 1 ]; then
             systemctl start cloudreve
@@ -3729,7 +3729,7 @@ update_cloudreve()
     green "正在安装/更新Cloudreve。。。"
     local temp_cloudreve_status=0
     systemctl -q is-active cloudreve 2>/dev/null && temp_cloudreve_status=1 || true
-    systemctl stop cloudreve
+    systemctl stop cloudreve 2>/dev/null || true
     if ! wget -O "$cloudreve_prefix/cloudreve.tar.gz" "https://github.com/cloudreve/Cloudreve/releases/download/${cloudreve_version}/cloudreve_${cloudreve_version}_linux_${machine}.tar.gz"; then
         red "获取Cloudreve失败！！"
         yellow "按回车键继续或者按Ctrl+c终止"
@@ -4183,8 +4183,8 @@ install_update_xray_tls_web()
             remove_php
             install_php_part1
         else
-            systemctl stop php-fpm
-            systemctl disable php-fpm
+            systemctl stop php-fpm 2>/dev/null || true
+            systemctl disable php-fpm 2>/dev/null || true
         fi
         install_php_part2
         [[ $update -eq 1 ]] && turn_on_off_php
@@ -4205,8 +4205,8 @@ install_update_xray_tls_web()
         remove_nginx
         install_nginx_part1
     else
-        systemctl stop nginx
-        systemctl disable nginx
+        systemctl stop nginx 2>/dev/null || true
+        systemctl disable nginx 2>/dev/null || true
         rm -rf ${nginx_prefix}/conf.d
         rm -rf ${nginx_prefix}/html/issue_certs
         rm -rf ${nginx_prefix}/conf/issue_certs.conf
@@ -4243,7 +4243,7 @@ install_update_xray_tls_web()
     config_nginx
     config_xray
     sleep 2s
-    systemctl stop cloudreve
+    systemctl stop cloudreve 2>/dev/null || true
     
     # 验证并重启
     if ! xray_test_config; then
@@ -4352,7 +4352,7 @@ install_check_update_update_php()
     if [ $php_status -eq 1 ]; then
         systemctl start php-fpm
     else
-        systemctl stop php-fpm
+        systemctl stop php-fpm 2>/dev/null || true
     fi
     green "安装/更新完成！"
 }
@@ -4427,7 +4427,7 @@ check_update_update_nginx()
         systemctl restart nginx
     else
         echo "[DEBUG] 停止 nginx..."
-        systemctl stop nginx
+        systemctl stop nginx 2>/dev/null || true
     fi
     if [ $xray_status -eq 1 ]; then
         # 验证配置后再重启
@@ -4439,7 +4439,7 @@ check_update_update_nginx()
         fi
     else
         echo "[DEBUG] 停止 xray..."
-        systemctl stop xray
+        systemctl stop xray 2>/dev/null || true
     fi
     cd /
     rm -rf "$temp_dir"
@@ -4457,7 +4457,7 @@ restart_xray_tls_web()
     fi
     
     systemctl restart xray nginx
-    systemctl stop php-fpm cloudreve
+    systemctl stop php-fpm cloudreve 2>/dev/null || true
     turn_on_off_php
     turn_on_off_cloudreve
     sleep 1s
@@ -4542,8 +4542,8 @@ reinit_domain()
     echo
     
     # 停止所有服务
-    systemctl stop xray nginx php-fpm cloudreve 2>/dev/null
-    systemctl disable php-fpm cloudreve 2>/dev/null
+    systemctl stop xray nginx php-fpm cloudreve 2>/dev/null || true
+    systemctl disable php-fpm cloudreve 2>/dev/null || true
     
     # 清理旧配置
     green "清理旧域名配置..."
@@ -4656,7 +4656,7 @@ add_domain()
     config_nginx
     config_xray
     sleep 2s
-    systemctl stop php-fpm cloudreve
+    systemctl stop php-fpm cloudreve 2>/dev/null || true
     xray_nginx_safe_restart
     init_web "-1"
     green "域名添加完成！！"
@@ -4774,7 +4774,7 @@ change_pretend()
         install_web_dependence "$pretend"
     fi
     config_nginx
-    systemctl stop php-fpm cloudreve
+    systemctl stop php-fpm cloudreve 2>/dev/null || true
     systemctl restart nginx
     init_web "$change"
     green "修改完成！"
@@ -6149,9 +6149,9 @@ start_menu()
             restart_xray_tls_web
             ;;
         14)
-            systemctl stop xray nginx
-            [[ $php_is_installed -eq 1 ]] && systemctl stop php-fpm
-            [ $cloudreve_is_installed -eq 1 ] && systemctl stop cloudreve
+            systemctl stop xray nginx 2>/dev/null || true
+            [[ $php_is_installed -eq 1 ]] && systemctl stop php-fpm 2>/dev/null || true
+            [ $cloudreve_is_installed -eq 1 ] && systemctl stop cloudreve 2>/dev/null || true
             green "已停止！"
             ;;
         15)
