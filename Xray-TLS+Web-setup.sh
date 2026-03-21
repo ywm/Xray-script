@@ -2379,7 +2379,7 @@ install_php_part1()
 }
 install_php_part2()
 {
-    useradd -r -s /bin/bash www-data
+    id www-data &>/dev/null || useradd -r -s /bin/bash www-data
     cp ${php_prefix}/etc/php-fpm.conf.default ${php_prefix}/etc/php-fpm.conf
     cp ${php_prefix}/etc/php-fpm.d/www.conf.default ${php_prefix}/etc/php-fpm.d/www.conf
     sed -i 's/^[ \t]*listen[ \t]*=/;&/g' ${php_prefix}/etc/php-fpm.d/www.conf
