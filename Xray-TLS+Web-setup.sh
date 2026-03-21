@@ -6064,7 +6064,7 @@ start_menu()
     esac
 }
 
-if [ "$1" == "--update" ]; then
+if [ "${1:-}" == "--update" ]; then
     update=1
     install_update_xray_tls_web
 else
