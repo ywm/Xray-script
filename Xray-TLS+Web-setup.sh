@@ -698,7 +698,6 @@ remove_xray()
 }
 remove_nginx()
 {
-    echo "[DEBUG] remove_nginx 开始执行..."
     systemctl stop nginx 2>/dev/null || true
     systemctl disable nginx 2>/dev/null || true
     rm -rf $nginx_service
@@ -718,7 +717,6 @@ remove_nginx()
     fi
     nginx_is_installed=0
     is_installed=0
-    echo "[DEBUG] remove_nginx 执行完成"
 }
 remove_php()
 {
@@ -741,10 +739,8 @@ remove_cloudreve()
 #备份域名伪装网站
 backup_domains_web()
 {
-    echo "[DEBUG] backup_domains_web 开始执行..."
     local i
     mkdir "${temp_dir}/domain_backup"
-    echo "[DEBUG] true_domain_list: ${true_domain_list[*]:-}"
     for i in ${true_domain_list[@]:-}
     do
         if [ "${1:-}" == "cp" ]; then
@@ -753,15 +749,12 @@ backup_domains_web()
             mv "${nginx_prefix}/html/${i}" "${temp_dir}/domain_backup" 2>/dev/null || true
         fi
     done
-    echo "[DEBUG] backup_domains_web 执行完成"
 }
 #获取配置信息
 get_config_info()
 {
-    echo "[DEBUG] get_config_info 开始执行, is_installed=$is_installed"
-    [[ $is_installed -eq 0 ]] && { echo "[DEBUG] is_installed=0，直接返回"; return; }
+    [[ $is_installed -eq 0 ]] && return
 
-    echo "[DEBUG] 开始读取配置..."
     # 检测并迁移旧版单文件配置
     if [ -f "$xray_config" ] && [ ! -d "$xray_config_dir" ]; then
         yellow "检测到旧版单文件配置，将在下次重新配置时自动迁移到多文件配置"
@@ -812,14 +805,12 @@ get_config_info()
 
     # 如果 nginx.conf 中没有域名信息，尝试从其他来源恢复
     if [[ ${#domain_list[@]} -eq 0 ]] && [[ -n "${reality_server_names:-}" ]]; then
-        echo "[DEBUG] nginx.conf 中无域名信息，尝试从 xray 配置恢复..."
         # 从 reality_server_names 获取第一个域名作为主域名
         local main_domain="${reality_server_names%% *}"
         if [[ -n "$main_domain" ]]; then
             # 假设三个域名相同（常见配置）
             domain_list=("$main_domain" "$main_domain" "$main_domain")
             true_domain_list=("$main_domain" "$main_domain" "$main_domain")
-            echo "[DEBUG] 从 xray 配置恢复域名: $main_domain"
         fi
     fi
 
@@ -827,7 +818,6 @@ get_config_info()
     ipv6_download_domain="$(grep "^#ipv6_download_domain=" $nginx_config 2>/dev/null | cut -d = -f 2 || true)"
     [ -z "$ipv6_download_domain" ] && ipv6_download_domain="[2606:4700:4700::1111]"
 
-    echo "[DEBUG] get_config_info 执行完成"
 }
 
 
@@ -1076,22 +1066,15 @@ get_system_info()
 check_port()
 {
     green "正在检查端口占用。。。"
-    echo "[DEBUG] check_port 开始执行"
     local xray_status=0
     local nginx_status=0
-    echo "[DEBUG] 检查 xray 状态..."
     systemctl -q is-active xray 2>/dev/null && xray_status=1 && systemctl stop xray 2>/dev/null || true
-    echo "[DEBUG] xray_status=$xray_status"
-    echo "[DEBUG] 检查 nginx 状态..."
     systemctl -q is-active nginx 2>/dev/null && nginx_status=1 && systemctl stop nginx 2>/dev/null || true
-    echo "[DEBUG] nginx_status=$nginx_status"
     ([ $xray_status -eq 1 ] || [ $nginx_status -eq 1 ]) && sleep 2s
-    echo "[DEBUG] 开始检查端口..."
     local check_list=('80' '443')
     local i
     for i in "${check_list[@]}"
     do
-        echo "[DEBUG] 检查端口 $i..."
         local port_check_result
         port_check_result=$(ss -natl 2>/dev/null | awk '{print $4}' | awk -F : '{print $NF}' | grep -E "^[0-9]+$" | grep -w "${i}" || true)
         if [ -n "$port_check_result" ]; then
@@ -1100,10 +1083,8 @@ check_port()
             exit 1
         fi
     done
-    echo "[DEBUG] 端口检查完成，恢复服务..."
     [ $xray_status -eq 1 ] && systemctl start xray
     [ $nginx_status -eq 1 ] && systemctl start nginx
-    echo "[DEBUG] check_port 执行完成"
 }
 
 #检查Nginx是否已通过apt/dnf/yum安装
@@ -1415,38 +1396,30 @@ install_bbr()
     get_kernel_info()
     {
         green "正在获取最新版本内核版本号。。。。(60内秒未获取成功自动跳过)"
-        echo "[DEBUG] get_kernel_info 开始执行"
         your_kernel_version="$(uname -r | cut -d - -f 1)"
-        echo "[DEBUG] 当前内核版本: $your_kernel_version"
         while [ ${your_kernel_version##*.} -eq 0 ]
         do
             your_kernel_version=${your_kernel_version%.*}
         done
-        echo "[DEBUG] 处理后内核版本: $your_kernel_version"
-        echo "[DEBUG] 开始下载内核列表..."
         if ! timeout 60 wget -q -O "temp_kernel_version" "https://kernel.ubuntu.com/~kernel-ppa/mainline/"; then
             yellow "获取内核版本超时或失败，跳过内核检查"
             latest_kernel_version="error"
             rm -f temp_kernel_version 2>/dev/null
             return 0
         fi
-        echo "[DEBUG] 内核列表下载完成，开始解析..."
         local kernel_list=()
         local kernel_list_temp
         kernel_list_temp=($(awk -F'\"v' '/v[0-9]/{print $2}' "temp_kernel_version" | cut -d '"' -f1 | cut -d '/' -f1 | sort -rV))
-        echo "[DEBUG] 找到 ${#kernel_list_temp[@]} 个内核版本"
         if [ ${#kernel_list_temp[@]} -le 1 ]; then
             latest_kernel_version="error"
             return 1
         fi
-        echo "[DEBUG] 开始处理内核列表..."
         local i2=0
         local i3
         local kernel_rc=""
         local kernel_list_temp2
         while ((i2<${#kernel_list_temp[@]}))
         do
-            echo "[DEBUG] 处理第 $i2 个: ${kernel_list_temp[$i2]}"
             if [[ "${kernel_list_temp[$i2]}" =~ -rc(0|[1-9][0-9]*)$ ]] && [ "$kernel_rc" == "" ]; then
                 kernel_list_temp2=("${kernel_list_temp[$i2]}")
                 kernel_rc="${kernel_list_temp[$i2]%-*}"
@@ -1460,7 +1433,6 @@ install_bbr()
                     kernel_list+=("${kernel_list_temp2[$i3]}")
                 done
                 kernel_rc=""
-                echo "[DEBUG] 分支3: 不增加 i2，重新处理"
             elif [ -z "$kernel_rc" ] || version_ge "${kernel_list_temp[$i2]}" "$kernel_rc"; then
                 kernel_list+=("${kernel_list_temp[$i2]}")
                 i2=$((i2+1))
@@ -1470,10 +1442,8 @@ install_bbr()
                     kernel_list+=("${kernel_list_temp2[$i3]}")
                 done
                 kernel_rc=""
-                echo "[DEBUG] 分支else: 不增加 i2，重新处理"
             fi
         done
-        echo "[DEBUG] while 循环结束"
         if [ -n "$kernel_rc" ]; then
             for((i3=0;i3<${#kernel_list_temp2[@]};i3++))
             do
@@ -2570,7 +2540,6 @@ compile_nginx()
     swap_off
     _nginx_http3=$openssl_supports_quic
     cd ..
-    echo "[DEBUG] compile_nginx 执行完成"
 }
 
 config_service_nginx()
@@ -2603,18 +2572,15 @@ EOF
 }
 install_nginx_part1()
 {
-    echo "[DEBUG] install_nginx_part1 开始执行..."
     green "正在安装Nginx。。。"
     cd "${nginx_version}"
     make install
     cd ..
     rm -rf "${nginx_version}"
     rm -rf "$openssl_version"
-    echo "[DEBUG] install_nginx_part1 执行完成"
 }
 install_nginx_part2()
 {
-    echo "[DEBUG] install_nginx_part2 开始执行..."
     mkdir ${nginx_prefix}/conf.d
     touch $nginx_config
     # 如果 custom.d 不存在则创建
@@ -2722,7 +2688,6 @@ EOF
     nginx_is_installed=1
     [ $xray_is_installed -eq 1 ] && is_installed=1 || is_installed=0
     install_geoip2_database
-    echo "[DEBUG] install_nginx_part2 执行完成"
 }
 
 
@@ -3011,12 +2976,9 @@ get_cert()
 
 get_all_certs()
 {
-    echo "[DEBUG] get_all_certs 开始执行..."
     local i
-    echo "[DEBUG] domain_list 数量: ${#domain_list[@]}"
     for ((i=0;i<${#domain_list[@]};i++))
     do
-        echo "[DEBUG] 处理域名 ${i}: ${true_domain_list[$i]}"
         if ! get_cert "$i"; then
             red    "域名\"${true_domain_list[$i]}\"证书申请失败！"
             yellow "请检查："
@@ -3027,7 +2989,6 @@ get_all_certs()
             read -r -s -n 1 || true
         fi
     done
-    echo "[DEBUG] get_all_certs 执行完成"
 }
 
 #nginx 配置
@@ -3172,7 +3133,6 @@ EOF
 #ipv6_download_domain=${ipv6_download_domain}
 EOF
 
-    echo "[DEBUG] config_nginx 执行完成"
 }
 
 add_pretend_config_to_file()
@@ -4139,14 +4099,10 @@ install_update_xray_tls_web()
     fi
     
     check_nginx_installed_system
-    echo "[DEBUG] check_nginx_installed_system 完成"
     [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
     check_SELinux
-    echo "[DEBUG] check_SELinux 完成"
     check_important_dependence_installed iproute2 iproute
-    echo "[DEBUG] 即将执行 check_port"
     check_port
-    echo "[DEBUG] check_port 完成"
     check_important_dependence_installed tzdata tzdata
     get_system_info
     check_important_dependence_installed ca-certificates ca-certificates
@@ -4481,87 +4437,60 @@ install_check_update_update_php()
 }
 check_update_update_nginx()
 {
-    echo "[DEBUG] 开始检查 nginx 更新..."
     check_nginx_installed_system
-    echo "[DEBUG] 检查 nginx 系统安装完成"
     [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
     check_SELinux
-    echo "[DEBUG] SELinux 检查完成"
     check_important_dependence_installed tzdata tzdata
     get_system_info
-    echo "[DEBUG] 系统信息获取完成"
     check_important_dependence_installed ca-certificates ca-certificates
     check_important_dependence_installed wget wget
     check_important_dependence_installed "procps" "procps-ng"
     install_epel
-    echo "[DEBUG] 依赖检查完成"
     ask_update_script_force
-    echo "[DEBUG] 脚本更新检查完成"
     if check_nginx_update; then
         green "Nginx有新版本"
-        ask_if "是否更新？[y/n]" || { echo "[DEBUG] 用户选择不更新，退出"; return 0; }
+        ask_if "是否更新？[y/n]" || return 0
     else
         green "Nginx已是最新版本"
-        echo "[DEBUG] nginx 已是最新版本，无需更新"
         return 0
     fi
-    echo "[DEBUG] 开始执行更新步骤..."
     check_ssh_timeout
-    echo "[DEBUG] SSH 超时检查完成"
     # 重新检查安装状态（因为脚本可能被更新重新加载）
     [ -e $nginx_config ] && nginx_is_installed=1 || nginx_is_installed=0
     [ -e /usr/local/bin/xray ] && xray_is_installed=1 || xray_is_installed=0
     ([ $xray_is_installed -eq 1 ] && [[ $nginx_is_installed -eq 1 ]]) && is_installed=1 || is_installed=0
-    echo "[DEBUG] 安装状态检查: is_installed=$is_installed, nginx_is_installed=$nginx_is_installed, xray_is_installed=$xray_is_installed"
     get_config_info
-    echo "[DEBUG] 配置信息获取完成"
     local nginx_status=0
     local xray_status=0
     systemctl -q is-active nginx 2>/dev/null && nginx_status=1 || true
     systemctl -q is-active xray 2>/dev/null && xray_status=1 || true
-    echo "[DEBUG] nginx 状态: $nginx_status, xray 状态: $xray_status"
     install_nginx_compile_toolchains
-    echo "[DEBUG] nginx 编译工具链安装完成"
     install_nginx_dependence
-    echo "[DEBUG] nginx 依赖安装完成"
     enter_temp_dir
-    echo "[DEBUG] 进入临时目录: $temp_dir"
     compile_nginx
-    echo "[DEBUG] nginx 编译完成"
     backup_domains_web
-    echo "[DEBUG] 域名网站备份完成"
     remove_nginx
-    echo "[DEBUG] 旧 nginx 移除完成"
     install_nginx_part1
-    echo "[DEBUG] nginx part1 安装完成"
     install_nginx_part2
-    echo "[DEBUG] nginx part2 安装完成"
     if ! config_nginx; then
         red "nginx 配置生成失败，更新中止"
         return 1
     fi
-    echo "[DEBUG] nginx 配置完成"
     mv "${temp_dir}/domain_backup/"* ${nginx_prefix}/html 2>/dev/null
-    echo "[DEBUG] 域名备份恢复完成"
     get_all_certs
-    echo "[DEBUG] 证书获取完成"
     if [ $nginx_status -eq 1 ]; then
-        echo "[DEBUG] 重启 nginx..."
         systemctl restart nginx
     else
-        echo "[DEBUG] 停止 nginx..."
         systemctl stop nginx 2>/dev/null || true
     fi
     if [ $xray_status -eq 1 ]; then
         # 验证配置后再重启
         if xray_test_config; then
-            echo "[DEBUG] 重启 xray..."
             systemctl restart xray
         else
             red "Xray 配置验证失败，请手动检查配置"
         fi
     else
-        echo "[DEBUG] 停止 xray..."
         systemctl stop xray 2>/dev/null || true
     fi
     cd /

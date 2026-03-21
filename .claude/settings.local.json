@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sed:*)",
+      "Bash(bash:*)",
+      "Bash(/tmp/add_cleanup.txt:*)",
+      "Bash(git checkout:*)",
+      "Bash(python3:*)",
+      "Bash(git add:*)",
+      "Bash(git fetch:*)",
+      "Bash(git stash:*)",
+      "Bash(git pull:*)",
+      "Bash(git restore:*)",
+      "Bash(git config:*)",
+      "Bash(FILE=\"E:/work/project/Xray-script/Xray-TLS+Web-setup.sh\" for func in add_domain change_xray_protocol check_http3_requirements config_nginx_with_http3_check delete_domain urlencode)",
+      "Bash(do echo:*)",
+      "Bash(grep -v \"^.*:$func\\(\\)\" echo \"\" done)",
+      "Bash(grep \"$func\")",
+      "Bash(echo \"Exit code: $?\")"
+    ]
+  }
+}
