@@ -3190,9 +3190,11 @@ server {
     http2 on;
 EOF
 
-    if [ "${_nginx_http3:-0}" -eq 1 ]; then
+    # 仅 XHTTP server 支持 HTTP/3 (QUIC 需要 UDP 端口，不能用于 Unix socket)
+    if [ "${_nginx_http3:-0}" -eq 1 ] && [[ "$listen_sock" == "/dev/shm/nginx/xhttp_web.sock" ]]; then
         cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
-    listen unix:${listen_sock} quic reuseport;
+    listen 443 quic reuseport;
+    listen [::]:443 quic reuseport;
     add_header Alt-Svc 'h3=":443"; ma=86400' always;
 EOF
     fi
