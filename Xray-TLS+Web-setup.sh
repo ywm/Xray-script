@@ -788,7 +788,7 @@ get_config_info()
     
     # 生成 Password
     if [ -n "$reality_private_key" ] && [ -f "/usr/local/bin/xray" ]; then
-        reality_password=$(/usr/local/bin/xray x25519 -i "$reality_private_key" 2>/dev/null | awk '/^Password:/ {print $2}')
+        reality_password=$(/usr/local/bin/xray x25519 -i "$reality_private_key" 2>/dev/null | awk '/^Password/ {print $(NF)}')
     fi
     
     # 读取域名配置
@@ -5150,7 +5150,7 @@ readRealityConfig()
     key_output=$(/usr/local/bin/xray x25519 2>/dev/null)
 
     reality_private_key=$(echo "$key_output" | awk '/^PrivateKey:/ {print $2}')
-    reality_password=$(echo "$key_output" | awk '/^Password:/ {print $2}')
+    reality_password=$(echo "$key_output" | awk '/^Password/ {print $(NF)}')
 
     if [ -z "$reality_private_key" ] || [ -z "$reality_password" ]; then
         red "密钥生成失败！xray 输出如下："
@@ -5221,7 +5221,7 @@ change_reality_config()
         
         local key_output=$(/usr/local/bin/xray x25519)
         reality_private_key=$(awk '/^PrivateKey:/ {print $2}' <<<"$key_output")
-        reality_password=$(awk '/^Password:/ {print $2}' <<<"$key_output")
+        reality_password=$(awk '/^Password/ {print $(NF)}' <<<"$key_output")
         
         if [ -z "$reality_private_key" ] || [ -z "$reality_password" ]; then
             red "密钥生成失败！"
