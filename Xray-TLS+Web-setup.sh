@@ -3277,12 +3277,40 @@ EOF
     # ==================== 10_dns.json ====================
     cat > "$xray_config_dns" <<EOF
 {
-    "dns": {
-        "servers": [
-            "1.1.1.1",
-            "8.8.8.8"
-        ]
+  "dns": {
+    "hosts": {
+      "dns.google": [
+        "8.8.8.8",
+        "8.8.4.4"
+      ]
+    },
+    "servers": [
+      {
+        "address": "https+local://8.8.4.4/dns-query",
+        "domains": [
+          "geosite:geolocation-!cn",
+          "geosite:google@cn"
+        ],
+        "expectIPs": [
+          "geoip:!cn"
+        ],
+        "queryStrategy": "UseIPv4"
+      },
+      "1.1.1.1",
+      {
+        "address": "localhost",
+        "skipFallback": false
+      }
+    ]
+  },
+  "policy": {
+    "levels": {
+      "0": {
+        "handshake": 24,
+        "connIdle": 320
+      }
     }
+  }
 }
 EOF
 
@@ -5465,7 +5493,7 @@ generate_vless_share_link()
         
         # 第一条：普通 XHTTP（上下行同线路）
         local link_normal="vless://${xid_3}@${xhttp_domain}:443"
-        link_normal+="?type=xhttp&security=tls&fp=chrome&alpn=h2&path=${encoded_path}"
+        link_normal+="?type=xhttp&security=tls&fp=chrome&alpn=h2&sni=${xhttp_domain}&host=${xhttp_domain}&path=${encoded_path}"
         link_normal+="#VLESS-XHTTP-TLS"
         
         # 第二条：上下行分离（上行 IPv4，下行 IPv6 示例节点）
@@ -5474,7 +5502,7 @@ generate_vless_share_link()
         local ipv6_domain="${ipv6_download_domain:-[2606:4700:4700::1111]}"
 
         local link_split="vless://${xid_3}@${xhttp_domain}:443"
-        link_split+="?type=xhttp&security=tls&fp=chrome&alpn=h2&path=${encoded_path}"
+        link_split+="?type=xhttp&security=tls&fp=chrome&alpn=h2&sni=${xhttp_domain}&host=${xhttp_domain}&path=${encoded_path}"
         link_split+="&extra=" # 开始 extra 参数（URI 编码）
         
         # extra JSON 编码（简单方式：base64 编码整个 extra）
