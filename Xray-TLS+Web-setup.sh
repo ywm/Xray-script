@@ -73,6 +73,18 @@ xhttp_grpc_header=false                    # false=启用 gRPC 伪装，true=关
 xhttp_sse_header=false                     # false=启用 SSE 伪装，true=关闭
 xhttp_streamup_keepalive="20-80"           # stream-up 模式保活间隔秒（随机范围）
 
+# XHTTP XMUX 配置（服务端默认值）
+xhttp_xmux_max_concurrency="16-32"
+xhttp_xmux_max_connections="0"
+xhttp_xmux_c_reuse_times="0"
+xhttp_xmux_request_times="600-900"
+xhttp_xmux_reusable_secs="1800-3000"
+xhttp_xmux_h_keepalive="0"
+
+# XHTTP 分包上行配置
+xhttp_sc_max_each_post="1000000"
+xhttp_sc_min_posts_interval="30"
+
 
 unset cloudreve_is_installed
 
@@ -3658,6 +3670,7 @@ generate_xhttp_inbound_file()
                             "keyFile": "${nginx_prefix}/certs/${true_domain_list[0]}.key"
                         }
                     ],
+                    "alpn": ["h3", "h2", "http/1.1"],
                     "minVersion": "1.2",
                     "maxVersion": "1.3"
                 },
@@ -3693,7 +3706,17 @@ generate_xhttp_inbound_file()
                       "xPaddingBytes": "$xhttp_padding",
                       "noGRPCHeader": $xhttp_grpc_header,
                       "noSSEHeader": $xhttp_sse_header,
-                      "scStreamUpServerSecs": "$xhttp_streamup_keepalive"
+                      "scStreamUpServerSecs": "$xhttp_streamup_keepalive",
+                      "scMaxEachPostBytes": "$xhttp_sc_max_each_post",
+                      "scMinPostsIntervalMs": "$xhttp_sc_min_posts_interval",
+                      "xmux": {
+                        "maxConcurrency": "$xhttp_xmux_max_concurrency",
+                        "maxConnections": "$xhttp_xmux_max_connections",
+                        "cMaxReuseTimes": "$xhttp_xmux_c_reuse_times",
+                        "hMaxRequestTimes": "$xhttp_xmux_request_times",
+                        "hMaxReusableSecs": "$xhttp_xmux_reusable_secs",
+                        "hKeepAlivePeriod": $xhttp_xmux_h_keepalive
+                      }
                     }
                 }
             },
@@ -3992,6 +4015,11 @@ print_config_info()
     tyblue " 端口: 443"
     tyblue " UUID: ${xid_3}"
     tyblue " Path: ${path}"
+    echo
+    yellow " XHTTP 使用提示:"
+    yellow "   1. CDN 中转: 推荐使用 Cloudflare, 并在 CF 面板开启 'gRPC' 支持"
+    yellow "   2. 穿透模式: 若无法通过 CDN, 尝试将 mode 改为 'packet-up'"
+    yellow "   3. QUIC 支持: 客户端 alpn 选 'h3' 可启用 QUIC (H3 模式)"
     echo
     
     # 伪装网站信息
@@ -5489,43 +5517,82 @@ generate_vless_share_link()
         
     elif [ $protocol -eq 3 ]; then
         local xhttp_domain="${domain_list[2]}"
-        local encoded_path=$(printf '%s' "$path" | jq -sRr @uri 2>/dev/null || printf '%s' "$path" | sed 's/\//%2F/g')
+        local encoded_path=$(urlencode "$path")
+        local alpn_val="h3,h2,http/1.1"
+        local encoded_alpn=$(urlencode "$alpn_val")
         
-        # 第一条：普通 XHTTP（上下行同线路）
+        # 构造 extra 基础配置 (仅包含 Mihomo 能识别的驼峰键名)
+        local extra_base_json=$(cat <<EOF
+{
+  "xPaddingBytes": "$xhttp_padding",
+  "noGRPCHeader": $xhttp_grpc_header,
+  "xmux": {
+    "maxConcurrency": "$xhttp_xmux_max_concurrency",
+    "maxConnections": "$xhttp_xmux_max_connections",
+    "cMaxReuseTimes": "$xhttp_xmux_c_reuse_times",
+    "hMaxRequestTimes": "$xhttp_xmux_request_times",
+    "hMaxReusableSecs": "$xhttp_xmux_reusable_secs"
+  }
+}
+EOF
+)
+        local encoded_extra_base=$(urlencode "$extra_base_json")
+
+        # 第一条：普通 XHTTP (上下行同线路)
         local link_normal="vless://${xid_3}@${xhttp_domain}:443"
-        link_normal+="?type=xhttp&security=tls&fp=chrome&alpn=h2&sni=${xhttp_domain}&host=${xhttp_domain}&path=${encoded_path}"
+        link_normal+="?type=xhttp&security=tls&fp=chrome&alpn=${encoded_alpn}&sni=${xhttp_domain}&host=${xhttp_domain}&path=${encoded_path}&mode=${xhttp_mode}"
+        link_normal+="&extra=${encoded_extra_base}"
         link_normal+="#VLESS-XHTTP-TLS"
         
-        # 第二条：上下行分离（上行 IPv4，下行 IPv6 示例节点）
-        # 注意：这里用一个常见的公共 IPv6 测试节点作为示例，用户可自行替换
-
+        # 第二条：上下行分离 (上行 IPv4, 下行 IPv6 示例节点)
         local ipv6_domain="${ipv6_download_domain:-[2606:4700:4700::1111]}"
-
-        local link_split="vless://${xid_3}@${xhttp_domain}:443"
-        link_split+="?type=xhttp&security=tls&fp=chrome&alpn=h2&sni=${xhttp_domain}&host=${xhttp_domain}&path=${encoded_path}"
-        link_split+="&extra=" # 开始 extra 参数（URI 编码）
         
-        # extra JSON 编码（简单方式：base64 编码整个 extra）
-        local extra_json='{
+        # 构造带有 downloadSettings 的 extra JSON (适配 Mihomo 解析逻辑)
+        local extra_split_json=$(cat <<EOF
+{
+  "xPaddingBytes": "$xhttp_padding",
+  "noGRPCHeader": $xhttp_grpc_header,
+  "xmux": {
+    "maxConcurrency": "$xhttp_xmux_max_concurrency",
+    "maxConnections": "$xhttp_xmux_max_connections",
+    "cMaxReuseTimes": "$xhttp_xmux_c_reuse_times",
+    "hMaxRequestTimes": "$xhttp_xmux_request_times",
+    "hMaxReusableSecs": "$xhttp_xmux_reusable_secs"
+  },
   "downloadSettings": {
-    "address": "'${ipv6_domain}'",
+    "address": "$ipv6_domain",
     "port": 443,
     "network": "xhttp",
     "security": "tls",
     "tlsSettings": {
-      "serverName": "'${xhttp_domain}'",
-      "alpn": ["h2"],
+      "serverName": "$xhttp_domain",
+      "alpn": ["h3", "h2"],
       "fingerprint": "chrome"
     },
     "xhttpSettings": {
-      "path": "'${path}'"
+      "path": "$path",
+      "host": "$xhttp_domain",
+      "extra": {
+        "xPaddingBytes": "$xhttp_padding",
+        "noGRPCHeader": $xhttp_grpc_header,
+        "xmux": {
+          "maxConcurrency": "$xhttp_xmux_max_concurrency",
+          "hMaxRequestTimes": "$xhttp_xmux_request_times",
+          "hMaxReusableSecs": "$xhttp_xmux_reusable_secs"
+        }
+      }
     }
   }
-}'
-        local extra_b64=$(echo -n "$extra_json" | base64 -w 0)
-        link_split+="$(printf '%s' "$extra_b64" | sed 's/+/%2B/g;s/\//%2F/g;s/=/%3D/g')"
-        
+}
+EOF
+)
+        local encoded_extra_split=$(urlencode "$extra_split_json")
+
+        local link_split="vless://${xid_3}@${xhttp_domain}:443"
+        link_split+="?type=xhttp&security=tls&fp=chrome&alpn=${encoded_alpn}&sni=${xhttp_domain}&host=${xhttp_domain}&path=${encoded_path}&mode=${xhttp_mode}"
+        link_split+="&extra=${encoded_extra_split}"
         link_split+="#VLESS-XHTTP-IPV6-Split"
+
         # 输出两条链接
         echo "$link_normal"
         echo "$link_split"
