@@ -67,7 +67,7 @@ reality_dest=""
 reality_hash32=""
 
 # XHTTP 高级参数（服务端默认值，可根据需要调整）
-xhttp_mode="auto"                          # auto / packet-up / stream-up / stream-one
+xhttp_mode="packet-up"                     # packet-up (CDN穿透最佳) / stream-up / stream-one / auto
 xhttp_padding="100-1000"                   # header padding 随机字节范围
 xhttp_grpc_header=false                    # false=启用 gRPC 伪装，true=关闭
 xhttp_sse_header=false                     # false=启用 SSE 伪装，true=关闭
@@ -5572,9 +5572,9 @@ EOF
     "xhttpSettings": {
       "path": "$path",
       "host": "$xhttp_domain",
+      "xPaddingBytes": "$xhttp_padding",
+      "noGRPCHeader": $xhttp_grpc_header,
       "extra": {
-        "xPaddingBytes": "$xhttp_padding",
-        "noGRPCHeader": $xhttp_grpc_header,
         "xmux": {
           "maxConcurrency": "$xhttp_xmux_max_concurrency",
           "hMaxRequestTimes": "$xhttp_xmux_request_times",
