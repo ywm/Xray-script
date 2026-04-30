@@ -2903,9 +2903,15 @@ read_cf_api()
     echo "export CF_Email='$cf_email'" > "$cf_api_file"
     echo "export CF_Key='$cf_key'" >> "$cf_api_file"
     chmod 600 "$cf_api_file"
-    
+
     source "$cf_api_file"
     export CF_Email && export CF_Key
+
+    # 同步写入 acme.sh 的 account.conf，确保自动续期能正常工作
+    if [ -f "$HOME/.acme.sh/acme.sh" ]; then
+        $HOME/.acme.sh/acme.sh --set-account-conf "SAVED_CF_Email=$cf_email" >/dev/null 2>&1
+        $HOME/.acme.sh/acme.sh --set-account-conf "SAVED_CF_Key=$cf_key" >/dev/null 2>&1
+    fi
 }
 
 
@@ -2917,12 +2923,20 @@ get_cert()
     local cert_file="${nginx_prefix}/certs/${main_domain}.cer"
     local key_file="${nginx_prefix}/certs/${main_domain}.key"
     local wildcard_marker="${nginx_prefix}/certs/.wildcard_cert"
+    local acme_cert_dir="$HOME/.acme.sh/${main_domain}_ecc"
 
     # 检查是否需要申请证书
+    # 必须同时满足：证书文件存在、证书有效、acme.sh 有对应的域名配置记录
     if [ -f "$cert_file" ] && [ -f "$key_file" ] && [ -f "$wildcard_marker" ]; then
-        if check_cert_valid "$cert_file" 15 1; then
-            green "泛域名证书 ${main_domain} 仍在有效期内，跳过申请。"
-            return 0
+        if [ -d "$acme_cert_dir" ]; then
+            if check_cert_valid "$cert_file" 15 1; then
+                green "泛域名证书 ${main_domain} 仍在有效期内，跳过申请。"
+                # 确保 CF 凭据同步到 acme.sh（处理历史遗留问题）
+                read_cf_api
+                return 0
+            fi
+        else
+            yellow "证书文件存在但 acme.sh 缺少域名配置记录，需要重新申请"
         fi
     fi
 
@@ -4289,10 +4303,38 @@ install_update_xray_tls_web()
 
     # 证书申请
     if [[ $update -eq 0 ]]; then
+        # 备份有效的证书申请信息（避免清理 acme.sh 时丢失）
+        acme_backup_dir="${temp_dir}/acme_backup"
+        acme_main_domain="${true_domain_list[0]}"
+        acme_cert_dir="$HOME/.acme.sh/${acme_main_domain}_ecc"
+        acme_cert_file="${nginx_prefix}/certs/${acme_main_domain}.cer"
+
+        if [ -d "$acme_cert_dir" ] && [ -f "$acme_cert_file" ] && check_cert_valid "$acme_cert_file" 15 1; then
+            green "备份有效的证书申请信息..."
+            mkdir -p "$acme_backup_dir"
+            cp -r "$acme_cert_dir" "$acme_backup_dir/"
+            # 同时备份 account.conf 中的 CF 凭据
+            [ -f "$HOME/.acme.sh/account.conf" ] && cp "$HOME/.acme.sh/account.conf" "$acme_backup_dir/"
+        fi
+
         [ -e $HOME/.acme.sh/acme.sh ] && $HOME/.acme.sh/acme.sh --uninstall
         rm -rf $HOME/.acme.sh
         curl https://get.acme.sh | sh
         $HOME/.acme.sh/acme.sh --register-account -ak ec-256 --server zerossl -m "my@example.com"
+
+        # 恢复证书申请信息
+        if [ -d "$acme_backup_dir" ]; then
+            green "恢复证书申请信息..."
+            mkdir -p "$HOME/.acme.sh"
+            [ -d "$acme_backup_dir/${acme_main_domain}_ecc" ] && cp -r "$acme_backup_dir/${acme_main_domain}_ecc" "$HOME/.acme.sh/"
+            # 恢复 account.conf（包含 CF 凭据）
+            if [ -f "$acme_backup_dir/account.conf" ]; then
+                cp "$acme_backup_dir/account.conf" "$HOME/.acme.sh/"
+            else
+                # 如果没有备份的 account.conf，从 cf_api.conf 同步 CF 凭据
+                read_cf_api
+            fi
+        fi
     fi
     $HOME/.acme.sh/acme.sh --upgrade --auto-upgrade
     get_cert
