@@ -2877,7 +2877,7 @@ sync_cf_to_acme_sh()
 
     local account_conf="$HOME/.acme.sh/account.conf"
     if [ -f "$account_conf" ]; then
-        grep -q "SAVED_CF_Email" "$account_conf" && return 0
+        grep -q "^SAVED_CF_Email=" "$account_conf" && return 0
     fi
 
     $HOME/.acme.sh/acme.sh --set-account-conf "SAVED_CF_Email=$CF_Email" >/dev/null 2>&1
@@ -4335,7 +4335,7 @@ install_update_xray_tls_web()
 
         [ -e $HOME/.acme.sh/acme.sh ] && $HOME/.acme.sh/acme.sh --uninstall
         rm -rf $HOME/.acme.sh
-        curl https://get.acme.sh | sh
+        curl https://get.acme.sh | sh || { red "acme.sh 安装失败，请检查网络连接"; exit 1; }
         $HOME/.acme.sh/acme.sh --register-account -ak ec-256 --server zerossl -m "my@example.com"
 
         # 恢复证书申请信息
