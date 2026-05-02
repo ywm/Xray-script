@@ -2868,15 +2868,34 @@ check_cert_valid()
 
 
 
+# 同步 CF 凭据到 acme.sh account.conf（仅在缺少时写入）
+sync_cf_to_acme_sh()
+{
+    [ -f "$HOME/.acme.sh/acme.sh" ] || return 0
+    [ -z "$CF_Email" ] && return 0
+    [ -z "$CF_Key" ] && return 0
+
+    local account_conf="$HOME/.acme.sh/account.conf"
+    if [ -f "$account_conf" ]; then
+        grep -q "SAVED_CF_Email" "$account_conf" && return 0
+    fi
+
+    $HOME/.acme.sh/acme.sh --set-account-conf "SAVED_CF_Email=$CF_Email" >/dev/null 2>&1
+    $HOME/.acme.sh/acme.sh --set-account-conf "SAVED_CF_Key=$CF_Key" >/dev/null 2>&1
+}
+
+
+
 # 获取并保存 Cloudflare API 凭据
 read_cf_api()
 {
     local cf_api_file="${nginx_prefix}/certs/cf_api.conf"
     
-    # 如果文件已存在，加载变量并返回
+    # 如果文件已存在，加载变量并同步到 acme.sh account.conf
     if [ -f "$cf_api_file" ]; then
         source "$cf_api_file"
         export CF_Email && export CF_Key
+        sync_cf_to_acme_sh
         return 0
     fi
 
@@ -2908,10 +2927,7 @@ read_cf_api()
     export CF_Email && export CF_Key
 
     # 同步写入 acme.sh 的 account.conf，确保自动续期能正常工作
-    if [ -f "$HOME/.acme.sh/acme.sh" ]; then
-        $HOME/.acme.sh/acme.sh --set-account-conf "SAVED_CF_Email=$cf_email" >/dev/null 2>&1
-        $HOME/.acme.sh/acme.sh --set-account-conf "SAVED_CF_Key=$cf_key" >/dev/null 2>&1
-    fi
+    sync_cf_to_acme_sh
 }
 
 
@@ -4304,10 +4320,10 @@ install_update_xray_tls_web()
     # 证书申请
     if [[ $update -eq 0 ]]; then
         # 备份有效的证书申请信息（避免清理 acme.sh 时丢失）
-        acme_backup_dir="${temp_dir}/acme_backup"
-        acme_main_domain="${true_domain_list[0]}"
-        acme_cert_dir="$HOME/.acme.sh/${acme_main_domain}_ecc"
-        acme_cert_file="${nginx_prefix}/certs/${acme_main_domain}.cer"
+        local acme_backup_dir="${temp_dir}/acme_backup"
+        local acme_main_domain="${true_domain_list[0]}"
+        local acme_cert_dir="$HOME/.acme.sh/${acme_main_domain}_ecc"
+        local acme_cert_file="${nginx_prefix}/certs/${acme_main_domain}.cer"
 
         if [ -d "$acme_cert_dir" ] && [ -f "$acme_cert_file" ] && check_cert_valid "$acme_cert_file" 15 1; then
             green "备份有效的证书申请信息..."
@@ -4327,13 +4343,20 @@ install_update_xray_tls_web()
             green "恢复证书申请信息..."
             mkdir -p "$HOME/.acme.sh"
             [ -d "$acme_backup_dir/${acme_main_domain}_ecc" ] && cp -r "$acme_backup_dir/${acme_main_domain}_ecc" "$HOME/.acme.sh/"
-            # 恢复 account.conf（包含 CF 凭据）
+            # 从备份的 account.conf 提取 CF 凭据写入新注册的 account.conf（不覆盖）
             if [ -f "$acme_backup_dir/account.conf" ]; then
-                cp "$acme_backup_dir/account.conf" "$HOME/.acme.sh/"
+                local saved_cf_email saved_cf_key
+                saved_cf_email=$(grep -oP "(?<=SAVED_CF_Email=)\S+" "$acme_backup_dir/account.conf" | tr -d "'\"")
+                saved_cf_key=$(grep -oP "(?<=SAVED_CF_Key=)\S+" "$acme_backup_dir/account.conf" | tr -d "'\"")
+                if [ -n "$saved_cf_email" ] && [ -n "$saved_cf_key" ]; then
+                    $HOME/.acme.sh/acme.sh --set-account-conf "SAVED_CF_Email=$saved_cf_email" >/dev/null 2>&1
+                    $HOME/.acme.sh/acme.sh --set-account-conf "SAVED_CF_Key=$saved_cf_key" >/dev/null 2>&1
+                fi
             else
                 # 如果没有备份的 account.conf，从 cf_api.conf 同步 CF 凭据
                 read_cf_api
             fi
+            chmod 600 "$HOME/.acme.sh/account.conf"
         fi
     fi
     $HOME/.acme.sh/acme.sh --upgrade --auto-upgrade
