@@ -4844,7 +4844,7 @@ change_pretend()
 reinstall_cloudreve()
 {
     get_config_info
-    ! check_need_cloudreve && red "Cloudreve目前没有绑定域名" && return 1
+    check_need_cloudreve || { red "Cloudreve目前没有绑定域名"; return 1; }
     red "重新安装Cloudreve将删除所有的网盘文件以及帐户信息，并重置管理员密码"
     ask_if "确定要继续吗？[y/n]" || return 0
     [ "$dnf" == "yum" ] && check_important_dependence_installed "" "yum-utils"
