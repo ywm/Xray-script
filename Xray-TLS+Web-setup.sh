@@ -763,21 +763,27 @@ backup_domains_web()
 #获取配置信息
 get_config_info()
 {
-    [[ $is_installed -eq 0 ]] && return
+    yellow "[DEBUG] get_config_info 开始，is_installed=$is_installed"
+    [[ $is_installed -eq 0 ]] && { yellow "[DEBUG] is_installed=0，返回"; return; }
 
     # 检测并迁移旧版单文件配置
+    yellow "[DEBUG] 检测配置文件类型..."
     if [ -f "$xray_config" ] && [ ! -d "$xray_config_dir" ]; then
         yellow "检测到旧版单文件配置，将在下次重新配置时自动迁移到多文件配置"
     fi
-    
+
     # 优先从多文件配置读取
+    yellow "[DEBUG] xray_config_dir=$xray_config_dir"
     if [ -d "$xray_config_dir" ]; then
+        yellow "[DEBUG] 使用多文件配置模式"
         # 读取 REALITY UUID (从 20_inbound_reality.json)
         if [ -f "$xray_config_inbound_reality" ]; then
+            yellow "[DEBUG] 读取 REALITY 配置..."
             xid_1="$(grep '"id"' $xray_config_inbound_reality | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
             reality_private_key="$(grep '"privateKey"' $xray_config_inbound_reality | cut -d : -f 2 | cut -d \" -f 2)"
             reality_server_names="$(grep '"serverNames"' $xray_config_inbound_reality | sed 's/.*\[//;s/\].*//' | tr ',' ' ' | sed 's/"//g')"
             reality_short_ids="$(grep '"shortIds"' $xray_config_inbound_reality | sed 's/.*\[//;s/\].*//' | tr ',' ' ')"
+            yellow "[DEBUG] REALITY 配置读取完成，xid_1=$xid_1"
         fi
         
         # 读取 Trojan 密码 (从 21_inbound_trojan.json)
