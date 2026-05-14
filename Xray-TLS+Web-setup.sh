@@ -787,16 +787,25 @@ get_config_info()
         fi
         
         # 读取 Trojan 密码 (从 21_inbound_trojan.json)
+        yellow "[DEBUG] 即将读取 Trojan 配置..."
         if [ -f "$xray_config_inbound_trojan" ]; then
             xid_2="$(grep '"password"' $xray_config_inbound_trojan | head -n1 | cut -d : -f 2 | cut -d \" -f 2)"
+            yellow "[DEBUG] Trojan 配置读取完成"
+        else
+            yellow "[DEBUG] Trojan 配置文件不存在，跳过"
         fi
-        
+
         # 读取 XHTTP UUID 和 path (从 22_inbound_xhttp.json)
+        yellow "[DEBUG] 即将读取 XHTTP 配置..."
         if [ -f "$xray_config_inbound_xhttp" ]; then
             xid_3="$(grep '"id"' $xray_config_inbound_xhttp | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
             path="$(grep '"path"' $xray_config_inbound_xhttp | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
+            yellow "[DEBUG] XHTTP 配置读取完成"
+        else
+            yellow "[DEBUG] XHTTP 配置文件不存在，跳过"
         fi
     else
+        yellow "[DEBUG] 使用旧版单文件配置模式"
         # 兼容旧版单文件配置
         xid_1="$(grep '"id"' $xray_config | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
         xid_2="$(grep -A10 '"protocol"[ '$'\t]*:[ '$'\t]*"trojan"' $xray_config | grep '"password"' | head -n1 | cut -d : -f 2 | cut -d \" -f 2)"
@@ -806,18 +815,34 @@ get_config_info()
         reality_short_ids="$(grep '"shortIds"' $xray_config | sed 's/.*\[//;s/\].*//' | tr ',' ' ')"
         path="$(grep '"path"' $xray_config | tail -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
     fi
-    
+
     # 生成 Password
+    yellow "[DEBUG] 即将运行 xray x25519..."
+    yellow "[DEBUG] reality_private_key 是否为空: $([ -z "$reality_private_key" ] && echo '是(跳过)' || echo '否(继续)')"
+    yellow "[DEBUG] /usr/local/bin/xray 是否存在: $([ -f /usr/local/bin/xray ] && echo '是(继续)' || echo '否(跳过)')"
     if [ -n "$reality_private_key" ] && [ -f "/usr/local/bin/xray" ]; then
+        # 先测试 xray x25519 无参数（生成新密钥对），验证 xray 二进制本身是否正常
+        yellow "[DEBUG] 测试1: xray x25519（无 -i，生成新密钥对）..."
+        local test_output
+        test_output=$(/usr/local/bin/xray x25519 2>/dev/null)
+        yellow "[DEBUG] 测试1 完成，退出码=$?"
+
+        # 再用 -i 从已有私钥派生 Password
+        yellow "[DEBUG] 测试2: xray x25519 -i（从已有私钥派生）..."
         reality_password=$(/usr/local/bin/xray x25519 -i "$reality_private_key" 2>/dev/null | awk '/^Password/ {print $(NF)}')
+        yellow "[DEBUG] 测试2 完成"
+    else
+        yellow "[DEBUG] 条件不满足，跳过 xray x25519"
     fi
-    
+
     # 读取域名配置
+    yellow "[DEBUG] 即将读取 nginx 域名配置..."
     domain_list=($(grep "^#domain_list=" $nginx_config 2>/dev/null | cut -d = -f 2 || true))
     true_domain_list=($(grep "^#true_domain_list=" $nginx_config 2>/dev/null | cut -d = -f 2 || true))
     domain_config_list=($(grep "^#domain_config_list=" $nginx_config 2>/dev/null | cut -d = -f 2 || true))
     pretend_list=($(grep "^#pretend_list=" $nginx_config 2>/dev/null | cut -d = -f 2 || true))
     subdomain_prefix_list=($(grep "^#subdomain_prefix_list=" $nginx_config 2>/dev/null | cut -d = -f 2 || true))
+    yellow "[DEBUG] nginx 域名配置读取完成，domain_list 数量=${#domain_list[@]}"
 
     # 如果 nginx.conf 中没有域名信息，尝试从其他来源恢复
     if [[ ${#domain_list[@]} -eq 0 ]] && [[ -n "${reality_server_names:-}" ]]; then
@@ -833,6 +858,7 @@ get_config_info()
     # 读取 IPv6 下行域名
     ipv6_download_domain="$(grep "^#ipv6_download_domain=" $nginx_config 2>/dev/null | cut -d = -f 2 || true)"
     [ -z "$ipv6_download_domain" ] && ipv6_download_domain="[2606:4700:4700::1111]"
+    yellow "[DEBUG] get_config_info 结束，即将返回"
 
 }
 
