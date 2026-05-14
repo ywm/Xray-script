@@ -4475,15 +4475,23 @@ check_update_update_nginx()
     check_ssh_timeout
     yellow "[DEBUG] check_ssh_timeout 返回，继续执行..."
     # 重新检查安装状态（因为脚本可能被更新重新加载）
+    yellow "[DEBUG] nginx_config=$nginx_config, xray_config=$xray_config"
     [ -e $nginx_config ] && nginx_is_installed=1 || nginx_is_installed=0
+    yellow "[DEBUG] nginx_is_installed=$nginx_is_installed"
     [ -e /usr/local/bin/xray ] && xray_is_installed=1 || xray_is_installed=0
+    yellow "[DEBUG] xray_is_installed=$xray_is_installed"
     ([ $xray_is_installed -eq 1 ] && [[ $nginx_is_installed -eq 1 ]]) && is_installed=1 || is_installed=0
+    yellow "[DEBUG] is_installed=$is_installed"
     get_config_info
+    yellow "[DEBUG] get_config_info 完成"
     local nginx_status=0
     local xray_status=0
     systemctl -q is-active nginx 2>/dev/null && nginx_status=1 || true
     systemctl -q is-active xray 2>/dev/null && xray_status=1 || true
+    yellow "[DEBUG] nginx_status=$nginx_status, xray_status=$xray_status"
+    yellow "[DEBUG] 即将调用 install_nginx_compile_toolchains..."
     install_nginx_compile_toolchains
+    yellow "[DEBUG] install_nginx_compile_toolchains 完成"
     install_nginx_dependence
     enter_temp_dir
     compile_nginx
