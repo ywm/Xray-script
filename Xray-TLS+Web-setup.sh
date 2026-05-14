@@ -1175,8 +1175,9 @@ check_ssh_timeout()
         yellow " 再次运行脚本时，重复之前选过的选项即可"
         yellow " 按回车键退出。。。。"
         read -r -s -n 1 || true
+        exit 0
     fi
-    exit 0
+    return 0
 }
 
 #删除防火墙和阿里云盾
