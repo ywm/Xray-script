@@ -1151,7 +1151,9 @@ check_SELinux()
 #配置sshd
 check_ssh_timeout()
 {
+    yellow "[DEBUG] 进入 check_ssh_timeout，in_install_update_xray_tls_web=$in_install_update_xray_tls_web"
     if grep -q "#This file has been edited by Xray-TLS-Web-setup-script" /etc/ssh/sshd_config; then
+        yellow "[DEBUG] SSH已配置过，直接返回"
         return 0
     fi
     echo -e "\\n\\n\\n"
@@ -1160,7 +1162,8 @@ check_ssh_timeout()
     tyblue " 如果中途断开连接将会很麻烦"
     tyblue " 设置ssh连接超时时间将有效降低断连可能性"
     echo
-    ask_if "是否设置ssh连接超时时间？[y/n]" || return 0
+    ask_if "是否设置ssh连接超时时间？[y/n]" || { yellow "[DEBUG] 用户拒绝设置SSH超时，返回"; return 0; }
+    yellow "[DEBUG] 用户同意设置SSH超时，开始配置..."
     sed -i '/^[ \t]*ClientAliveInterval[ \t]/d' /etc/ssh/sshd_config
     sed -i '/^[ \t]*ClientAliveCountMax[ \t]/d' /etc/ssh/sshd_config
     echo >> /etc/ssh/sshd_config
@@ -1175,8 +1178,10 @@ check_ssh_timeout()
         yellow " 再次运行脚本时，重复之前选过的选项即可"
         yellow " 按回车键退出。。。。"
         read -r -s -n 1 || true
+        yellow "[DEBUG] --update模式，exit 0"
         exit 0
     fi
+    yellow "[DEBUG] 非--update模式，return 0"
     return 0
 }
 
@@ -4461,11 +4466,14 @@ check_update_update_nginx()
     if check_nginx_update; then
         green "Nginx有新版本"
         ask_if "是否更新？[y/n]" || return 0
+        yellow "[DEBUG] 用户选择更新，继续执行..."
     else
         green "Nginx已是最新版本"
         return 0
     fi
+    yellow "[DEBUG] 即将调用 check_ssh_timeout..."
     check_ssh_timeout
+    yellow "[DEBUG] check_ssh_timeout 返回，继续执行..."
     # 重新检查安装状态（因为脚本可能被更新重新加载）
     [ -e $nginx_config ] && nginx_is_installed=1 || nginx_is_installed=0
     [ -e /usr/local/bin/xray ] && xray_is_installed=1 || xray_is_installed=0
