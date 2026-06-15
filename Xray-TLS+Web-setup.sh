@@ -1801,10 +1801,6 @@ install_bbr()
                         read -r -s -n 1 || true
                     fi
                     chmod +x xanmod-install.sh
-                    # 修复 xanmod 脚本中硬编码 releases 导致 404 的问题
-                    if grep -q "releases" xanmod-install.sh; then
-                        sed -i 's/releases/$(lsb_release -sc)/g' xanmod-install.sh 2>/dev/null || sed -i "" 's/releases/$(lsb_release -sc)/g' xanmod-install.sh
-                    fi
                     ./xanmod-install.sh
                     if [ "$(sysctl net.ipv4.tcp_congestion_control | cut -d = -f 2 | awk '{print $1}')" == "$temp_bbr" ] && [ "$(sysctl net.core.default_qdisc | cut -d = -f 2 | awk '{print $1}')" == "$(grep '^[ '$'\t]*net.core.default_qdisc[ '$'\t]*=' "/etc/sysctl.conf" | tail -n 1 | cut -d = -f 2 | awk '{print $1}')" ]; then
                         green "--------------------$temp_bbr已安装--------------------"
