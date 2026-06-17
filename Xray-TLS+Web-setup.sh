@@ -3693,6 +3693,16 @@ generate_xhttp_inbound_file()
                         "xver": 1
                     },
                     {
+                        "alpn": "h2",
+                        "dest": "/dev/shm/xray/xhttp.sock",
+                        "xver": 1
+                    },
+                    {
+                        "alpn": "h3",
+                        "dest": "/dev/shm/xray/xhttp.sock",
+                        "xver": 1
+                    },
+                    {
                         "dest": "/dev/shm/nginx/xhttp_web.sock",
                         "xver": 1
                     }
@@ -5046,6 +5056,7 @@ change_xray_id()
 
 change_xray_path()
 {
+    get_config_info
     tyblue "您现在的path是：$path"
     ask_if "是否要继续?[y/n]" || return 0
     while true
