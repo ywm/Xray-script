@@ -3766,6 +3766,9 @@ generate_xhttp_inbound_file()
                         "hKeepAlivePeriod": $xhttp_xmux_h_keepalive
                       }
                     }
+                },
+                "sockopt": {
+                    "acceptProxyProtocol": true
                 }
             },
             "sniffing": {
