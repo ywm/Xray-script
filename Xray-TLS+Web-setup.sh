@@ -5698,18 +5698,183 @@ EOF
     
     # 5. 设置权限
     chmod 644 "$sub_file"
+
+    # 6. 同时生成一个简单的 yaml 文件，将四个配置都写到 proxies 中，方便 mihomo 测试
+    local yaml_file="${sub_file}.yaml"
     
-    # 6. 显示订阅地址
+    local reality_domain="${domain_list[0]}"
+    local first_short_id="${reality_short_ids%% *}"
+    first_short_id="${first_short_id//\"/}"
+    local server_name="${reality_server_names%% *}"
+    server_name="${server_name//\"/}"
+    
+    local trojan_domain="${domain_list[1]}"
+    local xhttp_domain="${domain_list[2]}"
+    local ipv6_domain="${ipv6_download_domain:-[2606:4700:4700::1111]}"
+
+    cat > "$yaml_file" << EOF
+# ==================== Mihomo (Clash Meta) Config ====================
+# Generated at: $(date '+%Y-%m-%d %H:%M:%S')
+# ====================================================================
+
+port: 7890
+socks-port: 7891
+mixed-port: 7892
+allow-lan: false
+mode: rule
+log-level: info
+ipv6: true
+external-controller: 127.0.0.1:9090
+
+dns:
+  enable: true
+  ipv6: true
+  listen: 0.0.0.0:1053
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  nameserver:
+    - 119.29.29.29
+    - 223.5.5.5
+  fallback:
+    - 1.1.1.1
+    - 8.8.8.8
+
+proxies:
+  - name: "VLESS-REALITY-VISION"
+    type: vless
+    server: "${reality_domain}"
+    port: 443
+    uuid: "${xid_1}"
+    network: tcp
+    udp: true
+    flow: xtls-rprx-vision
+    tls: true
+    servername: "${server_name}"
+    client-fingerprint: chrome
+    skip-cert-verify: false
+    packet-encoding: xudp
+    reality-opts:
+      public-key: "${reality_password}"
+      short-id: "${first_short_id}"
+
+  - name: "Trojan-TLS"
+    type: trojan
+    server: "${trojan_domain}"
+    port: 443
+    password: "${xid_2}"
+    udp: true
+    tls: true
+    sni: "${trojan_domain}"
+    client-fingerprint: chrome
+    skip-cert-verify: false
+
+  - name: "VLESS-XHTTP-TLS"
+    type: vless
+    server: "${xhttp_domain}"
+    port: 443
+    uuid: "${xid_3}"
+    udp: true
+    tls: true
+    servername: "${xhttp_domain}"
+    client-fingerprint: chrome
+    alpn:
+      - h2
+    network: xhttp
+    xhttp-opts:
+      path: "${path}"
+      host: "${xhttp_domain}"
+      mode: "${xhttp_mode}"
+      no-grpc-header: ${xhttp_grpc_header}
+      x-padding-bytes: "${xhttp_padding}"
+      reuse-settings:
+        max-concurrency: "${xhttp_xmux_max_concurrency}"
+        max-connections: "${xhttp_xmux_max_connections}"
+        c-max-reuse-times: "${xhttp_xmux_c_reuse_times}"
+        h-max-request-times: "${xhttp_xmux_request_times}"
+        h-max-reusable-secs: "${xhttp_xmux_reusable_secs}"
+
+  - name: "VLESS-XHTTP-IPV6-Split"
+    type: vless
+    server: "${xhttp_domain}"
+    port: 443
+    uuid: "${xid_3}"
+    udp: true
+    tls: true
+    servername: "${xhttp_domain}"
+    client-fingerprint: chrome
+    alpn:
+      - h2
+    network: xhttp
+    xhttp-opts:
+      path: "${path}"
+      host: "${xhttp_domain}"
+      mode: "${xhttp_mode}"
+      no-grpc-header: ${xhttp_grpc_header}
+      x-padding-bytes: "${xhttp_padding}"
+      reuse-settings:
+        max-concurrency: "${xhttp_xmux_max_concurrency}"
+        max-connections: "${xhttp_xmux_max_connections}"
+        c-max-reuse-times: "${xhttp_xmux_c_reuse_times}"
+        h-max-request-times: "${xhttp_xmux_request_times}"
+        h-max-reusable-secs: "${xhttp_xmux_reusable_secs}"
+      download-settings:
+        server: "${ipv6_domain}"
+        port: 443
+        tls: true
+        servername: "${xhttp_domain}"
+        client-fingerprint: chrome
+        alpn:
+          - h3
+        path: "${path}"
+        host: "${xhttp_domain}"
+        reuse-settings:
+          max-concurrency: "${xhttp_xmux_max_concurrency}"
+          h-max-request-times: "${xhttp_xmux_request_times}"
+          h-max-reusable-secs: "${xhttp_xmux_reusable_secs}"
+
+proxy-groups:
+  - name: "节点选择"
+    type: select
+    proxies:
+      - "自动选择"
+      - "VLESS-REALITY-VISION"
+      - "Trojan-TLS"
+      - "VLESS-XHTTP-TLS"
+      - "VLESS-XHTTP-IPV6-Split"
+      - "DIRECT"
+
+  - name: "自动选择"
+    type: url-test
+    url: http://www.gstatic.com/generate_204
+    interval: 300
+    tolerance: 50
+    proxies:
+      - "VLESS-REALITY-VISION"
+      - "Trojan-TLS"
+      - "VLESS-XHTTP-TLS"
+      - "VLESS-XHTTP-IPV6-Split"
+
+rules:
+  - MATCH,节点选择
+EOF
+
+    chmod 644 "$yaml_file"
+    
+    # 7. 显示订阅地址
     local main_domain="${domain_list[0]}"
     
     echo
     green "=================================================="
     green "订阅链接已生成 (请务必妥善保管):"
     tyblue "https://${main_domain}/subs/${sub_token}"
+    echo
+    green "Mihomo (Clash Meta) 配置文件已生成:"
+    tyblue "https://${main_domain}/subs/${sub_token}.yaml"
     green "=================================================="
     echo
     purple "订阅说明:"
     purple "  - 包含 3 个协议: REALITY + Trojan + XHTTP"
+    purple "  - 提供了通用的 Base64 订阅链接以及直观的 Mihomo YAML 配置文件链接"
     purple "  - 客户端会自动选择最优协议"
     purple "  - 订阅地址不会变化,可长期使用"
     purple "  - 配置更新后,客户端会自动获取新配置"
