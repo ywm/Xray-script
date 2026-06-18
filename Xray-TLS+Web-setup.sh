@@ -5786,6 +5786,7 @@ proxies:
       mode: "${xhttp_mode}"
       no-grpc-header: ${xhttp_grpc_header}
       x-padding-bytes: "${xhttp_padding}"
+      no-sse-header: ${xhttp_sse_header}
       reuse-settings:
         max-concurrency: "${xhttp_xmux_max_concurrency}"
         max-connections: "${xhttp_xmux_max_connections}"
@@ -5811,6 +5812,7 @@ proxies:
       mode: "${xhttp_mode}"
       no-grpc-header: ${xhttp_grpc_header}
       x-padding-bytes: "${xhttp_padding}"
+      no-sse-header: ${xhttp_sse_header}
       reuse-settings:
         max-concurrency: "${xhttp_xmux_max_concurrency}"
         max-connections: "${xhttp_xmux_max_connections}"
