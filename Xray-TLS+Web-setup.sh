@@ -857,7 +857,9 @@ get_config_info()
 
     # 读取 IPv6 下行域名
     ipv6_download_domain="$(grep "^#ipv6_download_domain=" $nginx_config 2>/dev/null | cut -d = -f 2 || true)"
-    [ -z "$ipv6_download_domain" ] && ipv6_download_domain="[2606:4700:4700::1111]"
+    if [ -z "$ipv6_download_domain" ] || [ "$ipv6_download_domain" = "[2606:4700:4700::1111]" ]; then
+        ipv6_download_domain="ipv6.cloudflare.com"
+    fi
     yellow "[DEBUG] get_config_info 结束，即将返回"
 
 }
@@ -2191,7 +2193,6 @@ readDomain()
     tyblue "注意: 此域名只需要 IPv6 解析 (AAAA 记录)"
     echo
     purple "常用公共 IPv6 节点示例:"
-    purple "  • [2606:4700:4700::1111]  (Cloudflare DNS)"
     purple "  • ipv6.cloudflare.com"
     echo
     
@@ -2199,7 +2200,7 @@ readDomain()
     read -p "IPv6 下行域名 [留空使用默认]: " ipv6_domain
     
     if [ -z "$ipv6_domain" ]; then
-        ipv6_domain="[2606:4700:4700::1111]"
+        ipv6_domain="ipv6.cloudflare.com"
         green "使用默认: Cloudflare IPv6 (${ipv6_domain})"
     else
         green "已设置 IPv6 下行: ${ipv6_domain}"
@@ -5612,7 +5613,7 @@ EOF
         link_normal+="#VLESS-XHTTP-TLS"
         
         # 第二条：上下行分离 (上行 IPv4, 下行 IPv6 示例节点)
-        local ipv6_domain="${ipv6_download_domain:-[2606:4700:4700::1111]}"
+        local ipv6_domain="${ipv6_download_domain:-ipv6.cloudflare.com}"
         
         # 构造带有 downloadSettings 的 extra JSON (适配 Mihomo 解析逻辑)
         local extra_split_json=$(cat <<EOF
@@ -5713,7 +5714,7 @@ EOF
     
     local trojan_domain="${domain_list[1]}"
     local xhttp_domain="${domain_list[2]}"
-    local ipv6_domain="${ipv6_download_domain:-[2606:4700:4700::1111]}"
+    local ipv6_domain="${ipv6_download_domain:-ipv6.cloudflare.com}"
 
     cat > "$yaml_file" << EOF
 # ==================== Mihomo (Clash Meta) Config ====================
