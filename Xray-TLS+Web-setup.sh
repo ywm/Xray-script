@@ -5634,7 +5634,7 @@ EOF
     "security": "tls",
     "tlsSettings": {
       "serverName": "$xhttp_domain",
-      "alpn": ["h3", "h2"],
+      "alpn": ["h2"],
       "fingerprint": "chrome"
     },
     "xhttpSettings": {
@@ -5830,7 +5830,7 @@ proxies:
         servername: "${xhttp_domain}"
         client-fingerprint: chrome
         alpn:
-          - h3
+          - h2
         path: "${path}"
         host: "${xhttp_domain}"
         reuse-settings:
