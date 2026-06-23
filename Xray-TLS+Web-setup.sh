@@ -769,45 +769,33 @@ backup_domains_web()
 #获取配置信息
 get_config_info()
 {
-    yellow "[DEBUG] get_config_info 开始，is_installed=$is_installed"
-    [[ $is_installed -eq 0 ]] && { yellow "[DEBUG] is_installed=0，返回"; return; }
+    [[ $is_installed -eq 0 ]] && return
 
     # 检测并迁移旧版单文件配置
-    yellow "[DEBUG] 检测配置文件类型..."
     if [ -f "$xray_config" ] && [ ! -d "$xray_config_dir" ]; then
         yellow "检测到旧版单文件配置，将在下次重新配置时自动迁移到多文件配置"
     fi
 
     # 优先从多文件配置读取
-    yellow "[DEBUG] xray_config_dir=$xray_config_dir"
     if [ -d "$xray_config_dir" ]; then
-        yellow "[DEBUG] 使用多文件配置模式"
         # 读取 REALITY UUID (从 20_inbound_reality.json)
         if [ -f "$xray_config_inbound_reality" ]; then
-            yellow "[DEBUG] 读取 REALITY 配置..."
             xid_1="$(grep '"id"' "$xray_config_inbound_reality" 2>/dev/null | head -n 1 | cut -d : -f 2 | cut -d \" -f 2 || true)"
             reality_private_key="$(grep '"privateKey"' "$xray_config_inbound_reality" 2>/dev/null | cut -d : -f 2 | cut -d \" -f 2 || true)"
             reality_server_names="$(grep '"serverNames"' "$xray_config_inbound_reality" 2>/dev/null | sed 's/.*\[//;s/\].*//' | tr ',' ' ' | sed 's/"//g' || true)"
             reality_short_ids="$(grep '"shortIds"' "$xray_config_inbound_reality" 2>/dev/null | sed 's/.*\[//;s/\].*//' | tr ',' ' ' || true)"
-            yellow "[DEBUG] REALITY 配置读取完成，xid_1=$xid_1"
         fi
         
         # 读取 Trojan 密码 (从 21_inbound_trojan.json)
-        yellow "[DEBUG] 即将读取 Trojan 配置..."
         if [ -f "$xray_config_inbound_trojan" ]; then
             xid_2="$(grep '"password"' "$xray_config_inbound_trojan" 2>/dev/null | head -n1 | cut -d : -f 2 | cut -d \" -f 2 || true)"
-            yellow "[DEBUG] Trojan 配置读取完成"
-        else
-            yellow "[DEBUG] Trojan 配置文件不存在，跳过"
         fi
 
         # 读取 XHTTP UUID 和 path (从 22_inbound_xhttp.json)
-        yellow "[DEBUG] 即将读取 XHTTP 配置..."
         if [ -f "$xray_config_inbound_xhttp" ]; then
             xid_3="$(grep '"id"' "$xray_config_inbound_xhttp" 2>/dev/null | head -n 1 | cut -d : -f 2 | cut -d \" -f 2 || true)"
             path="$(grep '"path"' "$xray_config_inbound_xhttp" 2>/dev/null | head -n 1 | cut -d : -f 2 | cut -d \" -f 2 || true)"
             if [ -f "/usr/local/etc/xray/vlessenc_keys.json" ]; then
-                yellow "[DEBUG] 发现已有的 vlessenc_keys.json，尝试读取密钥..."
                 if command -v jq &>/dev/null; then
                     xhttp_encryption="$(jq -r '.encryption' /usr/local/etc/xray/vlessenc_keys.json 2>/dev/null || true)"
                     xhttp_decryption="$(jq -r '.decryption' /usr/local/etc/xray/vlessenc_keys.json 2>/dev/null || true)"
@@ -815,20 +803,15 @@ get_config_info()
                     xhttp_encryption="$(grep '"encryption"' /usr/local/etc/xray/vlessenc_keys.json 2>/dev/null | cut -d : -f 2 | cut -d \" -f 2 | tr -d '[:space:]' || true)"
                     xhttp_decryption="$(grep '"decryption"' /usr/local/etc/xray/vlessenc_keys.json 2>/dev/null | cut -d : -f 2 | cut -d \" -f 2 | tr -d '[:space:]' || true)"
                 fi
-                if [ -n "$xhttp_encryption" ]; then
-                    green "[DEBUG] 成功从文件载入 VLESS Encryption 密钥对"
-                else
-                    yellow "[DEBUG] vlessenc_keys.json 解析失败 (可能格式错误)"
-                fi
+
             fi
             # 如果密钥丢失或解析失败（为空），且 xray 二进制存在，尝试生成
             if { [ -z "$xhttp_encryption" ] || [ -z "$xhttp_decryption" ]; } && [ -f "/usr/local/bin/xray" ]; then
-                yellow "[DEBUG] 未找到有效加密密钥，正在尝试使用已安装 of Xray 生成新密钥..."
                 local temp_keys
                 temp_keys=$(/usr/local/bin/xray vlessenc 2>/dev/null || true)
                 if echo "$temp_keys" | grep -q 'X25519'; then
-                    xhttp_encryption="$(echo "$temp_keys" | sed -n '/X25519/,/ML-KEM-768/p' | grep '"encryption"' | cut -d : -f 2 | cut -d \" -f 2 | tr -d '[:space:]' || true)"
-                    xhttp_decryption="$(echo "$temp_keys" | sed -n '/X25519/,/ML-KEM-768/p' | grep '"decryption"' | cut -d : -f 2 | cut -d \" -f 2 | tr -d '[:space:]' || true)"
+                    xhttp_encryption="$(echo "$temp_keys" | sed -n '/X25519/,/^$/p' | grep '"encryption"' | cut -d : -f 2 | cut -d \" -f 2 | tr -d '[:space:]' || true)"
+                    xhttp_decryption="$(echo "$temp_keys" | sed -n '/X25519/,/^$/p' | grep '"decryption"' | cut -d : -f 2 | cut -d \" -f 2 | tr -d '[:space:]' || true)"
                     # 将提取出的干净密钥写入标准的 JSON 文件中，以便后续 jq 或 grep 可以正常解析
                     cat > /usr/local/etc/xray/vlessenc_keys.json <<EOF
 {
@@ -836,17 +819,10 @@ get_config_info()
   "decryption": "$xhttp_decryption"
 }
 EOF
-                    green "[DEBUG] 成功通过 Xray 生成并保存了新的 VLESS Encryption 密钥对"
-                else
-                    yellow "[DEBUG] 当前 Xray 版本不支持 vlessenc 命令，VLESS 加密将默认回落为 none"
                 fi
             fi
-            yellow "[DEBUG] XHTTP 配置读取完成"
-        else
-            yellow "[DEBUG] XHTTP 配置文件不存在，跳过"
         fi
     else
-        yellow "[DEBUG] 使用旧版单文件配置模式"
         # 兼容旧版单文件配置
         xid_1="$(grep '"id"' "$xray_config" 2>/dev/null | head -n 1 | cut -d : -f 2 | cut -d \" -f 2 || true)"
         xid_2="$(grep -A10 '"protocol"[ '$'\t]*:[ '$'\t]*"trojan"' "$xray_config" 2>/dev/null | grep '"password"' 2>/dev/null | head -n1 | cut -d : -f 2 | cut -d \" -f 2 || true)"
@@ -858,32 +834,21 @@ EOF
     fi
 
     # 生成 Password
-    yellow "[DEBUG] 即将运行 xray x25519..."
-    yellow "[DEBUG] reality_private_key 是否为空: $([ -z "$reality_private_key" ] && echo '是(跳过)' || echo '否(继续)')"
-    yellow "[DEBUG] /usr/local/bin/xray 是否存在: $([ -f /usr/local/bin/xray ] && echo '是(继续)' || echo '否(跳过)')"
     if [ -n "$reality_private_key" ] && [ -f "/usr/local/bin/xray" ]; then
         # 先测试 xray x25519 无参数（生成新密钥对），验证 xray 二进制本身是否正常
-        yellow "[DEBUG] 测试1: xray x25519（无 -i，生成新密钥对）..."
         local test_output
         test_output=$(/usr/local/bin/xray x25519 2>/dev/null)
-        yellow "[DEBUG] 测试1 完成，退出码=$?"
 
         # 再用 -i 从已有私钥派生 Password
-        yellow "[DEBUG] 测试2: xray x25519 -i（从已有私钥派生）..."
         reality_password=$(/usr/local/bin/xray x25519 -i "$reality_private_key" 2>/dev/null | awk '/^Password/ {print $(NF)}')
-        yellow "[DEBUG] 测试2 完成"
-    else
-        yellow "[DEBUG] 条件不满足，跳过 xray x25519"
     fi
 
     # 读取域名配置
-    yellow "[DEBUG] 即将读取 nginx 域名配置..."
     domain_list=($(grep "^#domain_list=" $nginx_config 2>/dev/null | cut -d = -f 2 || true))
     true_domain_list=($(grep "^#true_domain_list=" $nginx_config 2>/dev/null | cut -d = -f 2 || true))
     domain_config_list=($(grep "^#domain_config_list=" $nginx_config 2>/dev/null | cut -d = -f 2 || true))
     pretend_list=($(grep "^#pretend_list=" $nginx_config 2>/dev/null | cut -d = -f 2 || true))
     subdomain_prefix_list=($(grep "^#subdomain_prefix_list=" $nginx_config 2>/dev/null | cut -d = -f 2 || true))
-    yellow "[DEBUG] nginx 域名配置读取完成，domain_list 数量=${#domain_list[@]}"
 
     # 如果 nginx.conf 中没有域名信息，尝试从其他来源恢复
     if [[ ${#domain_list[@]} -eq 0 ]] && [[ -n "${reality_server_names:-}" ]]; then
@@ -903,7 +868,6 @@ EOF
     if [ -z "$ipv6_download_domain" ] || [ "$ipv6_download_domain" = "[2606:4700:4700::1111]" ]; then
         ipv6_download_domain="ipv6.cloudflare.com"
     fi
-    yellow "[DEBUG] get_config_info 结束，即将返回"
 
 }
 
@@ -1228,9 +1192,7 @@ check_SELinux()
 #配置sshd
 check_ssh_timeout()
 {
-    yellow "[DEBUG] 进入 check_ssh_timeout，in_install_update_xray_tls_web=$in_install_update_xray_tls_web"
     if grep -q "#This file has been edited by Xray-TLS-Web-setup-script" /etc/ssh/sshd_config; then
-        yellow "[DEBUG] SSH已配置过，直接返回"
         return 0
     fi
     echo -e "\\n\\n\\n"
@@ -1239,8 +1201,7 @@ check_ssh_timeout()
     tyblue " 如果中途断开连接将会很麻烦"
     tyblue " 设置ssh连接超时时间将有效降低断连可能性"
     echo
-    ask_if "是否设置ssh连接超时时间？[y/n]" || { yellow "[DEBUG] 用户拒绝设置SSH超时，返回"; return 0; }
-    yellow "[DEBUG] 用户同意设置SSH超时，开始配置..."
+    ask_if "是否设置ssh连接超时时间？[y/n]" || return 0
     sed -i '/^[ \t]*ClientAliveInterval[ \t]/d' /etc/ssh/sshd_config
     sed -i '/^[ \t]*ClientAliveCountMax[ \t]/d' /etc/ssh/sshd_config
     echo >> /etc/ssh/sshd_config
@@ -1255,10 +1216,8 @@ check_ssh_timeout()
         yellow " 再次运行脚本时，重复之前选过的选项即可"
         yellow " 按回车键退出。。。。"
         read -r -s -n 1 || true
-        yellow "[DEBUG] --update模式，exit 0"
         exit 0
     fi
-    yellow "[DEBUG] 非--update模式，return 0"
     return 0
 }
 
@@ -2269,7 +2228,11 @@ readDomain()
     echo
     
     local xhttp_cdn_domain_input=""
-    read -p "请输入优选域名/IP [直接回车使用上次配置]: " xhttp_cdn_domain_input
+    if [ -n "$last_xhttp_cdn_domain" ]; then
+        read -p "请输入优选域名/IP [直接回车使用上次配置]: " xhttp_cdn_domain_input
+    else
+        read -p "请输入优选域名/IP [直接回车跳过，不启用]: " xhttp_cdn_domain_input
+    fi
     
     if [ -z "$xhttp_cdn_domain_input" ] && [ -n "$last_xhttp_cdn_domain" ]; then
         xhttp_cdn_domain="$last_xhttp_cdn_domain"
@@ -2292,6 +2255,9 @@ readDomain()
     green  "  REALITY: $reality_domain"
     green  "  Trojan:  $trojan_domain"
     green  "  XHTTP:   $xhttp_domain"
+    if [ -n "${xhttp_cdn_domain:-}" ]; then
+        purple "  CDN优选: $xhttp_cdn_domain"
+    fi
     purple "  IPv6下行: $ipv6_domain"
     green  "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo
@@ -4145,6 +4111,10 @@ print_config_info()
     tyblue " 端口: 443"
     tyblue " UUID: ${xid_3}"
     tyblue " Path: ${path}"
+    if [ -n "${xhttp_cdn_domain:-}" ]; then
+        tyblue " 优选域名: ${xhttp_cdn_domain}"
+        purple "   (客户端连接此地址，SNI/Host 仍用真实域名)"
+    fi
     echo
     yellow " XHTTP 使用提示:"
     yellow "   1. CDN 中转: 推荐使用 Cloudflare, 并在 CF 面板开启 'gRPC' 支持"
@@ -4420,8 +4390,8 @@ install_update_xray_tls_web()
         local temp_keys
         temp_keys=$(/usr/local/bin/xray vlessenc 2>/dev/null || true)
         if echo "$temp_keys" | grep -q 'X25519'; then
-            xhttp_encryption="$(echo "$temp_keys" | sed -n '/X25519/,/ML-KEM-768/p' | grep '"encryption"' | cut -d : -f 2 | cut -d \" -f 2 | tr -d '[:space:]' || true)"
-            xhttp_decryption="$(echo "$temp_keys" | sed -n '/X25519/,/ML-KEM-768/p' | grep '"decryption"' | cut -d : -f 2 | cut -d \" -f 2 | tr -d '[:space:]' || true)"
+            xhttp_encryption="$(echo "$temp_keys" | sed -n '/X25519/,/^$/p' | grep '"encryption"' | cut -d : -f 2 | cut -d \" -f 2 | tr -d '[:space:]' || true)"
+            xhttp_decryption="$(echo "$temp_keys" | sed -n '/X25519/,/^$/p' | grep '"decryption"' | cut -d : -f 2 | cut -d \" -f 2 | tr -d '[:space:]' || true)"
             cat > /usr/local/etc/xray/vlessenc_keys.json <<EOF
 {
   "encryption": "$xhttp_encryption",
@@ -4616,32 +4586,21 @@ check_update_update_nginx()
     if check_nginx_update; then
         green "Nginx有新版本"
         ask_if "是否更新？[y/n]" || return 0
-        yellow "[DEBUG] 用户选择更新，继续执行..."
     else
         green "Nginx已是最新版本"
         return 0
     fi
-    yellow "[DEBUG] 即将调用 check_ssh_timeout..."
     check_ssh_timeout
-    yellow "[DEBUG] check_ssh_timeout 返回，继续执行..."
     # 重新检查安装状态（因为脚本可能被更新重新加载）
-    yellow "[DEBUG] nginx_config=$nginx_config, xray_config=$xray_config"
     [ -e $nginx_config ] && nginx_is_installed=1 || nginx_is_installed=0
-    yellow "[DEBUG] nginx_is_installed=$nginx_is_installed"
     [ -e /usr/local/bin/xray ] && xray_is_installed=1 || xray_is_installed=0
-    yellow "[DEBUG] xray_is_installed=$xray_is_installed"
     ([ $xray_is_installed -eq 1 ] && [[ $nginx_is_installed -eq 1 ]]) && is_installed=1 || is_installed=0
-    yellow "[DEBUG] is_installed=$is_installed"
     get_config_info
-    yellow "[DEBUG] get_config_info 完成"
     local nginx_status=0
     local xray_status=0
     systemctl -q is-active nginx 2>/dev/null && nginx_status=1 || true
     systemctl -q is-active xray 2>/dev/null && xray_status=1 || true
-    yellow "[DEBUG] nginx_status=$nginx_status, xray_status=$xray_status"
-    yellow "[DEBUG] 即将调用 install_nginx_compile_toolchains..."
     install_nginx_compile_toolchains
-    yellow "[DEBUG] install_nginx_compile_toolchains 完成"
     install_nginx_dependence
     enter_temp_dir
     compile_nginx
@@ -5189,6 +5148,66 @@ change_xray_path()
     green "更换成功！！"
     print_config_info
 }
+
+# 修改 XHTTP 优选域名/IP（轻量操作，不重置域名/证书）
+change_xhttp_cdn_domain()
+{
+    get_config_info
+
+    echo -e "\n\n"
+    tyblue "==================== 修改 XHTTP 优选域名/IP ===================="
+    echo
+    if [ -n "${xhttp_cdn_domain:-}" ]; then
+        tyblue " 当前优选域名: ${xhttp_cdn_domain}"
+    else
+        tyblue " 当前状态: 未启用优选域名（直连模式）"
+    fi
+    tyblue " XHTTP 真实域名: ${domain_list[2]}"
+    echo
+    purple " 提示: 优选域名用于客户端连接地址（过 CDN 提速），"
+    purple "       SNI 和 Host 始终使用真实域名 ${domain_list[2]}"
+    purple " 常见推荐: cf.dyn.riotcdn.net.cdn.cloudflare.net"
+    purple " 输入 'none' 或 'direct' 可禁用优选域名（恢复直连模式）"
+    echo
+
+    local new_cdn_domain=""
+    read -p "请输入新的优选域名/IP [留空保持不变]: " new_cdn_domain
+
+    # 留空 → 不修改
+    if [ -z "$new_cdn_domain" ]; then
+        green "未修改，保持当前配置"
+        return 0
+    fi
+
+    # 输入 none/direct → 清除优选域名
+    if [ "$new_cdn_domain" == "none" ] || [ "$new_cdn_domain" == "direct" ]; then
+        xhttp_cdn_domain=""
+        green "已禁用优选域名，恢复直连模式"
+    else
+        xhttp_cdn_domain="$new_cdn_domain"
+        green "已设置优选域名/IP: $xhttp_cdn_domain"
+    fi
+
+    # 更新 nginx.conf 中的持久化注释
+    if grep -q "^#xhttp_cdn_domain=" "$nginx_config" 2>/dev/null; then
+        sed -i "s/^#xhttp_cdn_domain=.*/#xhttp_cdn_domain=${xhttp_cdn_domain}/" "$nginx_config"
+    else
+        # 如果注释行不存在，追加到文件末尾（在最后一个注释块中）
+        echo "#xhttp_cdn_domain=${xhttp_cdn_domain}" >> "$nginx_config"
+    fi
+
+    # 重新生成订阅文件
+    green "正在重新生成订阅文件..."
+    save_subscription_file
+
+    echo
+    green "==================== 修改完成 ===================="
+    echo
+    sleep 1s
+
+    print_config_info
+}
+
 simplify_system()
 {
     if systemctl -q is-active xray || systemctl -q is-active nginx || systemctl -q is-active php-fpm; then
@@ -5693,7 +5712,6 @@ generate_vless_share_link()
     elif [ $protocol -eq 3 ]; then
         local xhttp_domain="${domain_list[2]}"
         local server_address="${xhttp_cdn_domain:-$xhttp_domain}"
-        [ -z "$server_address" ] && server_address="$xhttp_domain"
         local encoded_path=$(urlencode "$path")
         local alpn_val="h3,h2,http/1.1"
         local encoded_alpn=$(urlencode "$alpn_val")
@@ -5830,7 +5848,6 @@ EOF
     local trojan_domain="${domain_list[1]}"
     local xhttp_domain="${domain_list[2]}"
     local server_address="${xhttp_cdn_domain:-$xhttp_domain}"
-    [ -z "$server_address" ] && server_address="$xhttp_domain"
     local ipv6_domain="${ipv6_download_domain:-ipv6.cloudflare.com}"
 
     cat > "$yaml_file" << EOF
@@ -6478,24 +6495,26 @@ start_menu()
     tyblue "  21. 修改REALITY配置"
     tyblue "  22. 管理Xray配置"
     purple "         查看/验证/备份多文件配置，管理用户自定义配置"
+    tyblue "  23. 修改XHTTP优选域名/IP"
+    purple "         修改CDN优选域名，无需重置域名/证书"
     echo
     tyblue " ----------------其它----------------"
-    tyblue "  23. 精简系统"
+    tyblue "  24. 精简系统"
     purple "         删除不必要的系统组件"
-    tyblue "  24. 修复退格键问题"
-    tyblue "  25. 修改dns"
+    tyblue "  25. 修复退格键问题"
+    tyblue "  26. 修改dns"
     yellow "  0. 退出脚本"
     echo
     echo
     
     local choice=""
-    while [[ ! "$choice" =~ ^(0|[1-9][0-9]*)$ ]] || ((choice>25))
+    while [[ ! "$choice" =~ ^(0|[1-9][0-9]*)$ ]] || ((choice>26))
     do
         read -p "您的选择是：" choice
     done
     
     # 权限检查
-    if (( choice==2 || (7<=choice&&choice<=9) || choice==13 || (15<=choice&&choice<=22) )) && [[ $is_installed -eq 0 ]]; then
+    if (( choice==2 || (7<=choice&&choice<=9) || choice==13 || (15<=choice&&choice<=23) )) && [[ $is_installed -eq 0 ]]; then
         red "请先安装Xray-REALITY+Web！"
         return 1
     fi
@@ -6632,12 +6651,15 @@ start_menu()
             view_xray_merged_config
             ;;
         23)
-            simplify_system
+            change_xhttp_cdn_domain
             ;;
         24)
-            repair_tuige
+            simplify_system
             ;;
         25)
+            repair_tuige
+            ;;
+        26)
             change_dns
             ;;
         0)
