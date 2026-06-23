@@ -66,6 +66,11 @@ reality_server_names=""
 reality_dest=""
 reality_hash32=""
 
+# VLESS Encryption (enc) 密钥对变量
+xhttp_encryption=""
+xhttp_decryption=""
+
+
 # XHTTP 高级参数（服务端默认值，可根据需要调整）
 xhttp_mode="packet-up"                     # packet-up (CDN穿透最佳) / stream-up / stream-one / auto
 xhttp_padding="100-1000"                   # header padding 随机字节范围
@@ -800,6 +805,15 @@ get_config_info()
         if [ -f "$xray_config_inbound_xhttp" ]; then
             xid_3="$(grep '"id"' $xray_config_inbound_xhttp | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
             path="$(grep '"path"' $xray_config_inbound_xhttp | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
+            if [ -f "/usr/local/etc/xray/vlessenc_keys.json" ]; then
+                xhttp_encryption="$(jq -r '.encryption' /usr/local/etc/xray/vlessenc_keys.json)"
+                xhttp_decryption="$(jq -r '.decryption' /usr/local/etc/xray/vlessenc_keys.json)"
+            elif [ -f "/usr/local/bin/xray" ]; then
+                # 如果密钥文件丢失但 xray 已安装，自动重新生成
+                /usr/local/bin/xray vlessenc > /usr/local/etc/xray/vlessenc_keys.json
+                xhttp_encryption="$(jq -r '.encryption' /usr/local/etc/xray/vlessenc_keys.json)"
+                xhttp_decryption="$(jq -r '.decryption' /usr/local/etc/xray/vlessenc_keys.json)"
+            fi
             yellow "[DEBUG] XHTTP 配置读取完成"
         else
             yellow "[DEBUG] XHTTP 配置文件不存在，跳过"
@@ -3744,7 +3758,7 @@ generate_xhttp_inbound_file()
                         "email": "xhttp@local"
                     }
                 ],
-                "decryption": "none"
+                "decryption": "$xhttp_decryption"
             },
             "streamSettings": {
                 "network": "xhttp",
@@ -4063,6 +4077,8 @@ print_config_info()
     tyblue " 协议: VLESS"
     tyblue " 传输: XHTTP"
     tyblue " 安全: TLS"
+    tyblue " VLESS加密: 默认启用 (mlkem768x25519plus + 0-RTT)"
+    tyblue " 加密密钥(encryption): ${xhttp_encryption}"
     tyblue " 域名: ${domain_list[2]}"
     tyblue " 端口: 443"
     tyblue " UUID: ${xid_3}"
@@ -4333,6 +4349,23 @@ install_update_xray_tls_web()
     if [[ $update -eq 1 ]] || [ $xray_is_installed -eq 0 ]; then
         remove_xray
         install_update_xray
+    fi
+
+    # VLESS Encryption (enc) 密钥对处理
+    mkdir -p /usr/local/etc/xray
+    if [ -z "$xhttp_encryption" ] || [ -z "$xhttp_decryption" ]; then
+        # 缺少密钥时（包括首次安装），使用新安装的 xray 生成密钥对并写入 JSON 文件
+        /usr/local/bin/xray vlessenc > /usr/local/etc/xray/vlessenc_keys.json
+        xhttp_encryption="$(jq -r '.encryption' /usr/local/etc/xray/vlessenc_keys.json)"
+        xhttp_decryption="$(jq -r '.decryption' /usr/local/etc/xray/vlessenc_keys.json)"
+    else
+        # 升级且已存在密钥时，将之前载入的密钥重新写入文件，防止被 remove_xray 清理
+        cat > /usr/local/etc/xray/vlessenc_keys.json <<EOF
+{
+  "encryption": "$xhttp_encryption",
+  "decryption": "$xhttp_decryption"
+}
+EOF
     fi
 
     # 证书申请
@@ -4985,6 +5018,9 @@ change_xray_id()
     tyblue " 3. XHTTP 的 UUID"
     yellow " 0. 返回"
     echo
+    purple " 提示: 若要重置 VLESS 加密(vlessenc)密钥，请先在终端运行: rm -f /usr/local/etc/xray/vlessenc_keys.json"
+    purple "       然后在此处修改任意协议的 ID/密码（或修改 XHTTP 的 path），脚本将自动重新生成全新的加密密钥对。"
+    echo
     
     local flag=""
     while [[ ! "$flag" =~ ^(0|[1-3])$ ]]
@@ -5608,7 +5644,7 @@ EOF
 
         # 第一条：普通 XHTTP (上下行同线路)
         local link_normal="vless://${xid_3}@${xhttp_domain}:443"
-        link_normal+="?type=xhttp&security=tls&fp=chrome&alpn=${encoded_alpn}&sni=${xhttp_domain}&host=${xhttp_domain}&path=${encoded_path}&mode=${xhttp_mode}"
+        link_normal+="?type=xhttp&security=tls&fp=chrome&alpn=${encoded_alpn}&sni=${xhttp_domain}&host=${xhttp_domain}&path=${encoded_path}&mode=${xhttp_mode}&encryption=$(urlencode "$xhttp_encryption")"
         link_normal+="&extra=${encoded_extra_base}"
         link_normal+="#VLESS-XHTTP-TLS"
         
@@ -5657,7 +5693,7 @@ EOF
         local encoded_extra_split=$(urlencode "$extra_split_json")
 
         local link_split="vless://${xid_3}@${xhttp_domain}:443"
-        link_split+="?type=xhttp&security=tls&fp=chrome&alpn=${encoded_alpn}&sni=${xhttp_domain}&host=${xhttp_domain}&path=${encoded_path}&mode=${xhttp_mode}"
+        link_split+="?type=xhttp&security=tls&fp=chrome&alpn=${encoded_alpn}&sni=${xhttp_domain}&host=${xhttp_domain}&path=${encoded_path}&mode=${xhttp_mode}&encryption=$(urlencode "$xhttp_encryption")"
         link_split+="&extra=${encoded_extra_split}"
         link_split+="#VLESS-XHTTP-IPV6-Split"
 
@@ -5784,6 +5820,7 @@ proxies:
     alpn:
       - h2
     network: xhttp
+    encryption: "${xhttp_encryption}"
     xhttp-opts:
       path: "${path}"
       host: "${xhttp_domain}"
@@ -5810,6 +5847,7 @@ proxies:
     alpn:
       - h2
     network: xhttp
+    encryption: "${xhttp_encryption}"
     xhttp-opts:
       path: "${path}"
       host: "${xhttp_domain}"
@@ -5833,6 +5871,7 @@ proxies:
           - h2
         path: "${path}"
         host: "${xhttp_domain}"
+        encryption: "${xhttp_encryption}"
         reuse-settings:
           max-concurrency: "${xhttp_xmux_max_concurrency}"
           h-max-request-times: "${xhttp_xmux_request_times}"
