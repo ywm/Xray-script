@@ -806,16 +806,17 @@ get_config_info()
             xid_3="$(grep '"id"' $xray_config_inbound_xhttp | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
             path="$(grep '"path"' $xray_config_inbound_xhttp | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
             if [ -f "/usr/local/etc/xray/vlessenc_keys.json" ]; then
-                xhttp_encryption="$(jq -r '.encryption' /usr/local/etc/xray/vlessenc_keys.json 2>/dev/null || echo '')"
-                xhttp_decryption="$(jq -r '.decryption' /usr/local/etc/xray/vlessenc_keys.json 2>/dev/null || echo '')"
+                xhttp_encryption="$(jq -r '.encryption' /usr/local/etc/xray/vlessenc_keys.json 2>/dev/null || true)"
+                xhttp_decryption="$(jq -r '.decryption' /usr/local/etc/xray/vlessenc_keys.json 2>/dev/null || true)"
             fi
             # 如果密钥丢失或解析失败（为空），且 xray 二进制存在，尝试生成
             if { [ -z "$xhttp_encryption" ] || [ -z "$xhttp_decryption" ]; } && [ -f "/usr/local/bin/xray" ]; then
                 local temp_keys
-                if temp_keys=$(/usr/local/bin/xray vlessenc 2>/dev/null) && echo "$temp_keys" | grep -q '"encryption"'; then
+                temp_keys=$(/usr/local/bin/xray vlessenc 2>/dev/null || true)
+                if echo "$temp_keys" | grep -q '"encryption"'; then
                     echo "$temp_keys" > /usr/local/etc/xray/vlessenc_keys.json
-                    xhttp_encryption="$(echo "$temp_keys" | jq -r '.encryption' 2>/dev/null)"
-                    xhttp_decryption="$(echo "$temp_keys" | jq -r '.decryption' 2>/dev/null)"
+                    xhttp_encryption="$(echo "$temp_keys" | jq -r '.encryption' 2>/dev/null || true)"
+                    xhttp_decryption="$(echo "$temp_keys" | jq -r '.decryption' 2>/dev/null || true)"
                 fi
             fi
             yellow "[DEBUG] XHTTP 配置读取完成"
@@ -4360,10 +4361,11 @@ install_update_xray_tls_web()
     if [ -z "$xhttp_encryption" ] || [ -z "$xhttp_decryption" ]; then
         # 缺少密钥时（包括首次安装），使用新安装的 xray 生成密钥对并写入 JSON 文件
         local temp_keys
-        if temp_keys=$(/usr/local/bin/xray vlessenc 2>/dev/null) && echo "$temp_keys" | grep -q '"encryption"'; then
+        temp_keys=$(/usr/local/bin/xray vlessenc 2>/dev/null || true)
+        if echo "$temp_keys" | grep -q '"encryption"'; then
             echo "$temp_keys" > /usr/local/etc/xray/vlessenc_keys.json
-            xhttp_encryption="$(echo "$temp_keys" | jq -r '.encryption' 2>/dev/null)"
-            xhttp_decryption="$(echo "$temp_keys" | jq -r '.decryption' 2>/dev/null)"
+            xhttp_encryption="$(echo "$temp_keys" | jq -r '.encryption' 2>/dev/null || true)"
+            xhttp_decryption="$(echo "$temp_keys" | jq -r '.decryption' 2>/dev/null || true)"
         fi
     else
         # 升级且已存在密钥时，将之前载入的密钥重新写入文件，防止被 remove_xray 清理
