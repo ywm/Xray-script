@@ -69,6 +69,7 @@ reality_hash32=""
 # VLESS Encryption (enc) 密钥对变量
 xhttp_encryption=""
 xhttp_decryption=""
+xhttp_cdn_domain=""
 
 
 # XHTTP 高级参数（服务端默认值，可根据需要调整）
@@ -897,6 +898,8 @@ EOF
 
     # 读取 IPv6 下行域名
     ipv6_download_domain="$(grep "^#ipv6_download_domain=" $nginx_config 2>/dev/null | cut -d = -f 2 || true)"
+    # 读取 XHTTP 优选/伪装域名
+    xhttp_cdn_domain="$(grep "^#xhttp_cdn_domain=" $nginx_config 2>/dev/null | cut -d = -f 2 || true)"
     if [ -z "$ipv6_download_domain" ] || [ "$ipv6_download_domain" = "[2606:4700:4700::1111]" ]; then
         ipv6_download_domain="ipv6.cloudflare.com"
     fi
@@ -2247,6 +2250,38 @@ readDomain()
         yellow "请确保此域名有 AAAA 记录解析"
     fi
     
+    # ===== XHTTP 优选域名/IP (伪装域名) 配置 =====
+    echo
+    tyblue "--------------------XHTTP 优选配置--------------------"
+    yellow "是否为 XHTTP 启用优选域名/IP（常用于过 Cloudflare CDN 提速）？"
+    echo
+    local last_xhttp_cdn_domain=""
+    if [ -f "$nginx_config" ]; then
+        last_xhttp_cdn_domain=$(grep "^#xhttp_cdn_domain=" "$nginx_config" 2>/dev/null | cut -d= -f2 || true)
+    fi
+    if [ -n "$last_xhttp_cdn_domain" ]; then
+        tyblue "上次选择: ${last_xhttp_cdn_domain}"
+        tyblue "直接回车使用上次配置,或输入新选择"
+    else
+        purple "提示: 留空则默认不启用（即直连模式，使用真实域名）"
+        purple "常见推荐: cf.dyn.riotcdn.net.cdn.cloudflare.net"
+    fi
+    echo
+    
+    local xhttp_cdn_domain_input=""
+    read -p "请输入优选域名/IP [直接回车使用上次配置]: " xhttp_cdn_domain_input
+    
+    if [ -z "$xhttp_cdn_domain_input" ] && [ -n "$last_xhttp_cdn_domain" ]; then
+        xhttp_cdn_domain="$last_xhttp_cdn_domain"
+        green "使用上次配置: $xhttp_cdn_domain"
+    elif [ -z "$xhttp_cdn_domain_input" ]; then
+        xhttp_cdn_domain=""
+        green "默认模式: 不启用优选域名（直连，使用真实域名 $xhttp_domain）"
+    else
+        xhttp_cdn_domain="$xhttp_cdn_domain_input"
+        green "已设置优选域名/IP: $xhttp_cdn_domain"
+    fi
+    
     # 保存 IPv6 域名供后续使用
     ipv6_download_domain="$ipv6_domain"
     
@@ -3220,6 +3255,7 @@ EOF
 #pretend_list=${pretend_list[*]}
 #subdomain_prefix_list=${subdomain_prefix_list[*]}
 #ipv6_download_domain=${ipv6_download_domain}
+#xhttp_cdn_domain=${xhttp_cdn_domain}
 EOF
 
 }
@@ -5656,6 +5692,8 @@ generate_vless_share_link()
         
     elif [ $protocol -eq 3 ]; then
         local xhttp_domain="${domain_list[2]}"
+        local server_address="${xhttp_cdn_domain:-$xhttp_domain}"
+        [ -z "$server_address" ] && server_address="$xhttp_domain"
         local encoded_path=$(urlencode "$path")
         local alpn_val="h3,h2,http/1.1"
         local encoded_alpn=$(urlencode "$alpn_val")
@@ -5678,7 +5716,7 @@ EOF
         local encoded_extra_base=$(urlencode "$extra_base_json")
 
         # 第一条：普通 XHTTP (上下行同线路)
-        local link_normal="vless://${xid_3}@${xhttp_domain}:443"
+        local link_normal="vless://${xid_3}@${server_address}:443"
         link_normal+="?type=xhttp&security=tls&fp=chrome&alpn=${encoded_alpn}&sni=${xhttp_domain}&host=${xhttp_domain}&path=${encoded_path}&mode=${xhttp_mode}"
         if [ -n "$xhttp_encryption" ]; then
             link_normal+="&encryption=$(urlencode "$xhttp_encryption")"
@@ -5730,7 +5768,7 @@ EOF
 )
         local encoded_extra_split=$(urlencode "$extra_split_json")
 
-        local link_split="vless://${xid_3}@${xhttp_domain}:443"
+        local link_split="vless://${xid_3}@${server_address}:443"
         link_split+="?type=xhttp&security=tls&fp=chrome&alpn=${encoded_alpn}&sni=${xhttp_domain}&host=${xhttp_domain}&path=${encoded_path}&mode=${xhttp_mode}"
         if [ -n "$xhttp_encryption" ]; then
             link_split+="&encryption=$(urlencode "$xhttp_encryption")"
@@ -5791,6 +5829,8 @@ EOF
     
     local trojan_domain="${domain_list[1]}"
     local xhttp_domain="${domain_list[2]}"
+    local server_address="${xhttp_cdn_domain:-$xhttp_domain}"
+    [ -z "$server_address" ] && server_address="$xhttp_domain"
     local ipv6_domain="${ipv6_download_domain:-ipv6.cloudflare.com}"
 
     cat > "$yaml_file" << EOF
@@ -5851,7 +5891,7 @@ proxies:
 
   - name: "VLESS-XHTTP-TLS"
     type: vless
-    server: "${xhttp_domain}"
+    server: "${server_address}"
     port: 443
     uuid: "${xid_3}"
     udp: true
@@ -5878,7 +5918,7 @@ proxies:
 
   - name: "VLESS-XHTTP-IPV6-Split"
     type: vless
-    server: "${xhttp_domain}"
+    server: "${server_address}"
     port: 443
     uuid: "${xid_3}"
     udp: true
