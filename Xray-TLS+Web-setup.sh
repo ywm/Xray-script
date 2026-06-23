@@ -806,17 +806,27 @@ get_config_info()
             xid_3="$(grep '"id"' $xray_config_inbound_xhttp | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
             path="$(grep '"path"' $xray_config_inbound_xhttp | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
             if [ -f "/usr/local/etc/xray/vlessenc_keys.json" ]; then
+                yellow "[DEBUG] 发现已有的 vlessenc_keys.json，尝试读取密钥..."
                 xhttp_encryption="$(jq -r '.encryption' /usr/local/etc/xray/vlessenc_keys.json 2>/dev/null || true)"
                 xhttp_decryption="$(jq -r '.decryption' /usr/local/etc/xray/vlessenc_keys.json 2>/dev/null || true)"
+                if [ -n "$xhttp_encryption" ]; then
+                    green "[DEBUG] 成功从文件载入 VLESS Encryption 密钥对"
+                else
+                    yellow "[DEBUG] vlessenc_keys.json 解析失败 (可能格式错误)"
+                fi
             fi
             # 如果密钥丢失或解析失败（为空），且 xray 二进制存在，尝试生成
             if { [ -z "$xhttp_encryption" ] || [ -z "$xhttp_decryption" ]; } && [ -f "/usr/local/bin/xray" ]; then
+                yellow "[DEBUG] 未找到有效加密密钥，正在尝试使用已安装的 Xray 生成新密钥..."
                 local temp_keys
                 temp_keys=$(/usr/local/bin/xray vlessenc 2>/dev/null || true)
                 if echo "$temp_keys" | grep -q '"encryption"'; then
                     echo "$temp_keys" > /usr/local/etc/xray/vlessenc_keys.json
                     xhttp_encryption="$(echo "$temp_keys" | jq -r '.encryption' 2>/dev/null || true)"
                     xhttp_decryption="$(echo "$temp_keys" | jq -r '.decryption' 2>/dev/null || true)"
+                    green "[DEBUG] 成功通过 Xray 生成并保存了新的 VLESS Encryption 密钥对"
+                else
+                    yellow "[DEBUG] 当前 Xray 版本不支持 vlessenc 命令，VLESS 加密将默认回落为 none"
                 fi
             fi
             yellow "[DEBUG] XHTTP 配置读取完成"
