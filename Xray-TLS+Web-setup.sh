@@ -822,18 +822,19 @@ get_config_info()
             fi
             # 如果密钥丢失或解析失败（为空），且 xray 二进制存在，尝试生成
             if { [ -z "$xhttp_encryption" ] || [ -z "$xhttp_decryption" ]; } && [ -f "/usr/local/bin/xray" ]; then
-                yellow "[DEBUG] 未找到有效加密密钥，正在尝试使用已安装的 Xray 生成新密钥..."
+                yellow "[DEBUG] 未找到有效加密密钥，正在尝试使用已安装 of Xray 生成新密钥..."
                 local temp_keys
                 temp_keys=$(/usr/local/bin/xray vlessenc 2>/dev/null || true)
-                if echo "$temp_keys" | grep -q '"encryption"'; then
-                    echo "$temp_keys" > /usr/local/etc/xray/vlessenc_keys.json
-                    if command -v jq &>/dev/null; then
-                        xhttp_encryption="$(echo "$temp_keys" | jq -r '.encryption' 2>/dev/null || true)"
-                        xhttp_decryption="$(echo "$temp_keys" | jq -r '.decryption' 2>/dev/null || true)"
-                    else
-                        xhttp_encryption="$(echo "$temp_keys" | grep '"encryption"' 2>/dev/null | cut -d : -f 2 | cut -d \" -f 2 | tr -d '[:space:]' || true)"
-                        xhttp_decryption="$(echo "$temp_keys" | grep '"decryption"' 2>/dev/null | cut -d : -f 2 | cut -d \" -f 2 | tr -d '[:space:]' || true)"
-                    fi
+                if echo "$temp_keys" | grep -q 'X25519'; then
+                    xhttp_encryption="$(echo "$temp_keys" | sed -n '/X25519/,/ML-KEM-768/p' | grep '"encryption"' | cut -d : -f 2 | cut -d \" -f 2 | tr -d '[:space:]' || true)"
+                    xhttp_decryption="$(echo "$temp_keys" | sed -n '/X25519/,/ML-KEM-768/p' | grep '"decryption"' | cut -d : -f 2 | cut -d \" -f 2 | tr -d '[:space:]' || true)"
+                    # 将提取出的干净密钥写入标准的 JSON 文件中，以便后续 jq 或 grep 可以正常解析
+                    cat > /usr/local/etc/xray/vlessenc_keys.json <<EOF
+{
+  "encryption": "$xhttp_encryption",
+  "decryption": "$xhttp_decryption"
+}
+EOF
                     green "[DEBUG] 成功通过 Xray 生成并保存了新的 VLESS Encryption 密钥对"
                 else
                     yellow "[DEBUG] 当前 Xray 版本不支持 vlessenc 命令，VLESS 加密将默认回落为 none"
@@ -4382,15 +4383,15 @@ install_update_xray_tls_web()
         # 缺少密钥时（包括首次安装），使用新安装的 xray 生成密钥对并写入 JSON 文件
         local temp_keys
         temp_keys=$(/usr/local/bin/xray vlessenc 2>/dev/null || true)
-        if echo "$temp_keys" | grep -q '"encryption"'; then
-            echo "$temp_keys" > /usr/local/etc/xray/vlessenc_keys.json
-            if command -v jq &>/dev/null; then
-                xhttp_encryption="$(echo "$temp_keys" | jq -r '.encryption' 2>/dev/null || true)"
-                xhttp_decryption="$(echo "$temp_keys" | jq -r '.decryption' 2>/dev/null || true)"
-            else
-                xhttp_encryption="$(echo "$temp_keys" | grep '"encryption"' 2>/dev/null | cut -d : -f 2 | cut -d \" -f 2 | tr -d '[:space:]' || true)"
-                xhttp_decryption="$(echo "$temp_keys" | grep '"decryption"' 2>/dev/null | cut -d : -f 2 | cut -d \" -f 2 | tr -d '[:space:]' || true)"
-            fi
+        if echo "$temp_keys" | grep -q 'X25519'; then
+            xhttp_encryption="$(echo "$temp_keys" | sed -n '/X25519/,/ML-KEM-768/p' | grep '"encryption"' | cut -d : -f 2 | cut -d \" -f 2 | tr -d '[:space:]' || true)"
+            xhttp_decryption="$(echo "$temp_keys" | sed -n '/X25519/,/ML-KEM-768/p' | grep '"decryption"' | cut -d : -f 2 | cut -d \" -f 2 | tr -d '[:space:]' || true)"
+            cat > /usr/local/etc/xray/vlessenc_keys.json <<EOF
+{
+  "encryption": "$xhttp_encryption",
+  "decryption": "$xhttp_decryption"
+}
+EOF
         fi
     else
         # 升级且已存在密钥时，将之前载入的密钥重新写入文件，防止被 remove_xray 清理
