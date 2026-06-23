@@ -576,8 +576,8 @@ check_nginx_update()
 {
     local nginx_version_now
     local openssl_version_now
-    nginx_version_now="nginx-$(${nginx_prefix}/sbin/nginx -V 2>&1 | grep "^nginx version:" | cut -d / -f 2)"
-    openssl_version_now="openssl-$(${nginx_prefix}/sbin/nginx -V 2>&1 | grep "^built with OpenSSL" | awk '{print $4}')"
+    nginx_version_now="nginx-$(${nginx_prefix}/sbin/nginx -V 2>&1 | grep "^nginx version:" | cut -d / -f 2 || true)"
+    openssl_version_now="openssl-$(${nginx_prefix}/sbin/nginx -V 2>&1 | grep "^built with OpenSSL" | awk '{print $4}' || true)"
 
     # ========== 调试输出 ==========
     echo
@@ -784,17 +784,17 @@ get_config_info()
         # 读取 REALITY UUID (从 20_inbound_reality.json)
         if [ -f "$xray_config_inbound_reality" ]; then
             yellow "[DEBUG] 读取 REALITY 配置..."
-            xid_1="$(grep '"id"' $xray_config_inbound_reality | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
-            reality_private_key="$(grep '"privateKey"' $xray_config_inbound_reality | cut -d : -f 2 | cut -d \" -f 2)"
-            reality_server_names="$(grep '"serverNames"' $xray_config_inbound_reality | sed 's/.*\[//;s/\].*//' | tr ',' ' ' | sed 's/"//g')"
-            reality_short_ids="$(grep '"shortIds"' $xray_config_inbound_reality | sed 's/.*\[//;s/\].*//' | tr ',' ' ')"
+            xid_1="$(grep '"id"' "$xray_config_inbound_reality" 2>/dev/null | head -n 1 | cut -d : -f 2 | cut -d \" -f 2 || true)"
+            reality_private_key="$(grep '"privateKey"' "$xray_config_inbound_reality" 2>/dev/null | cut -d : -f 2 | cut -d \" -f 2 || true)"
+            reality_server_names="$(grep '"serverNames"' "$xray_config_inbound_reality" 2>/dev/null | sed 's/.*\[//;s/\].*//' | tr ',' ' ' | sed 's/"//g' || true)"
+            reality_short_ids="$(grep '"shortIds"' "$xray_config_inbound_reality" 2>/dev/null | sed 's/.*\[//;s/\].*//' | tr ',' ' ' || true)"
             yellow "[DEBUG] REALITY 配置读取完成，xid_1=$xid_1"
         fi
         
         # 读取 Trojan 密码 (从 21_inbound_trojan.json)
         yellow "[DEBUG] 即将读取 Trojan 配置..."
         if [ -f "$xray_config_inbound_trojan" ]; then
-            xid_2="$(grep '"password"' $xray_config_inbound_trojan | head -n1 | cut -d : -f 2 | cut -d \" -f 2)"
+            xid_2="$(grep '"password"' "$xray_config_inbound_trojan" 2>/dev/null | head -n1 | cut -d : -f 2 | cut -d \" -f 2 || true)"
             yellow "[DEBUG] Trojan 配置读取完成"
         else
             yellow "[DEBUG] Trojan 配置文件不存在，跳过"
@@ -803,8 +803,8 @@ get_config_info()
         # 读取 XHTTP UUID 和 path (从 22_inbound_xhttp.json)
         yellow "[DEBUG] 即将读取 XHTTP 配置..."
         if [ -f "$xray_config_inbound_xhttp" ]; then
-            xid_3="$(grep '"id"' $xray_config_inbound_xhttp | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
-            path="$(grep '"path"' $xray_config_inbound_xhttp | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
+            xid_3="$(grep '"id"' "$xray_config_inbound_xhttp" 2>/dev/null | head -n 1 | cut -d : -f 2 | cut -d \" -f 2 || true)"
+            path="$(grep '"path"' "$xray_config_inbound_xhttp" 2>/dev/null | head -n 1 | cut -d : -f 2 | cut -d \" -f 2 || true)"
             if [ -f "/usr/local/etc/xray/vlessenc_keys.json" ]; then
                 yellow "[DEBUG] 发现已有的 vlessenc_keys.json，尝试读取密钥..."
                 xhttp_encryption="$(jq -r '.encryption' /usr/local/etc/xray/vlessenc_keys.json 2>/dev/null || true)"
@@ -836,13 +836,13 @@ get_config_info()
     else
         yellow "[DEBUG] 使用旧版单文件配置模式"
         # 兼容旧版单文件配置
-        xid_1="$(grep '"id"' $xray_config | head -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
-        xid_2="$(grep -A10 '"protocol"[ '$'\t]*:[ '$'\t]*"trojan"' $xray_config | grep '"password"' | head -n1 | cut -d : -f 2 | cut -d \" -f 2)"
-        xid_3="$(grep '"id"' $xray_config | tail -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
-        reality_private_key="$(grep '"privateKey"' $xray_config | cut -d : -f 2 | cut -d \" -f 2)"
-        reality_server_names="$(grep '"serverNames"' $xray_config | sed 's/.*\[//;s/\].*//' | tr ',' ' ' | sed 's/"//g')"
-        reality_short_ids="$(grep '"shortIds"' $xray_config | sed 's/.*\[//;s/\].*//' | tr ',' ' ')"
-        path="$(grep '"path"' $xray_config | tail -n 1 | cut -d : -f 2 | cut -d \" -f 2)"
+        xid_1="$(grep '"id"' "$xray_config" 2>/dev/null | head -n 1 | cut -d : -f 2 | cut -d \" -f 2 || true)"
+        xid_2="$(grep -A10 '"protocol"[ '$'\t]*:[ '$'\t]*"trojan"' "$xray_config" 2>/dev/null | grep '"password"' 2>/dev/null | head -n1 | cut -d : -f 2 | cut -d \" -f 2 || true)"
+        xid_3="$(grep '"id"' "$xray_config" 2>/dev/null | tail -n 1 | cut -d : -f 2 | cut -d \" -f 2 || true)"
+        reality_private_key="$(grep '"privateKey"' "$xray_config" 2>/dev/null | cut -d : -f 2 | cut -d \" -f 2 || true)"
+        reality_server_names="$(grep '"serverNames"' "$xray_config" 2>/dev/null | sed 's/.*\[//;s/\].*//' | tr ',' ' ' | sed 's/"//g' || true)"
+        reality_short_ids="$(grep '"shortIds"' "$xray_config" 2>/dev/null | sed 's/.*\[//;s/\].*//' | tr ',' ' ' || true)"
+        path="$(grep '"path"' "$xray_config" 2>/dev/null | tail -n 1 | cut -d : -f 2 | cut -d \" -f 2 || true)"
     fi
 
     # 生成 Password
@@ -1549,9 +1549,9 @@ install_bbr()
         if [[ "$release" == "ubuntu" ]] || [[ "$release" == "debian" ]] || [ $release == "deepin" ] || [[ "$release" == "other-debian" ]]; then
             dpkg --list > "temp_installed_list"
             local kernel_list_image
-            kernel_list_image=($(awk '{print $2}' "temp_installed_list" | grep '^linux-image'))
+            kernel_list_image=($(awk '{print $2}' "temp_installed_list" | grep '^linux-image' || true))
             local kernel_list_modules
-            kernel_list_modules=($(awk '{print $2}' "temp_installed_list" | grep '^linux-modules'))
+            kernel_list_modules=($(awk '{print $2}' "temp_installed_list" | grep '^linux-modules' || true))
             local kernel_now
             kernel_now="$(uname -r)"
             local ok_install=0
@@ -1584,15 +1584,15 @@ install_bbr()
         else
             rpm -qa > "temp_installed_list"
             local kernel_list
-            kernel_list=($(grep -E '^kernel(|-ml|-lt)-[0-9]' "temp_installed_list"))
+            kernel_list=($(grep -E '^kernel(|-ml|-lt)-[0-9]' "temp_installed_list" || true))
             #local kernel_list_headers
-            #kernel_list_headers=($(grep -E '^kernel(|-ml|-lt)-headers' "temp_installed_list"))
+            #kernel_list_headers=($(grep -E '^kernel(|-ml|-lt)-headers' "temp_installed_list" || true))
             local kernel_list_devel
-            kernel_list_devel=($(grep -E '^kernel(|-ml|-lt)-devel' "temp_installed_list"))
+            kernel_list_devel=($(grep -E '^kernel(|-ml|-lt)-devel' "temp_installed_list" || true))
             local kernel_list_modules
-            kernel_list_modules=($(grep -E '^kernel(|-ml|-lt)-modules' "temp_installed_list"))
+            kernel_list_modules=($(grep -E '^kernel(|-ml|-lt)-modules' "temp_installed_list" || true))
             local kernel_list_core
-            kernel_list_core=($(grep -E '^kernel(|-ml|-lt)-core' "temp_installed_list"))
+            kernel_list_core=($(grep -E '^kernel(|-ml|-lt)-core' "temp_installed_list" || true))
             local kernel_now
             kernel_now="$(uname -r)"
             local ok_install=0
@@ -2075,7 +2075,7 @@ readDomain()
     # 读取配置文件中的上次选择
     local last_reality_prefix=""
     if [ -f "$nginx_config" ]; then
-        last_reality_prefix=$(grep "^#subdomain_prefix_list=" "$nginx_config" 2>/dev/null | cut -d= -f2 | awk '{print $1}')
+        last_reality_prefix=$(grep "^#subdomain_prefix_list=" "$nginx_config" 2>/dev/null | cut -d= -f2 | awk '{print $1}' || true)
     fi
     
     if [ -n "$last_reality_prefix" ]; then
@@ -2124,7 +2124,7 @@ readDomain()
     
     local last_trojan_prefix=""
     if [ -f "$nginx_config" ]; then
-        last_trojan_prefix=$(grep "^#subdomain_prefix_list=" "$nginx_config" 2>/dev/null | cut -d= -f2 | awk '{print $2}')
+        last_trojan_prefix=$(grep "^#subdomain_prefix_list=" "$nginx_config" 2>/dev/null | cut -d= -f2 | awk '{print $2}' || true)
     fi
     
     if [ -n "$last_trojan_prefix" ]; then
@@ -2171,7 +2171,7 @@ readDomain()
     
     local last_xhttp_prefix=""
     if [ -f "$nginx_config" ]; then
-        last_xhttp_prefix=$(grep "^#subdomain_prefix_list=" "$nginx_config" 2>/dev/null | cut -d= -f2 | awk '{print $3}')
+        last_xhttp_prefix=$(grep "^#subdomain_prefix_list=" "$nginx_config" 2>/dev/null | cut -d= -f2 | awk '{print $3}' || true)
     fi
     
     if [ -n "$last_xhttp_prefix" ]; then
@@ -4416,8 +4416,8 @@ EOF
             # 从备份的 account.conf 提取 CF 凭据写入新注册的 account.conf（不覆盖）
             if [ -f "$acme_backup_dir/account.conf" ]; then
                 local saved_cf_email saved_cf_key
-                saved_cf_email=$(grep -oP "(?<=SAVED_CF_Email=)\S+" "$acme_backup_dir/account.conf" | tr -d "'\"")
-                saved_cf_key=$(grep -oP "(?<=SAVED_CF_Key=)\S+" "$acme_backup_dir/account.conf" | tr -d "'\"")
+                saved_cf_email=$(grep -oP "(?<=SAVED_CF_Email=)\S+" "$acme_backup_dir/account.conf" | tr -d "'\"" || true)
+                saved_cf_key=$(grep -oP "(?<=SAVED_CF_Key=)\S+" "$acme_backup_dir/account.conf" | tr -d "'\"" || true)
                 if [ -n "$saved_cf_email" ] && [ -n "$saved_cf_key" ]; then
                     $HOME/.acme.sh/acme.sh --set-account-conf "SAVED_CF_Email=$saved_cf_email" >/dev/null 2>&1
                     $HOME/.acme.sh/acme.sh --set-account-conf "SAVED_CF_Key=$saved_cf_key" >/dev/null 2>&1
