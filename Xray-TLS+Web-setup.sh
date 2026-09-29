@@ -2938,12 +2938,19 @@ sync_cf_to_acme_sh()
     [ -z "$CF_Key" ] && return 0
 
     local account_conf="$HOME/.acme.sh/account.conf"
-    if [ -f "$account_conf" ]; then
-        grep -q "^SAVED_CF_Email=" "$account_conf" && return 0
+    if [ -f "$account_conf" ] && grep -q "^SAVED_CF_Email=" "$account_conf"; then
+        return 0
     fi
 
-    $HOME/.acme.sh/acme.sh --set-account-conf "SAVED_CF_Email=$CF_Email" >/dev/null 2>&1
-    $HOME/.acme.sh/acme.sh --set-account-conf "SAVED_CF_Key=$CF_Key" >/dev/null 2>&1
+    $HOME/.acme.sh/acme.sh --set-account-conf "SAVED_CF_Email=$CF_Email" >/dev/null 2>&1 || {
+        printf '[ERROR] sync_cf_to_acme_sh: failed to save Cloudflare email setting\n' >&2
+        return 1
+    }
+    $HOME/.acme.sh/acme.sh --set-account-conf "SAVED_CF_Key=$CF_Key" >/dev/null 2>&1 || {
+        printf '[ERROR] sync_cf_to_acme_sh: failed to save Cloudflare key setting\n' >&2
+        return 1
+    }
+    return 0
 }
 
 
@@ -2952,15 +2959,19 @@ sync_cf_to_acme_sh()
 read_cf_api()
 {
     local cf_api_file="${nginx_prefix}/certs/cf_api.conf"
-    
+    printf '[DEBUG] read_cf_api: starting; credential_file=%s\n' "$cf_api_file" >&2
+
     # 如果文件已存在，加载变量并同步到 acme.sh account.conf
     if [ -f "$cf_api_file" ]; then
-        source "$cf_api_file"
-        export CF_Email && export CF_Key
-        sync_cf_to_acme_sh
+        printf '[DEBUG] read_cf_api: loading saved credentials\n' >&2
+        source "$cf_api_file" || { printf '[ERROR] read_cf_api: failed to load credential file\n' >&2; return 1; }
+        export CF_Email && export CF_Key || { printf '[ERROR] read_cf_api: failed to export credentials\n' >&2; return 1; }
+        sync_cf_to_acme_sh || { printf '[ERROR] read_cf_api: failed to sync credentials to acme.sh\n' >&2; return 1; }
+        printf '[DEBUG] read_cf_api: saved credentials loaded\n' >&2
         return 0
     fi
 
+    printf '[DEBUG] read_cf_api: no saved credentials; prompting\n' >&2
     echo -e "\n"
     tyblue "-------------------- Cloudflare API 配置 --------------------"
     tyblue " 申请泛域名证书需要通过 DNS 验证，请提供您的 Global API Key。"
@@ -2973,23 +2984,29 @@ read_cf_api()
         read -p "请输入 Cloudflare 注册邮箱: " cf_email
     done
     
+    printf '[DEBUG] read_cf_api: received email input\n' >&2
+
     local cf_key=""
     while [ -z "$cf_key" ]
     do
         read -p "请输入 Cloudflare Global API Key: " cf_key
     done
+    printf '[DEBUG] read_cf_api: received API key input (value hidden)\n' >&2
 
     # 写入文件方便下次自动加载
-    mkdir -p "${nginx_prefix}/certs"
-    echo "export CF_Email='$cf_email'" > "$cf_api_file"
-    echo "export CF_Key='$cf_key'" >> "$cf_api_file"
-    chmod 600 "$cf_api_file"
+    mkdir -p "${nginx_prefix}/certs" || { printf '[ERROR] read_cf_api: cannot create certificate directory\n' >&2; return 1; }
+    printf 'export CF_Email=%q\n' "$cf_email" > "$cf_api_file" || { printf '[ERROR] read_cf_api: cannot write credential file\n' >&2; return 1; }
+    printf 'export CF_Key=%q\n' "$cf_key" >> "$cf_api_file" || { printf '[ERROR] read_cf_api: cannot append API key to credential file\n' >&2; return 1; }
+    chmod 600 "$cf_api_file" || { printf '[ERROR] read_cf_api: cannot secure credential file permissions\n' >&2; return 1; }
+    printf '[DEBUG] read_cf_api: credential file written and secured\n' >&2
 
-    source "$cf_api_file"
-    export CF_Email && export CF_Key
+    source "$cf_api_file" || { printf '[ERROR] read_cf_api: failed to load newly written credential file\n' >&2; return 1; }
+    export CF_Email && export CF_Key || { printf '[ERROR] read_cf_api: failed to export credentials\n' >&2; return 1; }
+    printf '[DEBUG] read_cf_api: credentials loaded into environment\n' >&2
 
     # 同步写入 acme.sh 的 account.conf，确保自动续期能正常工作
-    sync_cf_to_acme_sh
+    sync_cf_to_acme_sh || { printf '[ERROR] read_cf_api: failed to sync credentials to acme.sh\n' >&2; return 1; }
+    printf '[DEBUG] read_cf_api: complete\n' >&2
 }
 
 
@@ -3027,7 +3044,12 @@ get_cert()
     green "证书不存在或已过期，开始申请泛域名证书..."
 
     # 获取 CF 凭据
-    read_cf_api
+    printf '[DEBUG] get_cert: reading Cloudflare credentials\n' >&2
+    if ! read_cf_api; then
+        red "读取或保存 Cloudflare API 配置失败"
+        return 1
+    fi
+    printf '[DEBUG] get_cert: Cloudflare credentials ready; proceeding to ACME\n' >&2
 
     # 准备申请环境 - 临时停止 xray 以避免配置冲突
     local xray_was_running=0
