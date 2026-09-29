@@ -1134,8 +1134,13 @@ check_port()
             exit 1
         fi
     done
-    [ $xray_status -eq 1 ] && systemctl start xray
-    [ $nginx_status -eq 1 ] && systemctl start nginx
+    if [ $xray_status -eq 1 ]; then
+        systemctl start xray
+    fi
+    if [ $nginx_status -eq 1 ]; then
+        systemctl start nginx
+    fi
+    return 0
 }
 
 #检查Nginx是否已通过apt/dnf/yum安装
