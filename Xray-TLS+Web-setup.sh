@@ -837,10 +837,10 @@ EOF
     if [ -n "$reality_private_key" ] && [ -f "/usr/local/bin/xray" ]; then
         # 先测试 xray x25519 无参数（生成新密钥对），验证 xray 二进制本身是否正常
         local test_output
-        test_output=$(/usr/local/bin/xray x25519 2>/dev/null)
+        test_output=$(/usr/local/bin/xray x25519 2>/dev/null || true)
 
         # 再用 -i 从已有私钥派生 Password
-        reality_password=$(/usr/local/bin/xray x25519 -i "$reality_private_key" 2>/dev/null | awk '/^Password/ {print $(NF)}')
+        reality_password=$(/usr/local/bin/xray x25519 -i "$reality_private_key" 2>/dev/null | awk '/^Password/ {print $(NF)}' || true)
     fi
 
     # 读取域名配置
@@ -1047,7 +1047,7 @@ fi
 [ -e ${cloudreve_prefix}/cloudreve.db ] && cloudreve_is_installed=1 || cloudreve_is_installed=0
 [ -e /usr/local/bin/xray ] && xray_is_installed=1 || xray_is_installed=0
 ([ $xray_is_installed -eq 1 ] && [[ $nginx_is_installed -eq 1 ]]) && is_installed=1 || is_installed=0
-cpu_thread_num="$(grep '^processor' /proc/cpuinfo | uniq | wc -l)"
+cpu_thread_num="$(grep '^processor' /proc/cpuinfo | uniq | wc -l || true)"
 if [ -z "$cpu_thread_num" ] || [ $cpu_thread_num -lt 1 ]; then
     red "获取CPU线程数失败！"
     exit 1
@@ -1076,7 +1076,7 @@ esac
 #获取系统版本信息
 get_system_info()
 {
-    timezone="$(ls -l /etc/localtime | awk -F zoneinfo/ '{print $NF}')"
+    timezone="$(ls -l /etc/localtime | awk -F zoneinfo/ '{print $NF}' || true)"
     if [[ ! -L /etc/localtime ]] || [ "$timezone" == "" ]; then
         yellow "获取时区失败！"
         green  "欢迎进行Bug report[https://github.com/ywm/Xray-script/issues]，感谢您的支持"
@@ -2438,7 +2438,13 @@ instal_php_imagick()
     else
         swap_off
     fi
-    mv modules/imagick.so "$(${php_prefix}/bin/php -i | grep "^extension_dir" | awk '{print $3}')"
+    local imagick_extension_dir=""
+    imagick_extension_dir="$(${php_prefix}/bin/php -i | grep "^extension_dir" | awk '{print $3}' || true)"
+    if [ -n "$imagick_extension_dir" ] && [ -f modules/imagick.so ]; then
+        mv modules/imagick.so "$imagick_extension_dir"
+    else
+        yellow "php-imagick 模块未安装（未找到扩展目录或编译产物）"
+    fi
     cd ..
     rm -rf imagick
 }
@@ -3999,7 +4005,9 @@ StandardError=syslog
 WantedBy=multi-user.target
 EOF
     systemctl daemon-reload
-    [ $temp_cloudreve_status -eq 1 ] && systemctl start cloudreve
+    if [ $temp_cloudreve_status -eq 1 ]; then
+        systemctl start cloudreve
+    fi
 }
 install_init_cloudreve()
 {
@@ -4008,15 +4016,21 @@ install_init_cloudreve()
     chmod 0700 $cloudreve_prefix
     update_cloudreve
     rm -rf /dev/shm/cloudreve
-    local password
-    password="$("$cloudreve_prefix/cloudreve" | grep "password" | awk '{print $6}')"
+    local password=""
+    # 首次运行 cloudreve 以生成初始管理员密码；取不到该字段时不应中断安装
+    password="$("$cloudreve_prefix/cloudreve" | grep "password" | awk '{print $6}' || true)"
     sleep 1s
     systemctl start cloudreve
     systemctl enable cloudreve
     tyblue "-------- 请打开\"https://${domain_list[$1]}\"进行Cloudreve初始化 -------"
     tyblue "  1. 登陆帐号"
     purple "    初始管理员账号：admin@cloudreve.org"
-    purple "    初始管理员密码：$password"
+    if [ -n "$password" ]; then
+        purple "    初始管理员密码：$password"
+    else
+        yellow "    未能自动获取初始管理员密码"
+        tyblue "    可在登录页点击\"忘记密码\"重置，或执行 ${cloudreve_prefix}/cloudreve 查看"
+    fi
     tyblue "  2. 右上角头像 -> 管理面板"
     tyblue "  3. 这时会弹出对话框 \"确定站点URL设置\" 选择 \"更改\""
     tyblue "  4. 左侧参数设置 -> 注册与登陆 -> 不允许新用户注册 -> 往下拉点击保存"
@@ -5342,7 +5356,7 @@ simplify_system()
             LANG="en_US.UTF-8" LANGUAGE="en_US:en" dpkg -s "$i" 2>/dev/null | grep -qi 'status[ '$'\t]*:[ '$'\t]*install[ '$'\t]*ok[ '$'\t]*installed[ '$'\t]*$' && keep_packages+=("$i")
         done
         keep_packages+=($(dpkg --list 'grub*' | grep '^[ '$'\t]*ii[ '$'\t]' | awk '{print $2}'))
-        dpkg -l | grep '^[ '$'\t]*ii[ '$'\t]' | awk '{print $2}' | cut -d : -f 1 > temp
+        dpkg -l | grep '^[ '$'\t]*ii[ '$'\t]' | awk '{print $2}' | cut -d : -f 1 > temp || true
         for package in "${debian_remove_packages[@]}"
         do
             if grep -q "$package" temp; then
@@ -5449,7 +5463,7 @@ readRealityConfig()
     # 生成密钥对
     green "正在生成 REALITY 密钥对..."
     local key_output=""
-    key_output=$(/usr/local/bin/xray x25519 2>/dev/null)
+    key_output=$(/usr/local/bin/xray x25519 2>/dev/null || true)
 
     reality_private_key=$(echo "$key_output" | awk '/^PrivateKey:/ {print $2}')
     reality_password=$(echo "$key_output" | awk '/^Password/ {print $(NF)}')
