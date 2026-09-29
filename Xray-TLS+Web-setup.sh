@@ -1515,7 +1515,9 @@ install_bbr()
                 rc_version="${rc_version##*'rc'}"
                 your_kernel_version="${your_kernel_version}-rc${rc_version}"
             fi
-            uname -r | grep -q xanmod && your_kernel_version="${your_kernel_version}-xanmod"
+            if uname -r | grep -q xanmod; then
+                your_kernel_version="${your_kernel_version}-xanmod"
+            fi
         else
             latest_kernel_version="${latest_kernel_version%%-*}"
         fi
