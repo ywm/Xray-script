@@ -2930,26 +2930,57 @@ check_cert_valid()
 
 
 
+# 将 CF 凭据写入 acme.sh 的 account.conf
+# acme.sh 通过 source account.conf 读取 SAVED_ 前缀的变量，因此直接写入文件即可
+write_cf_to_acme_account_conf()
+{
+    local cf_email="$1"
+    local cf_key="$2"
+    local account_conf="$HOME/.acme.sh/account.conf"
+    local account_conf_tmp="${account_conf}.tmp"
+
+    if [ -z "$cf_email" ] || [ -z "$cf_key" ]; then
+        return 1
+    fi
+    if [ ! -f "$account_conf" ]; then
+        printf '[WARN] write_cf_to_acme_account_conf: %s not found\n' "$account_conf" >&2
+        return 1
+    fi
+
+    # 先过滤掉旧的 CF 凭据行，再写入新值（acme.sh 以 source 方式读取本文件）
+    if ! (umask 077; awk '!/^SAVED_CF_Email=/ && !/^SAVED_CF_Key=/' "$account_conf" > "$account_conf_tmp"); then
+        rm -f "$account_conf_tmp"
+        return 1
+    fi
+    {
+        printf 'SAVED_CF_Email=%q\n' "$cf_email"
+        printf 'SAVED_CF_Key=%q\n' "$cf_key"
+    } >> "$account_conf_tmp" || { rm -f "$account_conf_tmp"; return 1; }
+    chmod 600 "$account_conf_tmp" || { rm -f "$account_conf_tmp"; return 1; }
+    mv "$account_conf_tmp" "$account_conf" || { rm -f "$account_conf_tmp"; return 1; }
+    return 0
+}
+
 # 同步 CF 凭据到 acme.sh account.conf（仅在缺少时写入）
+# 同步失败不阻断证书申请：凭据已通过环境变量传给 acme.sh，申请成功后 acme.sh 也会自行保存
 sync_cf_to_acme_sh()
 {
     [ -f "$HOME/.acme.sh/acme.sh" ] || return 0
-    [ -z "$CF_Email" ] && return 0
-    [ -z "$CF_Key" ] && return 0
+    [ -n "${CF_Email:-}" ] || return 0
+    [ -n "${CF_Key:-}" ] || return 0
 
     local account_conf="$HOME/.acme.sh/account.conf"
-    if [ -f "$account_conf" ] && grep -q "^SAVED_CF_Email=" "$account_conf"; then
+    if [ -f "$account_conf" ] && grep -q "^SAVED_CF_Email=" "$account_conf" && grep -q "^SAVED_CF_Key=" "$account_conf"; then
+        printf '[DEBUG] sync_cf_to_acme_sh: credentials already saved\n' >&2
         return 0
     fi
 
-    $HOME/.acme.sh/acme.sh --set-account-conf "SAVED_CF_Email=$CF_Email" >/dev/null 2>&1 || {
-        printf '[ERROR] sync_cf_to_acme_sh: failed to save Cloudflare email setting\n' >&2
-        return 1
-    }
-    $HOME/.acme.sh/acme.sh --set-account-conf "SAVED_CF_Key=$CF_Key" >/dev/null 2>&1 || {
-        printf '[ERROR] sync_cf_to_acme_sh: failed to save Cloudflare key setting\n' >&2
-        return 1
-    }
+    if write_cf_to_acme_account_conf "$CF_Email" "$CF_Key"; then
+        printf '[DEBUG] sync_cf_to_acme_sh: credentials saved to account.conf\n' >&2
+        return 0
+    fi
+
+    printf '[WARN] sync_cf_to_acme_sh: cannot save credentials to account.conf; auto-renew may need manual setup\n' >&2
     return 0
 }
 
@@ -2964,11 +2995,19 @@ read_cf_api()
     # 如果文件已存在，加载变量并同步到 acme.sh account.conf
     if [ -f "$cf_api_file" ]; then
         printf '[DEBUG] read_cf_api: loading saved credentials\n' >&2
-        source "$cf_api_file" || { printf '[ERROR] read_cf_api: failed to load credential file\n' >&2; return 1; }
-        export CF_Email && export CF_Key || { printf '[ERROR] read_cf_api: failed to export credentials\n' >&2; return 1; }
-        sync_cf_to_acme_sh || { printf '[ERROR] read_cf_api: failed to sync credentials to acme.sh\n' >&2; return 1; }
-        printf '[DEBUG] read_cf_api: saved credentials loaded\n' >&2
-        return 0
+        # 凭据文件损坏时不应中断安装，加载期间临时关闭 errexit
+        local source_rc=0
+        set +e
+        source "$cf_api_file"
+        source_rc=$?
+        set -e
+        if [ $source_rc -eq 0 ] && [ -n "${CF_Email:-}" ] && [ -n "${CF_Key:-}" ]; then
+            export CF_Email CF_Key
+            printf '[DEBUG] read_cf_api: saved credentials loaded\n' >&2
+            sync_cf_to_acme_sh
+            return 0
+        fi
+        printf '[WARN] read_cf_api: saved credential file unusable; asking again\n' >&2
     fi
 
     printf '[DEBUG] read_cf_api: no saved credentials; prompting\n' >&2
@@ -2993,19 +3032,24 @@ read_cf_api()
     done
     printf '[DEBUG] read_cf_api: received API key input (value hidden)\n' >&2
 
-    # 写入文件方便下次自动加载
-    mkdir -p "${nginx_prefix}/certs" || { printf '[ERROR] read_cf_api: cannot create certificate directory\n' >&2; return 1; }
-    printf 'export CF_Email=%q\n' "$cf_email" > "$cf_api_file" || { printf '[ERROR] read_cf_api: cannot write credential file\n' >&2; return 1; }
-    printf 'export CF_Key=%q\n' "$cf_key" >> "$cf_api_file" || { printf '[ERROR] read_cf_api: cannot append API key to credential file\n' >&2; return 1; }
-    chmod 600 "$cf_api_file" || { printf '[ERROR] read_cf_api: cannot secure credential file permissions\n' >&2; return 1; }
-    printf '[DEBUG] read_cf_api: credential file written and secured\n' >&2
-
-    source "$cf_api_file" || { printf '[ERROR] read_cf_api: failed to load newly written credential file\n' >&2; return 1; }
-    export CF_Email && export CF_Key || { printf '[ERROR] read_cf_api: failed to export credentials\n' >&2; return 1; }
+    # 凭据先进入当前环境，保证本次证书申请一定可用
+    CF_Email="$cf_email"
+    CF_Key="$cf_key"
+    export CF_Email CF_Key
     printf '[DEBUG] read_cf_api: credentials loaded into environment\n' >&2
 
+    # 写入文件方便下次自动加载（失败只影响下次免输入，不影响本次申请）
+    if mkdir -p "${nginx_prefix}/certs" \
+        && printf 'export CF_Email=%q\n' "$cf_email" > "$cf_api_file" \
+        && printf 'export CF_Key=%q\n' "$cf_key" >> "$cf_api_file" \
+        && chmod 600 "$cf_api_file"; then
+        printf '[DEBUG] read_cf_api: credential file written and secured\n' >&2
+    else
+        printf '[WARN] read_cf_api: cannot save credential file %s\n' "$cf_api_file" >&2
+    fi
+
     # 同步写入 acme.sh 的 account.conf，确保自动续期能正常工作
-    sync_cf_to_acme_sh || { printf '[ERROR] read_cf_api: failed to sync credentials to acme.sh\n' >&2; return 1; }
+    sync_cf_to_acme_sh
     printf '[DEBUG] read_cf_api: complete\n' >&2
 }
 
@@ -3070,6 +3114,13 @@ get_cert()
         red "请检查: 1. CF API Key/Email 是否正确; 2. 域名是否在当前 CF 账号下; 3. 网络是否通畅。"
         [ $xray_was_running -eq 1 ] && systemctl start xray
         return 1
+    fi
+
+    # 申请成功说明凭据有效，此时才写入 acme.sh，覆盖可能存在的旧凭据供自动续期使用
+    if write_cf_to_acme_account_conf "${CF_Email:-}" "${CF_Key:-}"; then
+        printf '[DEBUG] get_cert: credentials saved to account.conf after successful issuance\n' >&2
+    else
+        printf '[WARN] get_cert: cannot save credentials to account.conf; auto-renew may need manual setup\n' >&2
     fi
 
     # 安装证书
@@ -4470,14 +4521,14 @@ EOF
                 saved_cf_email=$(grep -oP "(?<=SAVED_CF_Email=)\S+" "$acme_backup_dir/account.conf" | tr -d "'\"" || true)
                 saved_cf_key=$(grep -oP "(?<=SAVED_CF_Key=)\S+" "$acme_backup_dir/account.conf" | tr -d "'\"" || true)
                 if [ -n "$saved_cf_email" ] && [ -n "$saved_cf_key" ]; then
-                    $HOME/.acme.sh/acme.sh --set-account-conf "SAVED_CF_Email=$saved_cf_email" >/dev/null 2>&1
-                    $HOME/.acme.sh/acme.sh --set-account-conf "SAVED_CF_Key=$saved_cf_key" >/dev/null 2>&1
+                    write_cf_to_acme_account_conf "$saved_cf_email" "$saved_cf_key" \
+                        || printf '[WARN] 恢复 Cloudflare 凭据到 acme.sh 失败，自动续期可能需要重新配置\n' >&2
                 fi
             else
                 # 如果没有备份的 account.conf，从 cf_api.conf 同步 CF 凭据
                 read_cf_api
             fi
-            chmod 600 "$HOME/.acme.sh/account.conf"
+            chmod 600 "$HOME/.acme.sh/account.conf" 2>/dev/null || true
         fi
     fi
     $HOME/.acme.sh/acme.sh --upgrade --auto-upgrade
