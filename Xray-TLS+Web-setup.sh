@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -Eeuo pipefail
 
 # 清理临时文件 trap
 cleanup_temp() {
@@ -20,6 +20,8 @@ handle_interrupt()
 }
 trap cleanup_temp EXIT INT TERM
 trap handle_interrupt INT TERM
+# 任何未预期失败都打印出错位置，便于定位静默退出
+trap 'rc=$?; if [ "${BASH_SUBSHELL:-0}" -eq 0 ]; then printf "\n[ERROR] 脚本未预期失败\n  行号: %s\n  函数: %s\n  命令: %s\n  状态: %s\n" "$LINENO" "${FUNCNAME[0]:-main}" "$BASH_COMMAND" "$rc" >&2; fi' ERR
 
 
 
@@ -3960,6 +3962,7 @@ init_web()
 update_cloudreve()
 {
     green "正在安装/更新Cloudreve。。。"
+    printf '[DEBUG] update_cloudreve: 开始，prefix=%s\n' "$cloudreve_prefix" >&2
     local temp_cloudreve_status=0
     systemctl -q is-active cloudreve 2>/dev/null && temp_cloudreve_status=1 || true
     safe_stop cloudreve
@@ -3968,9 +3971,11 @@ update_cloudreve()
         yellow "按回车键继续或者按Ctrl+c终止"
         read -r -s -n 1 || true
     fi
+    printf '[DEBUG] update_cloudreve: 下载完成，开始解压\n' >&2
     tar -zxf "$cloudreve_prefix/cloudreve.tar.gz" -C "$cloudreve_prefix" cloudreve
     rm -f "$cloudreve_prefix/cloudreve.tar.gz"
     chmod +x "$cloudreve_prefix/cloudreve"
+    printf '[DEBUG] update_cloudreve: 二进制就绪\n' >&2
 cat > $cloudreve_prefix/conf.ini << EOF
 [System]
 Mode = master
@@ -4004,10 +4009,12 @@ StandardError=syslog
 [Install]
 WantedBy=multi-user.target
 EOF
+    printf '[DEBUG] update_cloudreve: 配置与 systemd 单元已写入，执行 daemon-reload\n' >&2
     systemctl daemon-reload
     if [ $temp_cloudreve_status -eq 1 ]; then
         systemctl start cloudreve
     fi
+    printf '[DEBUG] update_cloudreve: 完成\n' >&2
 }
 install_init_cloudreve()
 {
@@ -4016,12 +4023,15 @@ install_init_cloudreve()
     chmod 0700 $cloudreve_prefix
     update_cloudreve
     rm -rf /dev/shm/cloudreve
+    printf '[DEBUG] install_init_cloudreve: 开始获取初始管理员密码\n' >&2
     local password=""
     # 首次运行 cloudreve 以生成初始管理员密码；取不到该字段时不应中断安装
     password="$("$cloudreve_prefix/cloudreve" | grep "password" | awk '{print $6}' || true)"
+    printf '[DEBUG] install_init_cloudreve: 密码提取结束\n' >&2
     sleep 1s
     systemctl start cloudreve
     systemctl enable cloudreve
+    printf '[DEBUG] install_init_cloudreve: cloudreve 服务已启动\n' >&2
     tyblue "-------- 请打开\"https://${domain_list[$1]}\"进行Cloudreve初始化 -------"
     tyblue "  1. 登陆帐号"
     purple "    初始管理员账号：admin@cloudreve.org"
