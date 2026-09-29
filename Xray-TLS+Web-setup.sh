@@ -1541,7 +1541,7 @@ install_bbr()
             do
                 if [[ "${kernel_list_image[$i]}" =~ "$kernel_now" ]]; then
                     unset 'kernel_list_image[$i]'
-                    ((ok_install++))
+                    ((ok_install++)) || true
                 fi
             done
             if [ $ok_install -lt 1 ]; then
@@ -1582,7 +1582,7 @@ install_bbr()
             do
                 if [[ "${kernel_list[$i]}" =~ "$kernel_now" ]]; then
                     unset 'kernel_list[$i]'
-                    ((ok_install++))
+                    ((ok_install++)) || true
                 fi
             done
             if [ $ok_install -lt 1 ]; then
@@ -4924,7 +4924,7 @@ add_domain()
     local i
     for ((i=${#domain_list[@]}-1; i!=0;))
     do
-        ((i--))
+        ((i--)) || true
         if [ "${domain_list[-1]}" == "${domain_list[$i]}" ] || [ "${domain_list[-1]}" == "${true_domain_list[$i]}" ] || [ "${true_domain_list[-1]}" == "${domain_list[$i]}" ] || [ "${true_domain_list[-1]}" == "${true_domain_list[$i]}" ]; then
             red "域名已存在！"
             return 1
@@ -4988,7 +4988,7 @@ delete_domain()
         read -p "你的选择是：" delete
     done
     [ $delete -eq 0 ] && return 0
-    ((delete--))
+    ((delete--)) || true
     if [ "${pretend_list[$delete]}" == "2" ]; then
         red "警告：此操作可能导致该域名下的Nextcloud网盘数据被删除"
         ask_if "是否要继续？[y/n]" || return 0
@@ -5042,7 +5042,7 @@ change_pretend()
             read -p "你的选择是：" change
         done
         [ $change -eq 0 ] && return 0
-        ((change--))
+        ((change--)) || true
     fi
     local pretend
     readPretend "${true_domain_list[$change]}"
@@ -5692,7 +5692,7 @@ view_xray_merged_config()
                 else
                     yellow "  $i. $fname [用户自定义]"
                 fi
-                ((i++))
+                ((i++)) || true
             done
             echo
 
@@ -6427,21 +6427,21 @@ generate_qrcode()
         # REALITY 二维码
         local link=$(generate_vless_share_link 1)
         if qrencode -o "${qr_dir}/reality.png" -s 10 -m 2 "$link" 2>/dev/null; then
-            ((count++))
+            ((count++)) || true
             green "  ✓ REALITY: ${qr_dir}/reality.png"
         fi
         
         # Trojan 二维码
         local link=$(generate_trojan_share_link)
         if qrencode -o "${qr_dir}/trojan.png" -s 10 -m 2 "$link" 2>/dev/null; then
-            ((count++))
+            ((count++)) || true
             green "  ✓ Trojan:  ${qr_dir}/trojan.png"
         fi
         
         # XHTTP 二维码
         local link=$(generate_vless_share_link 3)
         if qrencode -o "${qr_dir}/xhttp.png" -s 10 -m 2 "$link" 2>/dev/null; then
-            ((count++))
+            ((count++)) || true
             green "  ✓ XHTTP:   ${qr_dir}/xhttp.png"
         fi
         
