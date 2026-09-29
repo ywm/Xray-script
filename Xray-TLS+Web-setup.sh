@@ -4025,8 +4025,18 @@ install_init_cloudreve()
     rm -rf /dev/shm/cloudreve
     printf '[DEBUG] install_init_cloudreve: 开始获取初始管理员密码\n' >&2
     local password=""
-    # 首次运行 cloudreve 以生成初始管理员密码；取不到该字段时不应中断安装
-    password="$("$cloudreve_prefix/cloudreve" | grep "password" | awk '{print $6}' || true)"
+    # cloudreve 首次运行会生成初始管理员密码，之后作为服务常驻不退出，
+    # 因此限时运行并把输出写入文件后再提取，避免命令替换一直等待
+    local cloudreve_init_log="${cloudreve_prefix}/cloudreve_init.log"
+    # cloudreve 的数据库/配置按当前目录解析，必须与 systemd 单元的 WorkingDirectory 一致，
+    # 否则生成的初始密码属于另一个数据库，与随后启动的服务对不上
+    ( cd "$cloudreve_prefix" && timeout -k 5 15 ./cloudreve ) > "$cloudreve_init_log" 2>&1 || true
+    printf '[DEBUG] install_init_cloudreve: 初始化输出已记录到 %s\n' "$cloudreve_init_log" >&2
+    # 密码行形如 "... password: xxxx"，取冒号后的内容
+    local password_line=""
+    password_line="$(grep -i "password" "$cloudreve_init_log" 2>/dev/null | head -n 1 || true)"
+    printf '[DEBUG] install_init_cloudreve: 密码行: %s\n' "$password_line" >&2
+    password="$(printf '%s' "$password_line" | sed 's/.*[Pp]assword[^:]*:[[:space:]]*//' | tr -d '\r' || true)"
     printf '[DEBUG] install_init_cloudreve: 密码提取结束\n' >&2
     sleep 1s
     systemctl start cloudreve
