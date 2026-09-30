@@ -5981,6 +5981,7 @@ proxies:
     reality-opts:
       public-key: "${reality_password}"
       short-id: "${first_short_id}"
+      support-x25519mlkem768: true
 
   - name: "Trojan-TLS"
     type: trojan
