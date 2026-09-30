@@ -21,7 +21,7 @@ handle_interrupt()
 trap cleanup_temp EXIT INT TERM
 trap handle_interrupt INT TERM
 # 任何未预期失败都打印出错位置，便于定位静默退出
-trap 'rc=$?; if [ "${BASH_SUBSHELL:-0}" -eq 0 ]; then printf "\n[ERROR] 脚本未预期失败\n  行号: %s\n  函数: %s\n  命令: %s\n  状态: %s\n" "$LINENO" "${FUNCNAME[0]:-main}" "$BASH_COMMAND" "$rc" >&2; fi' ERR
+trap 'rc=$?; if [ "${BASH_SUBSHELL:-0}" -eq 0 ]; then printf "\n[ERROR] 脚本未预期失败\n  行号: %s\n  函数: %s\n  状态: %s\n" "$LINENO" "${FUNCNAME[0]:-main}" "$rc" >&2; fi' ERR
 
 
 
@@ -2979,12 +2979,10 @@ sync_cf_to_acme_sh()
 
     local account_conf="$HOME/.acme.sh/account.conf"
     if [ -f "$account_conf" ] && grep -q "^SAVED_CF_Email=" "$account_conf" && grep -q "^SAVED_CF_Key=" "$account_conf"; then
-        printf '[DEBUG] sync_cf_to_acme_sh: credentials already saved\n' >&2
         return 0
     fi
 
     if write_cf_to_acme_account_conf "$CF_Email" "$CF_Key"; then
-        printf '[DEBUG] sync_cf_to_acme_sh: credentials saved to account.conf\n' >&2
         return 0
     fi
 
@@ -2998,11 +2996,9 @@ sync_cf_to_acme_sh()
 read_cf_api()
 {
     local cf_api_file="${nginx_prefix}/certs/cf_api.conf"
-    printf '[DEBUG] read_cf_api: starting; credential_file=%s\n' "$cf_api_file" >&2
 
     # 如果文件已存在，加载变量并同步到 acme.sh account.conf
     if [ -f "$cf_api_file" ]; then
-        printf '[DEBUG] read_cf_api: loading saved credentials\n' >&2
         # 凭据文件损坏时不应中断安装，加载期间临时关闭 errexit
         local source_rc=0
         set +e
@@ -3011,14 +3007,12 @@ read_cf_api()
         set -e
         if [ $source_rc -eq 0 ] && [ -n "${CF_Email:-}" ] && [ -n "${CF_Key:-}" ]; then
             export CF_Email CF_Key
-            printf '[DEBUG] read_cf_api: saved credentials loaded\n' >&2
             sync_cf_to_acme_sh
             return 0
         fi
         printf '[WARN] read_cf_api: saved credential file unusable; asking again\n' >&2
     fi
 
-    printf '[DEBUG] read_cf_api: no saved credentials; prompting\n' >&2
     echo -e "\n"
     tyblue "-------------------- Cloudflare API 配置 --------------------"
     tyblue " 申请泛域名证书需要通过 DNS 验证，请提供您的 Global API Key。"
@@ -3030,35 +3024,28 @@ read_cf_api()
     do
         read -p "请输入 Cloudflare 注册邮箱: " cf_email
     done
-    
-    printf '[DEBUG] read_cf_api: received email input\n' >&2
 
     local cf_key=""
     while [ -z "$cf_key" ]
     do
         read -p "请输入 Cloudflare Global API Key: " cf_key
     done
-    printf '[DEBUG] read_cf_api: received API key input (value hidden)\n' >&2
 
     # 凭据先进入当前环境，保证本次证书申请一定可用
     CF_Email="$cf_email"
     CF_Key="$cf_key"
     export CF_Email CF_Key
-    printf '[DEBUG] read_cf_api: credentials loaded into environment\n' >&2
 
     # 写入文件方便下次自动加载（失败只影响下次免输入，不影响本次申请）
-    if mkdir -p "${nginx_prefix}/certs" \
-        && printf 'export CF_Email=%q\n' "$cf_email" > "$cf_api_file" \
-        && printf 'export CF_Key=%q\n' "$cf_key" >> "$cf_api_file" \
-        && chmod 600 "$cf_api_file"; then
-        printf '[DEBUG] read_cf_api: credential file written and secured\n' >&2
-    else
+    if ! mkdir -p "${nginx_prefix}/certs" \
+        || ! printf 'export CF_Email=%q\n' "$cf_email" > "$cf_api_file" \
+        || ! printf 'export CF_Key=%q\n' "$cf_key" >> "$cf_api_file" \
+        || ! chmod 600 "$cf_api_file"; then
         printf '[WARN] read_cf_api: cannot save credential file %s\n' "$cf_api_file" >&2
     fi
 
     # 同步写入 acme.sh 的 account.conf，确保自动续期能正常工作
     sync_cf_to_acme_sh
-    printf '[DEBUG] read_cf_api: complete\n' >&2
 }
 
 
@@ -3096,12 +3083,10 @@ get_cert()
     green "证书不存在或已过期，开始申请泛域名证书..."
 
     # 获取 CF 凭据
-    printf '[DEBUG] get_cert: reading Cloudflare credentials\n' >&2
     if ! read_cf_api; then
         red "读取或保存 Cloudflare API 配置失败"
         return 1
     fi
-    printf '[DEBUG] get_cert: Cloudflare credentials ready; proceeding to ACME\n' >&2
 
     # 准备申请环境 - 临时停止 xray 以避免配置冲突
     local xray_was_running=0
@@ -3125,9 +3110,7 @@ get_cert()
     fi
 
     # 申请成功说明凭据有效，此时才写入 acme.sh，覆盖可能存在的旧凭据供自动续期使用
-    if write_cf_to_acme_account_conf "${CF_Email:-}" "${CF_Key:-}"; then
-        printf '[DEBUG] get_cert: credentials saved to account.conf after successful issuance\n' >&2
-    else
+    if ! write_cf_to_acme_account_conf "${CF_Email:-}" "${CF_Key:-}"; then
         printf '[WARN] get_cert: cannot save credentials to account.conf; auto-renew may need manual setup\n' >&2
     fi
 
@@ -3962,7 +3945,6 @@ init_web()
 update_cloudreve()
 {
     green "正在安装/更新Cloudreve。。。"
-    printf '[DEBUG] update_cloudreve: 开始，prefix=%s\n' "$cloudreve_prefix" >&2
     local temp_cloudreve_status=0
     systemctl -q is-active cloudreve 2>/dev/null && temp_cloudreve_status=1 || true
     safe_stop cloudreve
@@ -3971,11 +3953,9 @@ update_cloudreve()
         yellow "按回车键继续或者按Ctrl+c终止"
         read -r -s -n 1 || true
     fi
-    printf '[DEBUG] update_cloudreve: 下载完成，开始解压\n' >&2
     tar -zxf "$cloudreve_prefix/cloudreve.tar.gz" -C "$cloudreve_prefix" cloudreve
     rm -f "$cloudreve_prefix/cloudreve.tar.gz"
     chmod +x "$cloudreve_prefix/cloudreve"
-    printf '[DEBUG] update_cloudreve: 二进制就绪\n' >&2
 cat > $cloudreve_prefix/conf.ini << EOF
 [System]
 Mode = master
@@ -4009,12 +3989,10 @@ StandardError=syslog
 [Install]
 WantedBy=multi-user.target
 EOF
-    printf '[DEBUG] update_cloudreve: 配置与 systemd 单元已写入，执行 daemon-reload\n' >&2
     systemctl daemon-reload
     if [ $temp_cloudreve_status -eq 1 ]; then
         systemctl start cloudreve
     fi
-    printf '[DEBUG] update_cloudreve: 完成\n' >&2
 }
 install_init_cloudreve()
 {
@@ -4023,7 +4001,6 @@ install_init_cloudreve()
     chmod 0700 $cloudreve_prefix
     update_cloudreve
     rm -rf /dev/shm/cloudreve
-    printf '[DEBUG] install_init_cloudreve: 开始获取初始管理员密码\n' >&2
     local password=""
     # cloudreve 首次运行会生成初始管理员密码，之后作为服务常驻不退出，
     # 因此限时运行并把输出写入文件后再提取，避免命令替换一直等待
@@ -4031,17 +4008,13 @@ install_init_cloudreve()
     # cloudreve 的数据库/配置按当前目录解析，必须与 systemd 单元的 WorkingDirectory 一致，
     # 否则生成的初始密码属于另一个数据库，与随后启动的服务对不上
     ( cd "$cloudreve_prefix" && timeout -k 5 15 ./cloudreve ) > "$cloudreve_init_log" 2>&1 || true
-    printf '[DEBUG] install_init_cloudreve: 初始化输出已记录到 %s\n' "$cloudreve_init_log" >&2
     # 密码行形如 "... password: xxxx"，取冒号后的内容
     local password_line=""
     password_line="$(grep -i "password" "$cloudreve_init_log" 2>/dev/null | head -n 1 || true)"
-    printf '[DEBUG] install_init_cloudreve: 密码行: %s\n' "$password_line" >&2
     password="$(printf '%s' "$password_line" | sed 's/.*[Pp]assword[^:]*:[[:space:]]*//' | tr -d '\r' || true)"
-    printf '[DEBUG] install_init_cloudreve: 密码提取结束\n' >&2
     sleep 1s
     systemctl start cloudreve
     systemctl enable cloudreve
-    printf '[DEBUG] install_init_cloudreve: cloudreve 服务已启动\n' >&2
     tyblue "-------- 请打开\"https://${domain_list[$1]}\"进行Cloudreve初始化 -------"
     tyblue "  1. 登陆帐号"
     purple "    初始管理员账号：admin@cloudreve.org"
