@@ -4,7 +4,11 @@ set -Eeuo pipefail
 # 清理临时文件 trap
 cleanup_temp() {
     if [[ -n "${temp_dir:-}" ]] && [[ -d "$temp_dir" ]]; then
-        rm -rf "$temp_dir"
+        if [[ "${preserve_domain_backup:-0}" -eq 1 ]]; then
+            printf '\n[WARN] 网站备份尚未恢复，保留临时目录: %s\n' "$temp_dir" >&2
+        else
+            rm -rf "$temp_dir"
+        fi
     fi
     # 清理根目录可能的残留临时文件
     rm -f /temp.c /temp.cpp 2>/dev/null || true
@@ -542,6 +546,17 @@ fedora_install_remi()
 enter_temp_dir()
 {
     local temp_exit_code=0
+    local backup_entry
+    # 上次更新失败留下的网站备份不能在重试时被删除。
+    for backup_entry in "$temp_dir/domain_backup/"* "$temp_dir/domain_backup/".[!.]* "$temp_dir/domain_backup/"..?*
+    do
+        if [[ -e "$backup_entry" || -L "$backup_entry" ]]; then
+            preserve_domain_backup=1
+            red "发现尚未恢复的网站备份，停止更新: ${temp_dir}/domain_backup"
+            yellow "请先恢复或另存备份，再移除该备份目录后重试"
+            exit 1
+        fi
+    done
     cd / || temp_exit_code=1
     rm -rf "$temp_dir" || temp_exit_code=1
     mkdir "$temp_dir" || temp_exit_code=1
@@ -757,16 +772,58 @@ remove_cloudreve()
 #备份域名伪装网站
 backup_domains_web()
 {
-    local i
+    local i source_path
     mkdir "${temp_dir}/domain_backup"
-    for i in ${true_domain_list[@]:-}
+    # 备份开始后，任何中途失败都必须保留尚未恢复的网站数据。
+    preserve_domain_backup=1
+    for i in "${true_domain_list[@]:-}"
     do
+        [[ -n "$i" ]] || continue
+        source_path="${nginx_prefix}/html/${i}"
+        if [[ ! -e "$source_path" && ! -L "$source_path" ]]; then
+            yellow "网站目录不存在，跳过备份: ${source_path}"
+            continue
+        fi
         if [ "${1:-}" == "cp" ]; then
-            cp -rf "${nginx_prefix}/html/${i}" "${temp_dir}/domain_backup" 2>/dev/null || true
+            if ! cp -rf "$source_path" "${temp_dir}/domain_backup"; then
+                red "网站备份失败，更新中止: ${source_path}"
+                return 1
+            fi
         else
-            mv "${nginx_prefix}/html/${i}" "${temp_dir}/domain_backup" 2>/dev/null || true
+            if ! mv "$source_path" "${temp_dir}/domain_backup"; then
+                red "网站备份失败，更新中止: ${source_path}"
+                return 1
+            fi
         fi
     done
+    return 0
+}
+# 恢复域名伪装网站；空备份是正常情况，实际恢复失败则保留备份。
+restore_domains_web()
+{
+    local backup_dir="${temp_dir}/domain_backup"
+    local entry count=0
+    preserve_domain_backup=1
+    if [[ ! -d "$backup_dir" ]]; then
+        red "网站备份目录不存在，更新中止: ${backup_dir}"
+        return 1
+    fi
+    for entry in "$backup_dir/"* "$backup_dir/".[!.]* "$backup_dir/"..?*
+    do
+        [[ -e "$entry" || -L "$entry" ]] || continue
+        if ! mv "$entry" "${nginx_prefix}/html/"; then
+            red "网站恢复失败，更新中止；剩余备份保留在: ${backup_dir}"
+            return 1
+        fi
+        count=$((count + 1))
+    done
+    preserve_domain_backup=0
+    if [[ "$count" -eq 0 ]]; then
+        yellow "没有需要恢复的本地网站备份，跳过恢复"
+    else
+        green "已恢复 ${count} 个网站备份"
+    fi
+    return 0
 }
 #获取配置信息
 get_config_info()
@@ -4462,7 +4519,9 @@ install_update_xray_tls_web()
         cp -r "${temp_dir}/certs_backup/"* "${nginx_prefix}/certs/" 2>/dev/null
     fi
 
-    [[ $update -eq 1 ]] && [ $use_existed_nginx -eq 0 ] && mv "${temp_dir}/domain_backup/"* ${nginx_prefix}/html 2>/dev/null
+    if [[ $update -eq 1 ]] && [ $use_existed_nginx -eq 0 ]; then
+        restore_domains_web
+    fi
 
     # 安装/更新 Xray (如果还没安装)
     if [[ $update -eq 1 ]] || [ $xray_is_installed -eq 0 ]; then
@@ -4699,7 +4758,7 @@ check_update_update_nginx()
         red "nginx 配置生成失败，更新中止"
         return 1
     fi
-    mv "${temp_dir}/domain_backup/"* ${nginx_prefix}/html 2>/dev/null
+    restore_domains_web
     get_all_certs
     if [ $nginx_status -eq 1 ]; then
         systemctl restart nginx
