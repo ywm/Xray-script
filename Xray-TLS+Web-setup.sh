@@ -45,7 +45,7 @@ unset ssh_service
 
 #安装配置信息
 nginx_version="nginx-1.31.6"
-openssl_version="openssl-3.6.4"
+openssl_version="openssl-3.6.5"
 nginx_prefix="/usr/local/nginx"
 nginx_config="${nginx_prefix}/conf/nginx.conf"
 nginx_service="/etc/systemd/system/nginx.service"
