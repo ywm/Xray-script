@@ -5921,9 +5921,9 @@ EOF
     "xhttpSettings": {
       "path": "$path",
       "host": "$xhttp_domain",
-      "xPaddingBytes": "$xhttp_padding",
-      "noGRPCHeader": $xhttp_grpc_header,
       "extra": {
+        "xPaddingBytes": "$xhttp_padding",
+        "noGRPCHeader": $xhttp_grpc_header,
         "xmux": {
           "maxConcurrency": "$xhttp_xmux_max_concurrency",
           "hMaxRequestTimes": "$xhttp_xmux_request_times",
