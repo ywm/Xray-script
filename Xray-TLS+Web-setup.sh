@@ -3402,12 +3402,17 @@ add_ssl_server_block()
     local listen_sock="$1"
     local server_name="$2"
     local comment="$3"
+    local listen_options="ssl proxy_protocol"
+    # Trojan 回落已由 Xray 解密，后端只接收 PROXY 头和明文应用数据。
+    if [[ "$listen_sock" == "/dev/shm/nginx/trojan_web.sock" ]]; then
+        listen_options="proxy_protocol"
+    fi
 
     cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
 
 # ${comment}
 server {
-    listen unix:${listen_sock} ssl proxy_protocol;
+    listen unix:${listen_sock} ${listen_options};
     http2 on;
 EOF
 
