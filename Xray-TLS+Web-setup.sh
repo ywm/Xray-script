@@ -5684,18 +5684,18 @@ view_xray_merged_config()
     yellow "提示: 用户自定义配置请使用其他编号 (如 30_, 40_, 55_ 等)"
     echo
     
-    tyblue "-------------请选择操作-------------"
-    tyblue " 1. 查看合并后的完整配置"
-    tyblue " 2. 查看单个配置文件"
-    tyblue " 3. 验证配置是否正确"
-    tyblue " 4. 列出所有配置文件"
-    tyblue " 5. 备份用户自定义配置"
-    tyblue " 6. 查看配置文件编号说明"
-    yellow " 0. 返回主菜单"
-    echo
-
     # ========== 主循环 - 操作后返回菜单而不是退出 ==========
     while true; do
+        tyblue "-------------请选择操作-------------"
+        tyblue " 1. 查看合并后的完整配置"
+        tyblue " 2. 查看单个配置文件"
+        tyblue " 3. 验证配置是否正确"
+        tyblue " 4. 列出所有配置文件"
+        tyblue " 5. 备份用户自定义配置"
+        tyblue " 6. 查看配置文件编号说明"
+        yellow " 0. 返回主菜单"
+        echo
+
         local choice=""
         while [[ ! "$choice" =~ ^(0|[1-6])$ ]]
         do
