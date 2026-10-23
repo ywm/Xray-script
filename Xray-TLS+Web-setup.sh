@@ -86,8 +86,8 @@ xhttp_sse_header=false                     # false=启用 SSE 伪装，true=关�
 xhttp_streamup_keepalive="20-80"           # stream-up 模式保活间隔秒（随机范围）
 
 # XHTTP XMUX 配置（服务端默认值）
-xhttp_xmux_max_concurrency="16-32"
-xhttp_xmux_max_connections="0"
+xhttp_xmux_max_concurrency="0"
+xhttp_xmux_max_connections="3"
 xhttp_xmux_c_reuse_times="0"
 xhttp_xmux_request_times="600-900"
 xhttp_xmux_reusable_secs="1800-3000"
@@ -5926,6 +5926,7 @@ EOF
         "noGRPCHeader": $xhttp_grpc_header,
         "xmux": {
           "maxConcurrency": "$xhttp_xmux_max_concurrency",
+          "maxConnections": "$xhttp_xmux_max_connections",
           "hMaxRequestTimes": "$xhttp_xmux_request_times",
           "hMaxReusableSecs": "$xhttp_xmux_reusable_secs"
         }
@@ -6124,6 +6125,7 @@ proxies:
         encryption: "${xhttp_encryption:-none}"
         reuse-settings:
           max-concurrency: "${xhttp_xmux_max_concurrency}"
+          max-connections: "${xhttp_xmux_max_connections}"
           h-max-request-times: "${xhttp_xmux_request_times}"
           h-max-reusable-secs: "${xhttp_xmux_reusable_secs}"
 
