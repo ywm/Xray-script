@@ -3209,9 +3209,19 @@ get_all_certs()
     done
 }
 
+validate_xhttp_path()
+{
+    if [[ ! "${1:-}" =~ ^(/[a-zA-Z0-9_-]+)+/?$ ]]; then
+        red "XHTTP path 无效：请使用 / 开头的字母、数字、下划线或短横线路径"
+        return 1
+    fi
+}
+
 #nginx 配置
 config_nginx()
 {
+    validate_xhttp_path "${path:-}" || return 1
+    local xhttp_path_base="${path%/}"
     # 检查域名列表是否有效 - 需要至少3个域名 (REALITY, Trojan, XHTTP)
     if [[ ${#domain_list[@]} -lt 3 ]]; then
         red "错误: 域名列表不完整 (需要3个域名，当前: ${#domain_list[@]})"
@@ -3283,7 +3293,7 @@ stream {
     }
     
     upstream xhttp {
-        server unix:/dev/shm/xray/xhttp_entry.sock;
+        server unix:/dev/shm/nginx/xhttp_web.sock;
     }
     
     upstream web {
@@ -3320,6 +3330,11 @@ http {
         CN         0;
         CLOUDFLARE 0;
         CLOUDFRONT 0;
+    }
+
+    map "\$blocked_country:\$uri" \$blocked_country_xhttp {
+        default \$blocked_country;
+        ~^1:${xhttp_path_base}(/|$) 0;
     }
 
     # HTTP 80 重定向到主域名的伪装站
@@ -3403,6 +3418,10 @@ add_ssl_server_block()
     local server_name="$2"
     local comment="$3"
     local listen_options="ssl proxy_protocol"
+    local country_variable='$blocked_country'
+    if [[ "$listen_sock" == "/dev/shm/nginx/xhttp_web.sock" ]]; then
+        country_variable='$blocked_country_xhttp'
+    fi
     # Trojan 回落已由 Xray 解密，后端只接收 PROXY 头和明文应用数据。
     if [[ "$listen_sock" == "/dev/shm/nginx/trojan_web.sock" ]]; then
         listen_options="proxy_protocol"
@@ -3440,9 +3459,27 @@ EOF
 
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
     include ${nginx_prefix}/custom.d/location.conf;
-    if (\$blocked_country) { return 403; }
+    if (${country_variable}) { return 403; }
 
 EOF
+    if [[ "$listen_sock" == "/dev/shm/nginx/xhttp_web.sock" ]]; then
+        local xhttp_path_base="${path%/}"
+        local location_match
+        for location_match in "= ${xhttp_path_base}" "^~ ${xhttp_path_base}/"; do
+            cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
+    location ${location_match} {
+        grpc_pass grpc://unix:/dev/shm/xray/xhttp.sock;
+        grpc_set_header Host \$http_host;
+        grpc_set_header X-Forwarded-For \$remote_addr;
+        grpc_set_header X-Xray-Trusted-Proxy "1";
+        grpc_read_timeout 3600s;
+        grpc_send_timeout 3600s;
+        client_max_body_size 0;
+    }
+
+EOF
+        done
+    fi
     add_pretend_config_to_file
     echo "}" >> ${nginx_prefix}/conf/nginx.conf
 }
@@ -3710,6 +3747,10 @@ xray_safe_restart()
 # 安全重启 Xray 和 Nginx
 xray_nginx_safe_restart()
 {
+    if ! "${nginx_prefix}/sbin/nginx" -t; then
+        red "Nginx 配置验证失败，取消重启"
+        return 1
+    fi
     # 验证 xray 配置
     if ! xray_test_config; then
         red "Xray 配置验证失败，取消重启"
@@ -3847,67 +3888,10 @@ EOF
 # 生成 XHTTP Inbound 配置文件
 generate_xhttp_inbound_file()
 {
+    validate_xhttp_path "${path:-}" || return 1
     cat > "$xray_config_inbound_xhttp" <<EOF
 {
     "inbounds": [
-        {
-            "tag": "xhttp-entry-in",
-            "listen": "/dev/shm/xray/xhttp_entry.sock,0666",
-            "protocol": "vless",
-            "settings": {
-                "clients": [
-                    {
-                        "id": "$xid_3",
-                        "email": "xhttp-entry@local"
-                    }
-                ],
-                "decryption": "none",
-                "fallbacks": [
-                    {
-                        "path": "$path",
-                        "dest": "/dev/shm/xray/xhttp.sock",
-                        "xver": 1
-                    },
-                    {
-                        "alpn": "h2",
-                        "dest": "/dev/shm/xray/xhttp.sock",
-                        "xver": 1
-                    },
-                    {
-                        "alpn": "h3",
-                        "dest": "/dev/shm/xray/xhttp.sock",
-                        "xver": 1
-                    },
-                    {
-                        "dest": "/dev/shm/nginx/xhttp_web.sock",
-                        "xver": 1
-                    }
-                ]
-            },
-            "streamSettings": {
-                "network": "raw",
-                "security": "tls",
-                "tlsSettings": {
-                    "certificates": [
-                        {
-                            "certificateFile": "${nginx_prefix}/certs/${true_domain_list[0]}.cer",
-                            "keyFile": "${nginx_prefix}/certs/${true_domain_list[0]}.key"
-                        }
-                    ],
-                    "alpn": ["h3", "h2", "http/1.1"],
-                    "minVersion": "1.2",
-                    "maxVersion": "1.3"
-                },
-                "rawSettings": {
-                    "acceptProxyProtocol": true
-                }
-            },
-            "sniffing": {
-                "enabled": true,
-                "destOverride": ["http", "tls", "quic"],
-                "routeOnly": true
-            }
-        },
         {
             "tag": "xhttp-in",
             "listen": "/dev/shm/xray/xhttp.sock,0666",
@@ -3944,7 +3928,7 @@ generate_xhttp_inbound_file()
                     }
                 },
                 "sockopt": {
-                    "acceptProxyProtocol": true
+                    "trustedXForwardedFor": ["X-Xray-Trusted-Proxy"]
                 }
             },
             "sniffing": {
@@ -4612,9 +4596,14 @@ EOF
     safe_stop cloudreve
     
     # 验证并重启
+    if ! "${nginx_prefix}/sbin/nginx" -t; then
+        red "Nginx 配置验证失败，取消重启"
+        return 1
+    fi
     if ! xray_test_config; then
         red "Xray 配置验证失败！"
         yellow "请检查配置文件: $xray_config_dir"
+        return 1
     else
         systemctl restart xray nginx
     fi
@@ -5112,9 +5101,10 @@ change_pretend()
         [ "$pretend" == "1" ] && check_SELinux
         install_web_dependence "$pretend"
     fi
-    config_nginx
+    config_nginx || return 1
+    generate_xhttp_inbound_file || return 1
     safe_stop php-fpm cloudreve
-    systemctl restart nginx
+    xray_nginx_safe_restart || return 1
     init_web "$change"
     green "修改完成！"
 }
@@ -5285,17 +5275,20 @@ change_xray_path()
         path=""
         while [ -z "$path" ]
         do
-            tyblue "---------------请输入新的path[/+字母数字组合]---------------"
-            read path
+            tyblue "---------------请输入新的path[/+字母数字、下划线或短横线，可分段]---------------"
+            IFS= read -r path
+            if ! validate_xhttp_path "$path"; then
+                path=""
+            fi
         done
         tyblue "您输入的path是：$path"
         ask_if "是否确定?[y/n]" && break
     done
     # 只更新 XHTTP 配置文件
-    generate_xhttp_inbound_file
+    generate_xhttp_inbound_file || return 1
     green "已更新 XHTTP 配置文件: $xray_config_inbound_xhttp"
-    config_nginx
-    xray_nginx_safe_restart
+    config_nginx || return 1
+    xray_nginx_safe_restart || return 1
     green "更换成功！！"
     print_config_info
 }
@@ -6298,9 +6291,9 @@ UUID: ${xid_3}
 架构说明:
   客户端 → 443端口(Nginx SNI分流)
          → 识别域名"${domain_list[2]}"
-         → Unix Socket → Xray TLS终止
-         → 匹配路径"${path}": 进入XHTTP处理
-         → 不匹配路径: 回落到伪装网站
+         → Unix Socket → Nginx TLS终止
+         → 匹配路径"${path}": grpc_pass → Xray XHTTP
+         → 不匹配路径: 由 Nginx 提供伪装网站
 
 CDN 配置(可选):
   如需使用CDN隐藏真实IP:
