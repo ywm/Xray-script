@@ -79,7 +79,8 @@ xhttp_cdn_domain=""
 
 
 # XHTTP 高级参数（服务端默认值，可根据需要调整）
-xhttp_mode="packet-up"                     # packet-up (CDN穿透最佳) / stream-up / stream-one / auto
+xhttp_server_mode="auto"                  # packet-up / stream-up / stream-one / auto
+xhttp_client_mode="packet-up"             # packet-up (CDN穿透最佳) / stream-up / stream-one / auto
 xhttp_padding="100-1000"                   # header padding 随机字节范围
 xhttp_grpc_header=false                    # false=启用 gRPC 伪装，true=关闭
 xhttp_sse_header=false                     # false=启用 SSE 伪装，true=关闭
@@ -3469,7 +3470,7 @@ EOF
             cat >> ${nginx_prefix}/conf/nginx.conf <<EOF
     location ${location_match} {
         grpc_pass grpc://unix:/dev/shm/xray/xhttp.sock;
-        grpc_set_header Host \$http_host;
+        grpc_set_header Host \$host;
         grpc_set_header X-Forwarded-For \$remote_addr;
         grpc_set_header X-Xray-Trusted-Proxy "1";
         grpc_read_timeout 3600s;
@@ -3909,9 +3910,10 @@ generate_xhttp_inbound_file()
                 "network": "xhttp",
                 "xhttpSettings": {
                     "path": "$path",
-                    "mode": "$xhttp_mode",
+                    "mode": "$xhttp_server_mode",
                     "extra": {
                       "xPaddingBytes": "$xhttp_padding",
+                      "xPaddingObfsMode": true,
                       "noGRPCHeader": $xhttp_grpc_header,
                       "noSSEHeader": $xhttp_sse_header,
                       "scStreamUpServerSecs": "$xhttp_streamup_keepalive",
@@ -5864,6 +5866,7 @@ generate_vless_share_link()
         local extra_base_json=$(cat <<EOF
 {
   "xPaddingBytes": "$xhttp_padding",
+  "xPaddingObfsMode": true,
   "noGRPCHeader": $xhttp_grpc_header,
   "xmux": {
     "maxConcurrency": "$xhttp_xmux_max_concurrency",
@@ -5879,7 +5882,7 @@ EOF
 
         # 第一条：普通 XHTTP (上下行同线路)
         local link_normal="vless://${xid_3}@${server_address}:443"
-        link_normal+="?type=xhttp&security=tls&fp=chrome&alpn=${encoded_alpn}&sni=${xhttp_domain}&host=${xhttp_domain}&path=${encoded_path}&mode=${xhttp_mode}"
+        link_normal+="?type=xhttp&security=tls&fp=chrome&alpn=${encoded_alpn}&sni=${xhttp_domain}&host=${xhttp_domain}&path=${encoded_path}&mode=${xhttp_client_mode}"
         if [ -n "$xhttp_encryption" ]; then
             link_normal+="&encryption=$(urlencode "$xhttp_encryption")"
         fi
@@ -5893,6 +5896,7 @@ EOF
         local extra_split_json=$(cat <<EOF
 {
   "xPaddingBytes": "$xhttp_padding",
+  "xPaddingObfsMode": true,
   "noGRPCHeader": $xhttp_grpc_header,
   "xmux": {
     "maxConcurrency": "$xhttp_xmux_max_concurrency",
@@ -5916,6 +5920,7 @@ EOF
       "host": "$xhttp_domain",
       "extra": {
         "xPaddingBytes": "$xhttp_padding",
+        "xPaddingObfsMode": true,
         "noGRPCHeader": $xhttp_grpc_header,
         "xmux": {
           "maxConcurrency": "$xhttp_xmux_max_concurrency",
@@ -5932,7 +5937,7 @@ EOF
         local encoded_extra_split=$(urlencode "$extra_split_json")
 
         local link_split="vless://${xid_3}@${server_address}:443"
-        link_split+="?type=xhttp&security=tls&fp=chrome&alpn=${encoded_alpn}&sni=${xhttp_domain}&host=${xhttp_domain}&path=${encoded_path}&mode=${xhttp_mode}"
+        link_split+="?type=xhttp&security=tls&fp=chrome&alpn=${encoded_alpn}&sni=${xhttp_domain}&host=${xhttp_domain}&path=${encoded_path}&mode=${xhttp_client_mode}"
         if [ -n "$xhttp_encryption" ]; then
             link_split+="&encryption=$(urlencode "$xhttp_encryption")"
         fi
@@ -6068,9 +6073,10 @@ proxies:
     xhttp-opts:
       path: "${path}"
       host: "${xhttp_domain}"
-      mode: "${xhttp_mode}"
+      mode: "${xhttp_client_mode}"
       no-grpc-header: ${xhttp_grpc_header}
       x-padding-bytes: "${xhttp_padding}"
+      x-padding-obfs-mode: true
       no-sse-header: ${xhttp_sse_header}
       reuse-settings:
         max-concurrency: "${xhttp_xmux_max_concurrency}"
@@ -6095,9 +6101,10 @@ proxies:
     xhttp-opts:
       path: "${path}"
       host: "${xhttp_domain}"
-      mode: "${xhttp_mode}"
+      mode: "${xhttp_client_mode}"
       no-grpc-header: ${xhttp_grpc_header}
       x-padding-bytes: "${xhttp_padding}"
+      x-padding-obfs-mode: true
       no-sse-header: ${xhttp_sse_header}
       reuse-settings:
         max-concurrency: "${xhttp_xmux_max_concurrency}"
