@@ -82,6 +82,10 @@ xhttp_cdn_domain=""
 xhttp_server_mode="auto"                  # packet-up / stream-up / stream-one / auto
 xhttp_client_mode="packet-up"             # packet-up (CDN穿透最佳) / stream-up / stream-one / auto
 xhttp_padding="100-1000"                   # header padding 随机字节范围
+xhttp_padding_key="x_padding"
+xhttp_padding_header="X-Padding"
+xhttp_padding_placement="queryInHeader"
+xhttp_padding_method="repeat-x"
 xhttp_grpc_header=false                    # false=启用 gRPC 伪装，true=关闭
 xhttp_sse_header=false                     # false=启用 SSE 伪装，true=关闭
 xhttp_streamup_keepalive="20-80"           # stream-up 模式保活间隔秒（随机范围）
@@ -3914,6 +3918,10 @@ generate_xhttp_inbound_file()
                     "extra": {
                       "xPaddingBytes": "$xhttp_padding",
                       "xPaddingObfsMode": true,
+                      "xPaddingKey": "$xhttp_padding_key",
+                      "xPaddingHeader": "$xhttp_padding_header",
+                      "xPaddingPlacement": "$xhttp_padding_placement",
+                      "xPaddingMethod": "$xhttp_padding_method",
                       "noGRPCHeader": $xhttp_grpc_header,
                       "noSSEHeader": $xhttp_sse_header,
                       "scStreamUpServerSecs": "$xhttp_streamup_keepalive",
@@ -5867,6 +5875,10 @@ generate_vless_share_link()
 {
   "xPaddingBytes": "$xhttp_padding",
   "xPaddingObfsMode": true,
+  "xPaddingKey": "$xhttp_padding_key",
+  "xPaddingHeader": "$xhttp_padding_header",
+  "xPaddingPlacement": "$xhttp_padding_placement",
+  "xPaddingMethod": "$xhttp_padding_method",
   "noGRPCHeader": $xhttp_grpc_header,
   "xmux": {
     "maxConcurrency": "$xhttp_xmux_max_concurrency",
@@ -5897,6 +5909,10 @@ EOF
 {
   "xPaddingBytes": "$xhttp_padding",
   "xPaddingObfsMode": true,
+  "xPaddingKey": "$xhttp_padding_key",
+  "xPaddingHeader": "$xhttp_padding_header",
+  "xPaddingPlacement": "$xhttp_padding_placement",
+  "xPaddingMethod": "$xhttp_padding_method",
   "noGRPCHeader": $xhttp_grpc_header,
   "xmux": {
     "maxConcurrency": "$xhttp_xmux_max_concurrency",
@@ -5921,6 +5937,10 @@ EOF
       "extra": {
         "xPaddingBytes": "$xhttp_padding",
         "xPaddingObfsMode": true,
+        "xPaddingKey": "$xhttp_padding_key",
+        "xPaddingHeader": "$xhttp_padding_header",
+        "xPaddingPlacement": "$xhttp_padding_placement",
+        "xPaddingMethod": "$xhttp_padding_method",
         "noGRPCHeader": $xhttp_grpc_header,
         "xmux": {
           "maxConcurrency": "$xhttp_xmux_max_concurrency",
@@ -6077,6 +6097,10 @@ proxies:
       no-grpc-header: ${xhttp_grpc_header}
       x-padding-bytes: "${xhttp_padding}"
       x-padding-obfs-mode: true
+      x-padding-key: "${xhttp_padding_key}"
+      x-padding-header: "${xhttp_padding_header}"
+      x-padding-placement: "${xhttp_padding_placement}"
+      x-padding-method: "${xhttp_padding_method}"
       no-sse-header: ${xhttp_sse_header}
       reuse-settings:
         max-concurrency: "${xhttp_xmux_max_concurrency}"
@@ -6105,6 +6129,10 @@ proxies:
       no-grpc-header: ${xhttp_grpc_header}
       x-padding-bytes: "${xhttp_padding}"
       x-padding-obfs-mode: true
+      x-padding-key: "${xhttp_padding_key}"
+      x-padding-header: "${xhttp_padding_header}"
+      x-padding-placement: "${xhttp_padding_placement}"
+      x-padding-method: "${xhttp_padding_method}"
       no-sse-header: ${xhttp_sse_header}
       reuse-settings:
         max-concurrency: "${xhttp_xmux_max_concurrency}"
