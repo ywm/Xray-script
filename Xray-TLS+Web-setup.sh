@@ -3463,8 +3463,8 @@ EOF
     ssl_prefer_server_ciphers on;
 
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
-    include ${nginx_prefix}/custom.d/location.conf;
     if (${country_variable}) { return 403; }
+    include ${nginx_prefix}/custom.d/location.conf;
 
 EOF
     if [[ "$listen_sock" == "/dev/shm/nginx/xhttp_web.sock" ]]; then
@@ -3807,7 +3807,7 @@ generate_reality_inbound_file()
                 "decryption": "none",
                 "fallbacks": [
                     {
-                        "dest": "/dev/shm/nginx/reality_web.sock",
+                        "dest": "/dev/shm/nginx/trojan_web.sock",
                         "xver": 1
                     }
                 ]
