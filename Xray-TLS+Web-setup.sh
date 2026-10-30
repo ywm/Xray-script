@@ -5939,7 +5939,7 @@ EOF
     "security": "tls",
     "tlsSettings": {
       "serverName": "$xhttp_domain",
-      "alpn": ["h3"],
+      "alpn": ["h2"],
       "fingerprint": "chrome"
     },
     "xhttpSettings": {
@@ -5956,8 +5956,10 @@ EOF
         "xmux": {
           "maxConcurrency": "$xhttp_xmux_max_concurrency",
           "maxConnections": "$xhttp_xmux_max_connections",
+          "cMaxReuseTimes": "$xhttp_xmux_c_reuse_times",
           "hMaxRequestTimes": "$xhttp_xmux_request_times",
-          "hMaxReusableSecs": "$xhttp_xmux_reusable_secs"
+          "hMaxReusableSecs": "$xhttp_xmux_reusable_secs",
+          "hKeepAlivePeriod": $xhttp_xmux_h_keepalive
         }
       }
     }
@@ -6158,15 +6160,17 @@ proxies:
         servername: "${xhttp_domain}"
         client-fingerprint: chrome
         alpn:
-          - h3
+          - h2
         path: "${path}"
         host: "${xhttp_domain}"
         encryption: "${xhttp_encryption:-none}"
         reuse-settings:
           max-concurrency: "${xhttp_xmux_max_concurrency}"
           max-connections: "${xhttp_xmux_max_connections}"
+          c-max-reuse-times: "${xhttp_xmux_c_reuse_times}"
           h-max-request-times: "${xhttp_xmux_request_times}"
           h-max-reusable-secs: "${xhttp_xmux_reusable_secs}"
+          h-keep-alive-period: ${xhttp_xmux_h_keepalive}
 
 proxy-groups:
   - name: "节点选择"
@@ -6372,7 +6376,7 @@ CDN 配置(可选):
     "security": "tls",
     "tlsSettings": {
       "serverName": "downlink.example.com",    # ← 下行域名（用于 SNI）
-      "alpn": ["h3"],
+      "alpn": ["h2"],
       "fingerprint": "chrome",
       "allowInsecure": false
     },
@@ -6395,7 +6399,7 @@ CDN 配置(可选):
     "security": "tls",
     "tlsSettings": {
       "serverName": "${domain_list[2]}",
-      "alpn": ["h3"],
+      "alpn": ["h2"],
       "fingerprint": "chrome"
     },
     "xhttpSettings": {
@@ -6407,7 +6411,7 @@ CDN 配置(可选):
 # 使用提示：
 # • 上行自动走当前服务器（你填的 ${domain_list[2]}）
 # • 下行走你配置的 downloadSettings 地址
-# • 下行使用 QUIC H3，入口须支持 HTTP/3 且 UDP 443 可达；不会自动回退 H2
+# • 下行默认使用 TLS H2，支持 IPv6 地址或仅含 AAAA 记录的域名
 # • 适合：上行优选低延迟 IP，下行优选高带宽 IPv6
 # • 不影响 REALITY 和 Trojan 协议
 
