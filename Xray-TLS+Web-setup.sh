@@ -3240,6 +3240,17 @@ config_nginx()
         return 1
     fi
 
+    # 每次生成配置都检测已安装的 Nginx，复用二进制时不会执行编译函数。
+    local nginx_build_info
+    if ! nginx_build_info=$("${nginx_prefix}/sbin/nginx" -V 2>&1); then
+        red "无法检测已安装 Nginx 的编译选项，停止生成配置"
+        return 1
+    fi
+    _nginx_http3=0
+    if [[ " $nginx_build_info " == *" --with-http_v3_module "* ]]; then
+        _nginx_http3=1
+    fi
+
     # 一次性生成完整的 Nginx 配置,避免多次 cat 拼接导致的问题
     cat > ${nginx_prefix}/conf/nginx.conf <<EOF
 user  root root;
@@ -5928,7 +5939,7 @@ EOF
     "security": "tls",
     "tlsSettings": {
       "serverName": "$xhttp_domain",
-      "alpn": ["h2"],
+      "alpn": ["h3"],
       "fingerprint": "chrome"
     },
     "xhttpSettings": {
@@ -6147,7 +6158,7 @@ proxies:
         servername: "${xhttp_domain}"
         client-fingerprint: chrome
         alpn:
-          - h2
+          - h3
         path: "${path}"
         host: "${xhttp_domain}"
         encryption: "${xhttp_encryption:-none}"
@@ -6361,7 +6372,7 @@ CDN 配置(可选):
     "security": "tls",
     "tlsSettings": {
       "serverName": "downlink.example.com",    # ← 下行域名（用于 SNI）
-      "alpn": ["h2"],
+      "alpn": ["h3"],
       "fingerprint": "chrome",
       "allowInsecure": false
     },
@@ -6384,7 +6395,7 @@ CDN 配置(可选):
     "security": "tls",
     "tlsSettings": {
       "serverName": "${domain_list[2]}",
-      "alpn": ["h2"],
+      "alpn": ["h3"],
       "fingerprint": "chrome"
     },
     "xhttpSettings": {
@@ -6396,6 +6407,7 @@ CDN 配置(可选):
 # 使用提示：
 # • 上行自动走当前服务器（你填的 ${domain_list[2]}）
 # • 下行走你配置的 downloadSettings 地址
+# • 下行使用 QUIC H3，入口须支持 HTTP/3 且 UDP 443 可达；不会自动回退 H2
 # • 适合：上行优选低延迟 IP，下行优选高带宽 IPv6
 # • 不影响 REALITY 和 Trojan 协议
 
