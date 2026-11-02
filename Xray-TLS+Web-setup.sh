@@ -2885,9 +2885,14 @@ install_geoip2_database() {
 install_update_xray()
 {
     green "正在安装/更新Xray。。。。"
+    local xray_was_running=0
+    if systemctl -q is-active xray; then
+        xray_was_running=1
+    fi
     mkdir -p /var/log/xray
     
-    if ! bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install --without-geodata --without-logfiles && ! bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install --without-geodata --without-logfiles; then
+    # 保留本项目的多文件启动方式，由本函数在配置就绪后重启。
+    if ! bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install --without-geodata --without-logfiles --no-update-service --manually-restart-later && ! bash -c "$(curl -L https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install --without-geodata --without-logfiles --no-update-service --manually-restart-later; then
         red    "安装/更新Xray失败"
         yellow "按回车键继续或者按Ctrl+c终止"
         read -r -s -n 1 || true
@@ -2952,9 +2957,10 @@ EOF
     systemctl daemon-reload
     systemctl enable xray
     
-    # 如果 xray 正在运行且配置存在，则重启
-    if systemctl -q is-active xray && [ -d "$xray_config_dir" ] && [ "$(ls -A $xray_config_dir 2>/dev/null)" ]; then
-        systemctl restart xray
+    # 根据更新前的状态恢复服务，避免安装器改变状态后漏掉重启。
+    if [ "$xray_was_running" -eq 1 ]; then
+        xray_test_config || return 1
+        systemctl restart xray || return 1
     fi
     
     xray_is_installed=1
@@ -6786,7 +6792,7 @@ start_menu()
             check_SELinux
             check_important_dependence_installed ca-certificates ca-certificates
             check_important_dependence_installed curl curl
-            install_update_xray
+            install_update_xray || return 1
             green "Xray更新完成！"
             ;;
         10)
