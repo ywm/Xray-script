@@ -3659,29 +3659,54 @@ EOF
 backup_user_xray_configs()
 {
     local backup_dir="${1:-}"
-    [ -z "$backup_dir" ] && backup_dir="/tmp/xray_user_configs_backup_$(date +%Y%m%d_%H%M%S)"
-    
     if [ ! -d "$xray_config_dir" ]; then
         return 0
     fi
-    
-    # 查找用户自定义配置（非脚本管理的编号）
-    local user_files=$(ls "${xray_config_dir}"/*.json 2>/dev/null | grep -v -E "/(00|10|20|21|22|50|60|69)_")
-    
-    if [ -z "$user_files" ]; then
-        yellow "没有检测到用户自定义配置文件"
+
+    # 查找用户自定义配置（非脚本管理的编号），保留文件名中的空格。
+    local file
+    local user_files=()
+    for file in "$xray_config_dir"/*.json; do
+        [ -f "$file" ] || continue
+        case "${file##*/}" in
+            00_*|10_*|20_*|21_*|22_*|50_*|60_*|69_*) continue ;;
+        esac
+        user_files+=("$file")
+    done
+
+    if [ "${#user_files[@]}" -eq 0 ]; then
+        yellow "没有检测到用户自定义配置文件" >&2
         return 0
     fi
-    
-    mkdir -p "$backup_dir"
-    
-    green "正在备份用户自定义配置到: $backup_dir"
-    for f in $user_files; do
-        cp "$f" "$backup_dir/"
-        green "  已备份: $(basename $f)"
+
+    if [ -z "$backup_dir" ]; then
+        backup_dir=$(mktemp -d /tmp/xray_user_configs_backup_XXXXXXXX) || return 1
+    fi
+    mkdir -p "$backup_dir" || return 1
+
+    green "正在备份用户自定义配置到: $backup_dir" >&2
+    for file in "${user_files[@]}"; do
+        cp -p "$file" "$backup_dir/" || return 1
+        green "  已备份: ${file##*/}" >&2
     done
-    
-    echo "$backup_dir"
+
+    printf '%s\n' "$backup_dir"
+}
+
+# 仅恢复本次安装/更新前备份的配置，不读取历史备份。
+restore_user_xray_configs()
+{
+    local backup_dir="${1:-}"
+    [ -z "$backup_dir" ] && return 0
+    [ -d "$backup_dir" ] || return 1
+    mkdir -p "$xray_config_dir" || return 1
+
+    local file
+    for file in "$backup_dir"/*.json; do
+        [ -f "$file" ] || continue
+        cp -p "$file" "$xray_config_dir/" || return 1
+    done
+    green "用户自定义配置已恢复，备份保留在: $backup_dir"
 }
 
 # 列出用户自定义的 Xray 配置文件
@@ -4356,18 +4381,15 @@ install_update_xray_tls_web()
 {
     in_install_update_xray_tls_web=1
     
-    # 检查是否有用户自定义配置，提示备份
-    if [ -d "$xray_config_dir" ]; then
-        if ! list_user_xray_configs; then
-            yellow "重新安装/更新会保留这些用户自定义配置文件"
-            yellow "脚本管理的配置文件（编号 00/10/20/21/22/50/60/69）将被重新生成"
-            echo
-            if ask_if "是否先备份用户自定义配置?[y/n]"; then
-                local backup_path=$(backup_user_xray_configs)
-                green "配置已备份到: $backup_path"
-                echo
-            fi
-        fi
+    # 自动备份本次操作前的自定义配置，生成默认配置后恢复。
+    local user_config_backup
+    if ! user_config_backup=$(backup_user_xray_configs); then
+        red "用户自定义配置备份失败，取消安装/更新"
+        return 1
+    fi
+    if [ -n "$user_config_backup" ]; then
+        yellow "重新安装/更新会保留用户自定义配置文件，不再需要的文件请自行删除"
+        yellow "脚本管理的配置文件（编号 00/10/20/21/22/50/60/69）将被重新生成"
     fi
     
     check_nginx_installed_system
@@ -4394,7 +4416,7 @@ install_update_xray_tls_web()
     if [[ $update -eq 0 ]]; then
         readDomain
         # 先安装 xray 再生成 REALITY 配置
-        install_update_xray
+        install_update_xray || return 1
         readRealityConfig
         path="/$(head -c 20 /dev/urandom | md5sum | head -c 10)"
         xid_1="$(cat /proc/sys/kernel/random/uuid)"
@@ -4543,8 +4565,8 @@ install_update_xray_tls_web()
 
     # 安装/更新 Xray (如果还没安装)
     if [[ $update -eq 1 ]] || [ $xray_is_installed -eq 0 ]; then
-        remove_xray
-        install_update_xray
+        # 直接更新，避免卸载时清除配置目录和已有密钥。
+        install_update_xray || return 1
     fi
 
     # VLESS Encryption (enc) 密钥对处理
@@ -4564,7 +4586,7 @@ install_update_xray_tls_web()
 EOF
         fi
     else
-        # 升级且已存在密钥时，将之前载入的密钥重新写入文件，防止被 remove_xray 清理
+        # 升级且已存在密钥时，将之前载入的密钥重新写入文件。
         cat > /usr/local/etc/xray/vlessenc_keys.json <<EOF
 {
   "encryption": "$xhttp_encryption",
@@ -4621,6 +4643,10 @@ EOF
     # 配置 Nginx 和 Xray
     config_nginx
     config_xray
+    if ! restore_user_xray_configs "$user_config_backup"; then
+        red "用户自定义配置恢复失败，取消重启；备份位于: $user_config_backup"
+        return 1
+    fi
     sleep 2s
     safe_stop cloudreve
     
