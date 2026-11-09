@@ -3554,7 +3554,7 @@ config_xray()
     cat > "$xray_config_log" <<EOF
 {
     "log": {
-        "loglevel": "warning",
+        "logLevel": "warning",
         "error": "/var/log/xray/error.log",
         "access": "/var/log/xray/access.log"
     }
