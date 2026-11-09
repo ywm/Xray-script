@@ -847,7 +847,7 @@ get_config_info()
             xid_1="$(grep '"id"' "$xray_config_inbound_reality" 2>/dev/null | head -n 1 | cut -d : -f 2 | cut -d \" -f 2 || true)"
             reality_private_key="$(grep '"privateKey"' "$xray_config_inbound_reality" 2>/dev/null | cut -d : -f 2 | cut -d \" -f 2 || true)"
             reality_server_names="$(grep '"serverNames"' "$xray_config_inbound_reality" 2>/dev/null | sed 's/.*\[//;s/\].*//' | tr ',' ' ' | sed 's/"//g' || true)"
-            reality_short_ids="$(grep '"shortIds"' "$xray_config_inbound_reality" 2>/dev/null | sed 's/.*\[//;s/\].*//' | tr ',' ' ' || true)"
+            reality_short_ids="$(grep '"shortIds"' "$xray_config_inbound_reality" 2>/dev/null | sed 's/.*\[//;s/\].*//' | tr ',' ' ' | awk '{$1=$1; print}' || true)"
         fi
         
         # 读取 Trojan 密码 (从 21_inbound_trojan.json)
@@ -893,7 +893,7 @@ EOF
         xid_3="$(grep '"id"' "$xray_config" 2>/dev/null | tail -n 1 | cut -d : -f 2 | cut -d \" -f 2 || true)"
         reality_private_key="$(grep '"privateKey"' "$xray_config" 2>/dev/null | cut -d : -f 2 | cut -d \" -f 2 || true)"
         reality_server_names="$(grep '"serverNames"' "$xray_config" 2>/dev/null | sed 's/.*\[//;s/\].*//' | tr ',' ' ' | sed 's/"//g' || true)"
-        reality_short_ids="$(grep '"shortIds"' "$xray_config" 2>/dev/null | sed 's/.*\[//;s/\].*//' | tr ',' ' ' || true)"
+        reality_short_ids="$(grep '"shortIds"' "$xray_config" 2>/dev/null | sed 's/.*\[//;s/\].*//' | tr ',' ' ' | awk '{$1=$1; print}' || true)"
         path="$(grep '"path"' "$xray_config" 2>/dev/null | tail -n 1 | cut -d : -f 2 | cut -d \" -f 2 || true)"
     fi
 
@@ -3874,7 +3874,7 @@ generate_reality_inbound_file()
                     "xver": 1,
                     "serverNames": [$(echo "$reality_server_names" | awk '{for(i=1;i<=NF;i++) printf "\"%s\"%s", $i, (i<NF?", ":"")}')],
                     "privateKey": "$reality_private_key",
-                    "shortIds": [${reality_short_ids// /, }]
+                    "shortIds": [$(printf '%s\n' "$reality_short_ids" | awk '{for(i=1;i<=NF;i++) {printf "%s%s",sep,$i; sep=", "}}')]
                 },
                 "rawSettings": {
                     "acceptProxyProtocol": true
@@ -5769,7 +5769,9 @@ view_xray_merged_config()
         if [[ $choice -eq 1 ]]; then
             echo -e "\\n"
             tyblue "==================== 合并后的完整配置 ===================="
-            /usr/local/bin/xray run -confdir "$xray_config_dir" -dump 2>&1
+            if ! /usr/local/bin/xray run -confdir "$xray_config_dir" -dump 2>&1; then
+                red "配置合并失败，请修正上述配置错误后重试"
+            fi
             echo
             yellow "按回车键返回菜单..."
             read -r -s -n 1 || true
