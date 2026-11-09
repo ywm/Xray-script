@@ -3793,10 +3793,19 @@ xray_safe_restart()
     fi
 }
 
+# Nginx 停止后 ExecStopPost 会删除运行目录，配置检查前需重新创建。
+nginx_test_config()
+{
+    mkdir -p /dev/shm/nginx/tcmalloc || return 1
+    chmod 711 /dev/shm/nginx || return 1
+    chmod 0777 /dev/shm/nginx/tcmalloc || return 1
+    "${nginx_prefix}/sbin/nginx" -t
+}
+
 # 安全重启 Xray 和 Nginx
 xray_nginx_safe_restart()
 {
-    if ! "${nginx_prefix}/sbin/nginx" -t; then
+    if ! nginx_test_config; then
         red "Nginx 配置验证失败，取消重启"
         return 1
     fi
@@ -4651,7 +4660,7 @@ EOF
     safe_stop cloudreve
     
     # 验证并重启
-    if ! "${nginx_prefix}/sbin/nginx" -t; then
+    if ! nginx_test_config; then
         red "Nginx 配置验证失败，取消重启"
         return 1
     fi
